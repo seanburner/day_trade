@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "src"
+version = "0.1.0"
+description = "ORCiD Search"
+authors = ["Sean A. Burner"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python   = "^3.11"
+pandas   = "^2.0"
+requests = "^2.32"
+thefuzz  = "^0.22"
+
+[tool.poetry.group.dev.dependencies]
+tox = "^4.26.0"
+pytest = "^8.3.5"
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

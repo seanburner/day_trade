@@ -1,0 +1,19 @@
+name: ORCiD Search Test
+
+on: [push, pull_request]
+
+
+jobs:
+  tox_test:
+    name: Tox test
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run tox tests
+      id: test
+
+      uses: fedora-python/tox-github-action@main
+      with:
+        tox_env: py313,py312
+        dnf_install: poetry
+
+    runs-on: ubuntu-latest
