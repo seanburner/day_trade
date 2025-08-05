@@ -36,6 +36,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 class SchwabAccount :
     
@@ -56,7 +57,7 @@ class SchwabAccount :
                             "login"   : f"https://api.schwabapi.com/v1/oauth/authorize?client_id={self.APP_KEY}&redirect_uri=127.0.0.1",
                             "refresh" :  "https://api.schwabapi.com/v1/oauth/token"
                         } 
-        credentials , returned_url  = self.Authenticate ()
+        credentials , returned_url  = "","" #self.Authenticate ()
         self.RefreshToken(credentials , returned_url)
         print ("\t\t Schwab Account Initiated ") 
 
@@ -69,7 +70,8 @@ class SchwabAccount :
                            Nothing   
             RETURNS    :
                            bool -> True / False  
-        """   
+        """
+        intermediate_url = ""
         #webbrowser.open(self.Endpoints['login'])    
         #returned_url        = input()
         #print( returned_url )
@@ -78,18 +80,28 @@ class SchwabAccount :
         try:
             options = webdriver.ChromeOptions()
             driver = webdriver.Chrome(service=service, options=options)
+            print( 'Endpoint : ', self.Endpoints['login'] )
             driver.get( self.Endpoints['login'] )
-            WebDriverWait(driver, 10).until(
-                    EC.url_changes(initial_url)
+            time.sleep(2)
+            intermediate_url = driver.current_url
+            print( intermediate_url ) 
+            WebDriverWait(driver, 20).until(
+                    EC.url_changes(  intermediate_url )
                 )
             returned_url = driver.current_url
-            print( returned_url ) 
+            print( returned_url )
+        except TimeoutException :
+            print ( 'Using this url : ', intermediate_url )
         except:
-            print("\t\t|EXCEPTION: MAIN::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-            print("\t\t * Writing : " , configs['csv_output'] )
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
-            
+
+        
+        if  returned_url.find('code=') == -1 :
+            print ('\t\t Registration process failed : ', returned_url )
+            return False
+        
         credentials         = f"{self.APP_KEY}:{self.APP_SECRET}"
         response_code       = f"{returned_url[returned_url.index('code=') + 5: returned_url.index('%40')]}@"
         base64_credentials  = base64.b64encode(credentials.encode("utf-8")).decode("utf-8" )
@@ -105,7 +117,7 @@ class SchwabAccount :
                             }
 
         print ( crdentials , response_code ) 
-
+        return True
 
     def RefreshToken(self, credentials , refresh_token_value):
         """
@@ -115,17 +127,23 @@ class SchwabAccount :
         logger.info("Initializing...")
         # You can pull this from a local file,
         # Google Cloud Firestore/Secret Manager, etc.
-        #returned_url = "code=C0.b2F1dGgyLmJkYy5zY2h3YWIuY29t.KfJBeHrK-MsvlzeOpJpWTUfsWEsoYD8dhW-gOeXJxG8%40&session=97c8048b-b555-46ec-903b-f24cdab497be"
-        #refresh_token_value = f"{returned_url[returned_url.index('code=') + 5: returned_url.index('%40')]}@"
+        returned_url = "code=C0.b2F1dGgyLmJkYy5zY2h3YWIuY29t.0KfYtT0_PM9qhcIj157qejO7EI9j7IobOkmIxuf3OAg%40&session=7e847b43-0513-4e68-9459-86f486758502"
+        refresh_token_value = f"{returned_url[returned_url.index('code=') + 5: returned_url.index('%40')]}@"
         print( ' Converted Token: ' , refresh_token_value )
         payload = {
         "grant_type": "refresh_token",
         "refresh_token": refresh_token_value,
     }
+        auth_string = f"{self.APP_KEY}:{self.APP_SECRET}"
+        encoded_auth_string = base64.b64encode(auth_string.encode("utf-8")).decode("utf-8")
         headers = {
-        "Authorization": f'Basic {base64.b64encode(f"{self.APP_KEY}:{self.APP_SECRET}".encode()).decode()}',
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
+                "Authorization": f"Basic {encoded_auth_string}",
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+        #headers = {
+        #"Authorization": f'Basic {base64.b64encode(f"{self.APP_KEY}:{self.APP_SECRET}".encode()).decode()}',
+        #"Content-Type": "application/x-www-form-urlencoded",
+    #}
 
         refresh_token_response = requests.post(
         url="https://api.schwabapi.com/v1/oauth/token",
