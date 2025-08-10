@@ -24,12 +24,19 @@ from datetime import datetime
 
 
 class DayTradeStrategy:
+    OpenRange  = { 'high': 0, 'low': 0 , 'vwap' : 0}
+    Occurrence = 0 
+    AvgVolume  = 0
+    WatchAlert = ''
+
+    
     def __init__(self) :
         """
             Initialize the variables for the Trading Account class 
         """
         self.Strategies = {
-                                'basic':{ 'detail' : 'Basic Bitch of the group', 'method': self.DayTradeBasic}
+                                'basic'         :{ 'detail' : 'Basic Bitch of the group',                       'method': self.DayTradeBasic},
+                                'opening_range' :{ 'detail' : 'Use first candle to provide range of interest',  'method': self.OpeningRange} 
                           }
 
         self.Stocks     = {
@@ -76,7 +83,12 @@ class DayTradeStrategy:
     
     def Run( self,  ticker_row : list, account : object ) -> bool :
         """
-            Switching station to control which strategy gets used 
+            Switching station to control which strategy gets used
+            ARGS  :
+                    ticker_row : list of fields for stock quote
+                    account    : initiated account object
+            RETURNS:
+                    success : True/False
         """
         if not ( self.StrategyName in  self.Strategies.keys() ):
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Strategy does not exist : ", self.StrategyName )
@@ -133,7 +145,7 @@ class DayTradeStrategy:
                         ticker_row   : information about the stock and current price and volume
                         account      : the trading account for BUYS and SELLS 
             RETURNS    :
-                        bool; True/False - in case something breaks or could not complete                         
+                        bool: True/False - in case something breaks or could not complete                         
         """
         limit           = 0.20        # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE
         risk_percent    = 0.00015
@@ -157,7 +169,12 @@ class DayTradeStrategy:
             if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0 and (#float(ticker_row[ index ]) > 568  and 
                     ( float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous'])  and
                                  float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
+                volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )
+                if volume_increase  < 7 :  # 7 fold increase in volume seems excessive, needs more testing 
+                    print( f"\t\t Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
+                    return False, action
                 #print( "\t\t * BUY SIGNAL " ) 
+                print( f"\t\t Volume increase OKAY : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                 if  account.Buy( ticker_row[0] , float(ticker_row[ index ])  )  :
                     success = True
                     self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] =  ticker_row[ index ]
@@ -185,7 +202,7 @@ class DayTradeStrategy:
             #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
             if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and( ( (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) )  or
                      (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) )  )  and
-                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):
+                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):                 
                  profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
                  strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
                  crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
@@ -220,7 +237,54 @@ class DayTradeStrategy:
 
 
 
+    def OpeningRange ( self, ticker_row : list, account : object ) -> (bool, str) :
+        """
+            Sets the limits for the account
 
+            PARAMETER  :
+                        ticker_row   : information about the stock and current price and volume
+                        account      : the trading account for BUYS and SELLS 
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                         
+        """
+        action  = ""
+        success = True
+        interval= 900
+        
+        try:
+            vwap = ( ((ticker_row[2] + ticker_row[3] + ticker_row[4])/3) * ticker_row[5] ) / ticker_row[5]
+            print(f"\t\t\t\t\t {ticker_row } -> {vwap}  <- {self.OpenRange['vwap']}" )
+            if self.OpenRange['high'] == 0 :
+                account.Performance[ticker_row[0] ] = []
+                self.OpenRange['vwap']  = vwap
+                self.OpenRange['low']   = float( ticker_row[2] )
+                self.OpenRange['high']  = float( ticker_row[4] )
+                self.AvgVolume          = float( ticker_row[5] )                
+            else :
+                if self.WatchAlert == '':
+                    if  float(ticker_row[3]) >  self.OpenRange['high'] :
+                        self.Occurrence += 1
+                        interval = 300
+                        self.WatchAlert = 'ALERT'
+                        print( f'\t WATCHING: Broke Above  : {self.Occurrence}   {ticker_row[3]}   {ticker_row[5]}   VWAP: {vwap} <- {self.OpenRange["vwap"]}'   ) 
+                    else:
+                        self.Occurrence  = 0
+                        print( f'\t Broke BELOW  {self.Occurrence}   {ticker_row[3]}   {ticker_row[5]}    VWAP:{vwap}<- {self.OpenRange["vwap"]}') 
+                    self.AvgVolume          = (float(self.AvgVolume) + float(ticker_row[5]) ) / 2
+                    if self.Occurrence > 3  and float(ticker_row[5]) > self.AvgVolume:    # should add something about the volume
+                        print( 'Looks like going up : should shift to  minute or buy into this ')
+                        self.WatchAlert = 'ALERT'
+                    print(f"\t Volume  {self.AvgVolume}   -> {ticker_row[5]} ")
+                else:
+                    if  float(ticker_row[3]) <  self.OpenRange['high'] :
+                        print('\t  NOT WATCHING ANYMORE '  )
+                        self.WatchAlert = ''
+                account.Performance[ticker_row[0] ].append( 'WIN')
+            return success , action, interval                
+        except:
+            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
 
 
 

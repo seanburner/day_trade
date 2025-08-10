@@ -20,7 +20,7 @@ import argparse
 import functools
 import requests
 
-from datetime           import datetime
+from datetime           import datetime, timedelta
 from SchwabAccount      import SchwabAccount 
 
 class TradeAccount:
@@ -39,9 +39,11 @@ class TradeAccount:
         self.Mode           = ""                       # Are we Testing or Trading or something else
         self.Performance    = {}                       # Keep track of wins and loses  
 
-        self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret ) 
+        self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
 
-        self.SetLimit(limit )                   # INCASE VALUE SENT IN THROUGH CONSTRUCTOR
+        self.Funds          = self.Conn.CashForTrading()
+
+        self.SetLimit(limit )                           # INCASE VALUE SENT IN THROUGH CONSTRUCTOR
         
     def __str__(self ) -> str :
         """
@@ -64,6 +66,68 @@ class TradeAccount:
         self.index = self.index - 1
         return self.data[self.index]
 
+
+
+
+  
+    def Quote ( self, symbols : list | str, frequency : int = 15, frequencyType : str = "minute" ) -> requests.Response :
+        """
+            Abstraction to call the underlying client ( Schwab / ) to get a quote
+            The last candle in candles:{} will be the most current one we want for frequency and timeframe
+            ARGS    :
+                        symbols : list 
+            RETURNS : 
+        """
+        quote_info      = None
+        periodTypes     = ["day","month","year","ytf"]
+        frequencyTypes  = [ "minute","daily","weekly","monthly"]
+        try:
+            #return self.Conn.Quote( stocks)
+            periodType = 'day'
+            period = 1
+            frequencyType = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
+            frequency = (15 if frequency == 0 else frequency )
+            startDate = datetime.now() - timedelta( hours = 30)
+            endDate = datetime.now()  - timedelta( hours = 30, minutes = 15)
+          
+            candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
+                                              frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
+           
+           
+            if 'candles' in candles :
+                quote_info = candles['candles'][-1]
+                quote_info['symbol'] = candles['symbol']
+                print( quote_info )
+                new_quote_info = {}
+                for key in quote_info.keys():                  
+                    new_quote_info[key] =  float( quote_info[key]) if key in ['volume','open','close','high','low'] else quote_info[key]
+
+         
+        except:            
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+
+        finally:
+            return quote_info
+
+
+
+
+
+
+    def SetFunds ( self, funds : float = 1000, limit : float = 0.10) -> None :
+        """
+            Manually set the funds values, this is usually for live testing mode
+            ARGS    :
+                        funds : float 
+            RETURNS :
+                        nothing 
+        """
+        self.Funds = funds
+        self.SetLimit(limit )                
+        
+    
     def SetTargetGoal( self, target : float  ) -> None :
         """
             A decimal of how much we want to make trading ( today ) before quitting .80 ( 80% of our funds ) 
@@ -74,6 +138,9 @@ class TradeAccount:
                         Nothing 
         """
         self.TargetGoal =  self.Funds  + (target * self.Funds) # ONLY NEED 1 % AT A TIME /DAILY
+
+
+        
 
     def SetMode ( self, mode : str ) -> None :
         """
@@ -91,13 +158,8 @@ class TradeAccount:
             RETURNS     :
                             Nothing 
         """
-        try:
-            self.Limit =  limit 
-        except:
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-            for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )
-
+        self.Limit =  limit 
+        
 
 
 
@@ -141,7 +203,7 @@ class TradeAccount:
             # CHECK IF CAN AFFORD TO BUY
             #print( "Check : " , str( type( price )) , " : " , str( type( self.Funds * self.Limit ))   )
             if price > ( self.Funds * self.Limit ):
-                print(message_prefix + " Cant even buy ONE stock " )
+                print(message_prefix + f" Cant even buy ONE stock : {( self.Funds * self.Limit )}  " )
                 return success
 
             # CHECK IF ALREADY HOLDING 
@@ -170,7 +232,7 @@ class TradeAccount:
                 
             print ( "\t\t BOUGHT : " , self.InPlay )
             success = True 
-            return success
+            return success 
         except: 
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -230,5 +292,33 @@ class TradeAccount:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

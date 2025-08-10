@@ -18,7 +18,8 @@ import inspect
 import platform
 import argparse
 import functools
-import requests 
+import requests
+
 #import http.client
 #import urllib.request
 #from urllib.parse import urlparse
@@ -27,6 +28,7 @@ import pandas               as pd
 #import numpy  as np 
 import  matplotlib.pyplot   as plt
 
+from MySQLConn          import MySQLConn
 from datetime           import datetime
 from PDFReport          import PDFReport
 from TradeAccount       import TradeAccount
@@ -133,7 +135,11 @@ def blank_config() -> dict:
                     'email'             : '',
                     'csv_input_fields'  : False,                    
                     'display_config'    : False,
-                    'list_strategies'   : False
+                    'list_strategies'   : False,
+                    'trading_platform'  : 'Schwab',
+                    'sql_server'        : "127.0.0.1",
+                    'sql_user'          : "",
+                    'sql_password'      : ""
                     } 
 
 
@@ -303,7 +309,7 @@ def parse_arguments() -> {} :
                         'email'             : { 'help': 'Email to send the report ',                'action' : None } ,
         		'api_key'           : { 'help': 'API KEY for endpoint' , 		    'action' : None}, 
         		'stock'             : { 'help': 'Stock ticker symbol', 		            'action' : None },
-			'action'            : { 'help': 'Options: download/back_test/trade' , 	    'action' : None}, 
+			'action'            : { 'help': 'Options: download/back_test/trade/test/live_test' ,  'action' : None}, 
 			'start_date'        : { 'help': 'Start date', 	                            'action' : None}, 
 			'end_date'          : { 'help': 'End date' ,  			            'action' : None}, 
 			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None }, 
@@ -311,10 +317,15 @@ def parse_arguments() -> {} :
                         'strategy'          : { 'help': 'Strategy to use ',                         'action' : None },
                         'app_key'           : { 'help': 'Schwab application key ',                  'action' : None },
                         'app_secret'        : { 'help': 'Schwab application Secret ',               'action' : None },
+                        'trading_platform'  : { 'help': 'Platform of your trading account [ Schwab]','action' : None},
+                        'app_secret'        : { 'help': 'Schwab application Secret ',               'action' : None },
+                        'sql_server'        : { 'help': 'The address of the sql server',            'action' : None},                        
+                        'sql_user'          : { 'help': 'User account for SQL ',                    'action' : None},
+                        'sql_password'      : { 'help': 'Password for SQL account',                 'action' : None},
 			'csv_input_fields'  : { 'help': 'Display the fields for the csv file',      'action' : 'store_true'},			
 			'display_config'    : { 'help': 'Display the configuration', 	            'action' : 'store_true'},
                         'list_strategies'   : { 'help': 'Display available strategies', 	    'action' : 'store_true'},
-                        
+                                                
 		}
     try:
         # SET DEFAULTS        
@@ -349,6 +360,65 @@ def system_test( configs : dict ) -> None :
     
     
 
+def  live_test( configs: dict  ) -> None :
+    """
+        Test the strategy by using live data 
+        Provide  charts for confirmation
+        1. pull quotes 
+        2. 
+        PARAMETERS :                    
+                    configs     :  dictionary of configuration info                   
+        RETURNS    :
+                    Nothing 
+    """
+    msg         = ""
+    cont        = True
+    data        = {}
+    success     = False    
+    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    
+    
+    account.SetFunds( 1000.00, 0.10 )
+    try:        
+        print( '\t* About to live test: ', account )
+        Strategies.Set( configs['strategy'] , account)        
+        account.SetMode( "TEST")
+        for stock in configs['stock'].split(",") :
+            data[stock] = []
+
+         
+        time_interval = 60 # 15 min=900 
+        while ( cont )  :
+            td = account.Quote ( configs['stock'],  time_interval/60)
+            if td != None:
+                print( 'QUOTE : ', td)
+                ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['open']}",f"{td['close']}",f"{td['volume']}"]
+                data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low':f"{td['low']}",'quote':f"{td['open']}",'high':f"{td['high']}",'close':f"{td['close']}",'volume':f"{td['volume']}"})
+                print( ticker_row )
+                success , msg , time_interval = Strategies.Run(  ticker_row,  account )
+                if msg.upper() == "BOUGHT" :
+                    print("\t\t\t In Play - should shift from 15 -> 5 min  : " )
+                    time_interval = 300
+                elif msg.upper() == "CLOSED" :
+                    print("\t\t\t OUT Play - should shift from 5 -> 15 min  : " )
+                    time_interval = 900
+                print(f"\t\t Sleeping from : {time_interval} - { datetime.now() }",  )
+                time.sleep( time_interval )
+                print(f"\t\t  AWAKE  : {time_interval} - { datetime.now() }",  )
+            else:
+                cont = False
+                print( 'Just received  empty ticker info ')
+        
+
+        # SEND EMAIL OF PERFORMANCE
+        email_report( configs, data, account )
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
 def  back_test( configs: dict  ) -> None :
     """
         Run the selected data through the day_trade_strategy to see outcome
@@ -357,15 +427,19 @@ def  back_test( configs: dict  ) -> None :
         2. 
         PARAMETERS :                    
                     configs     :  dictionary of configuration info
-                    account     :  trading account
+                    
         RETURNS    :
                     Nothing 
     """
     msg         = "" 
     data        = None
     success     = False 
-    account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
-    
+    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    interval    = 900
+    account.SetFunds( funds=5000.00, limit=0.10 )
+    conn        = MySQLConn( )
+
+    conn.Connect(server =configs['sql_server'], database='trading', username =configs['sql_user'], passwd =configs['sql_password'] )
     try:
         # LOAD TEST DATA
         if configs['input_data'] == '' or  configs['input_data'] is None :
@@ -377,28 +451,35 @@ def  back_test( configs: dict  ) -> None :
         Strategies.Set( configs['strategy'] , account)
         account.SetMode( "TEST")
         for index, row in data.iterrows() :
-            ticker_row = [f"{configs['stock']}",f"{row['timestamp']}",f"{row['high']}",f"{row['low']}",f"{row['close']}",f"{row['volume']}"]
+            ticker_row = [f"{configs['stock']}",f"{row['timestamp']}",float(row['high']),float(row['low']),float(row['close']),float(row['volume'])]
             print( f"\t\t Data :  {ticker_row} ")
-            success , msg = Strategies.Run(  ticker_row,  account )
+            success , msg , interval = Strategies.Run(  ticker_row,  account )
             if msg.upper() == "BOUGHT" :
                 print("\t\t\t In Play - should shift from 15 -> 5 min  : " )
             elif msg.upper() == "CLOSED" :
                 print("\t\t\t OUT Play - should shift from 5 -> 15 min  : " )
 
+
+        conn.Send("SELECT * from trading.transactions;")
+        print("REULTS: " , conn.Results)
+
         # SEND EMAIL OF PERFORMANCE
         email_report( configs, data, account )
     except:
-        print("\t\t|EXCEPTION: MAIN::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
 
+
+
+
         
-def email_report ( configs : dict , data : object , account : object ) -> None :
+def email_report ( configs : dict , data : dict , account : object ) -> None :
     """
         Prep and send report of trading 
     """
     stock = configs['stock']
-    report = PDFReport( f"../reports/{stock}.pdf")
+    report = PDFReport( f"../reports/{stock}_{str(datetime.now())[:19]}.pdf")
     try:
         # PLOT THE DATA
         plt.plot(data['high'] )
@@ -412,13 +493,15 @@ def email_report ( configs : dict , data : object , account : object ) -> None :
         #plt.show()
 
         # Pie chart
-        opts = ['WIN','LOSS' ]
+        stats = ''
+        opts = ['WIN','LOSS' ]        
         for stock in account.Performance.keys() :
-            stats = [account.Performance[stock].count( opt ) for opt in opts ]            
+            for opt in opts :
+                stats = [account.Performance[stock].count( opt ) for opt in opts ]            
             plt.pie( stats, labels=opts, autopct='%1.1f%%', startangle=90)
             plt.title( stock )
             plt.axis ('equal')
-            #plt.show ()
+            #plt.show ()        
         report.AddPieChart( stats, opts)
         
         # LIST OF COMPLETED ORDERS
@@ -451,7 +534,7 @@ def email_report ( configs : dict , data : object , account : object ) -> None :
         report.AddText( contents , "h3", 2)
         report.Save()
     except:
-        print("\t\t|EXCEPTION: email_Report::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
 
@@ -497,7 +580,8 @@ def main() -> None :
         hub = {
                 'download'  : download_stock_data,
                 'back_test' : back_test,
-                'test'      : system_test
+                'test'      : system_test,
+                'live_test' : live_test
             }
 
         hub[ configs ['action'] ] ( configs  ) 
