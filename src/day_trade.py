@@ -1,3 +1,4 @@
+#! /usr/bin/python3
 ## ###################################################################################################################
 ##  Program :   Day Trade 
 ##  Author  :
@@ -606,4 +607,6 @@ def main() -> None :
             print("\t\t >>   " + str(entry) )
 
 
-main()    
+if __name__ == "__main__":
+    # execute only if run as a script        
+    main()  
