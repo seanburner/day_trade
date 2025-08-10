@@ -461,7 +461,7 @@ def  back_test( configs: dict  ) -> None :
 
 
         conn.Send("SELECT * from trading.transactions;")
-        print("REULTS: " , conn.Results)
+        print("RESULTS: " , conn.Results)
 
         # SEND EMAIL OF PERFORMANCE
         email_report( configs, data, account )
@@ -537,6 +537,16 @@ def email_report ( configs : dict , data : dict , account : object ) -> None :
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
+
+
+
+def business_logic_test( val1, val2 ,val4) -> int|float:
+    """
+        TODO :: Scaffolding for testing
+    """
+    return val1 + val2 +val3
+
+
 
 
             
