@@ -17,4 +17,4 @@ jobs:
         uses: fedora-python/tox-github-action@main
         with:
           tox_env: py313,py312
-          dnf_install: poetry
+          dnf_install:	poetry, mariadb-devel # This is the new, essential line
