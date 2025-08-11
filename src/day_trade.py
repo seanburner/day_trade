@@ -358,8 +358,91 @@ def system_test( configs : dict ) -> None :
     account = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
 
 
+
+
+
+
+
+def send_data_to_file( configs : dict , data: dict   )   -> None :
+    """
+        SEND THE DATA from a live session to a data file for later replay 
+        ARGS   :
+                configs : configuration dictionary
+                data    : dictionary of quote entries 
+        RETURNS:
+                Nothing 
+    """        
+    indx        = 0
+    line        = ""
+    contents    = "SYMBOL, DATETIME, LOW ,QUOTE, HIGH ,CLOSE , VOLUME , INTERVAL\n"
+
     
+    try:        
+        for key in data.keys():
+            contents    = "SYMBOL, DATETIME, LOW ,QUOTE, HIGH ,CLOSE , VOLUME , INTERVAL\n"
+            for row in data[key]:
+                line = ""
+                for key2 in row:
+                    if len( line) > 1  :
+                        line += ','
+                    line +=  data[key][key2] 
+                contents += line 
+            with open( f"../data/{key}_{str(datetime.now())[:19]}.csv","w") as data_file:
+                data_file.write( contents ) 
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
+
+
     
+def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
+    """
+        SEND THE COMPLETED TRANSACTIONS TO SQL FOR REPORTING AND ANALYSIS LATER
+        ARGS   :
+                configs : configuration dictionary
+                trades  : list of entries 
+        RETURNS:
+                Nothing 
+    """    
+    conn        = MySQLConn( )
+    indx        = 0
+    line        = ""
+    query       = ""
+
+    
+    try:
+        if len( trades ) == 0 :
+            return
+
+        if configs['sql_server'] == "" or  configs['sql_user'] == ""  or configs['sql_password'] == "" :
+            return 
+        
+        conn.Connect(server =configs['sql_server'], database='trading', username =configs['sql_user'], passwd =configs['sql_password'] )
+        query = "INSERT INTO trading.transactions ( symbol, datetime, bought, qty, closed, sold, p_l,time_interval) values "
+        
+        for entry in trades :
+            line = ""
+            for field in entry :
+                if len( line) > 1  :
+                    line += ','
+                line +=  "'" +field +"'"
+            query += ( ',' if indx > 0 else '') + '(' + line + ')'
+            indx += 1
+            
+        print(f" QUERY : { query } " )
+        conn.Write( query ) 
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
+            
 
 def  live_test( configs: dict  ) -> None :
     """
@@ -379,7 +462,8 @@ def  live_test( configs: dict  ) -> None :
     account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
     
     
-    account.SetFunds( 1000.00, 0.10 )
+    
+    account.SetFunds( 5000.00, 0.10 )
     try:        
         print( '\t* About to live test: ', account )
         Strategies.Set( configs['strategy'] , account)        
@@ -388,29 +472,39 @@ def  live_test( configs: dict  ) -> None :
             data[stock] = []
 
          
-        time_interval = 60 # 15 min=900 
+        time_interval = 900 
         while ( cont )  :
-            td = account.Quote ( configs['stock'],  time_interval/60)
-            if td != None:
-                print( 'QUOTE : ', td)
-                ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['open']}",f"{td['close']}",f"{td['volume']}"]
-                data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low':f"{td['low']}",'quote':f"{td['open']}",'high':f"{td['high']}",'close':f"{td['close']}",'volume':f"{td['volume']}"})
-                print( ticker_row )
-                success , msg , time_interval = Strategies.Run(  ticker_row,  account )
-                if msg.upper() == "BOUGHT" :
-                    print("\t\t\t In Play - should shift from 15 -> 5 min  : " )
-                    time_interval = 300
-                elif msg.upper() == "CLOSED" :
-                    print("\t\t\t OUT Play - should shift from 5 -> 15 min  : " )
-                    time_interval = 900
-                print(f"\t\t Sleeping from : {time_interval} - { datetime.now() }",  )
-                time.sleep( time_interval )
-                print(f"\t\t  AWAKE  : {time_interval} - { datetime.now() }",  )
-            else:
+            current_time = datetime.now()
+            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :
                 cont = False
-                print( 'Just received  empty ticker info ')
+                print("\t\t\t\t -> Outside of market hours ")
+                ## Sell whatever is InPlay
+            else:
+                td = account.Quote ( configs['stock'],  time_interval)
+                if td != None:
+                    ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}"]
+                    data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low': float(td['low']),'quote':float(td['open']),
+                                                             'high':float(td['high']),'close':float(td['close']),'volume':float(td['volume']), 'interval': time_interval/60 })
+                
+                    success , msg , time_interval = Strategies.Run(  ticker_row,  account )
+                    if msg.upper() == "BOUGHT" :
+                        print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
+                    elif msg.upper() == "CLOSED" :
+                        print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )                    
+                    print(f"\t\t Sleeping from : {time_interval} - { datetime.now() }",  )
+                    time.sleep( time_interval )
+                    print(f"\t\t  AWAKE  : {time_interval} - { datetime.now() } -> {time_interval}",  )                
+                else:
+                    cont = False
+                    print( 'Just received  empty ticker info ')
         
+        # SEND TRANSACTIONS TO SQL
+        send_transactions_to_sql( configs, account.Trades  )
 
+        # SEND DATA TO FILE
+        send_data_to_file( configs, data )
+
+        
         # SEND EMAIL OF PERFORMANCE
         email_report( configs, data, account )
     except:
@@ -438,9 +532,8 @@ def  back_test( configs: dict  ) -> None :
     account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
     interval    = 900
     account.SetFunds( funds=5000.00, limit=0.10 )
-    conn        = MySQLConn( )
 
-    conn.Connect(server =configs['sql_server'], database='trading', username =configs['sql_user'], passwd =configs['sql_password'] )
+    
     try:
         # LOAD TEST DATA
         if configs['input_data'] == '' or  configs['input_data'] is None :
@@ -461,9 +554,6 @@ def  back_test( configs: dict  ) -> None :
                 print("\t\t\t OUT Play - should shift from 5 -> 15 min  : " )
 
 
-        conn.Send("SELECT * from trading.transactions;")
-        print("RESULTS: " , conn.Results)
-
         # SEND EMAIL OF PERFORMANCE
         email_report( configs, data, account )
     except:
@@ -479,11 +569,17 @@ def email_report ( configs : dict , data : dict , account : object ) -> None :
     """
         Prep and send report of trading 
     """
+
+    if data.get('high',0) == 0 :
+        print( "\t * Email Report  - no data to send ")
+        return
+    
     stock = configs['stock']
     report = PDFReport( f"../reports/{stock}_{str(datetime.now())[:19]}.pdf")
     try:
         # PLOT THE DATA
-        plt.plot(data['high'] )
+        plt.plot(data.get('high',0)  )
+
 
         # Add labels and a title
         plt.xlabel('X-axis Label')

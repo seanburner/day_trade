@@ -175,10 +175,13 @@ class SchwabAccount :
             Returns:
                 request.Response: Dictionary containing candle history
         """
+        response = ""
+        
         try:
-            print( f"\t\t >> AGAIN Comparing {startDate}  -> { endDate}")
-            print(" Now TimeStamp : " , int(datetime.now().timestamp()  * 1000) )
-            return requests.get(f'{self._base_api_url}/marketdata/v1/pricehistory',
+            self.CheckAccessTokens() 
+            #print( f"\t\t >> AGAIN Comparing {startDate}  -> { endDate}")
+            #print(" Now TimeStamp : " , int(datetime.now().timestamp()  * 1000) )
+            response =requests.get(f'{self._base_api_url}/marketdata/v1/pricehistory',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params=self._params_parser({'symbol': symbol,
                                                         'periodType': periodType,
@@ -190,10 +193,18 @@ class SchwabAccount :
                                                         'needExtendedHoursData': needExtendedHoursData,
                                                         'needPreviousClose': needPreviousClose}),
                             timeout=self.Timeout)
+        
+            print(f"Schwab:QuoteByIntetval - {response} - {response.text}")
+            return response
+        
         except:   
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
+
+            print(f"\n-> ERROR: {response.text}")
+
+
   
     def Quote ( self, stocks :  list  ) -> requests.Response :
         """
@@ -204,13 +215,16 @@ class SchwabAccount :
                         dictionary of stock quote information 
         """
         self.CheckAccessTokens() 
-        return requests.get(f'{self._base_api_url}/marketdata/v1/quotes',
+        response = requests.get(f'{self._base_api_url}/marketdata/v1/quotes',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params={'symbols': str(stocks),
                                  'fields': ['quote','regular'],
                                  'indicative': False},
-                            timeout=self.Timeout).json()
-                    
+                            timeout=self.Timeout)
+        
+        print(f"Schwab:Quote - {response} - {response.text}")
+
+        return response.json()
 
         
     def CashForTrading( self ) -> float :

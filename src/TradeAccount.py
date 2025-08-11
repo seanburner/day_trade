@@ -70,7 +70,7 @@ class TradeAccount:
 
 
   
-    def Quote ( self, symbols : list | str, frequency : int = 15, frequencyType : str = "minute" ) -> requests.Response :
+    def Quote ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" ) -> requests.Response :
         """
             Abstraction to call the underlying client ( Schwab / ) to get a quote
             The last candle in candles:{} will be the most current one we want for frequency and timeframe
@@ -78,26 +78,27 @@ class TradeAccount:
                         symbols : list 
             RETURNS : 
         """
+        candles         = ""
         quote_info      = None
-        periodTypes     = ["day","month","year","ytf"]
-        frequencyTypes  = [ "minute","daily","weekly","monthly"]
+        periodTypes     = ["day","month","year","ytd"]
+        frequencyTypes  = ["minute","daily","weekly","monthly"]
         try:
             #return self.Conn.Quote( stocks)
             periodType = 'day'
             period = 1
             frequencyType = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
-            frequency = (15 if frequency == 0 else frequency )
-            startDate = datetime.now() - timedelta( hours = 30)
-            endDate = datetime.now()  - timedelta( hours = 30, minutes = 15)
-          
+            frequency = int (15 if frequency/60 == 0 else frequency/60 )
+            startDate = datetime.now() - timedelta( seconds = frequency * 60)
+            endDate = datetime.now()  
+            print( f"Frequency : {frequency} ->  {frequency }"  )
             candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
            
-           
+            
+            print( f"\n->TradeAccount::" + str(inspect.currentframe().f_code.co_name) + f" -quote_info : { candles}")
             if 'candles' in candles :
                 quote_info = candles['candles'][-1]
                 quote_info['symbol'] = candles['symbol']
-                print( quote_info )
                 new_quote_info = {}
                 for key in quote_info.keys():                  
                     new_quote_info[key] =  float( quote_info[key]) if key in ['volume','open','close','high','low'] else quote_info[key]
@@ -107,7 +108,8 @@ class TradeAccount:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-
+                
+            print(f"\n-> ERROR: {candles}")
         finally:
             return quote_info
 
@@ -163,7 +165,7 @@ class TradeAccount:
 
 
 
-    def GetLimit( self, ) -> float :
+    def GetLimit( self ) -> float :
         """
             Gets the the current limit  in dollars of the accounts 
             PARAMETERS  : 

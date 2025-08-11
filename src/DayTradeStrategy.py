@@ -154,6 +154,7 @@ class DayTradeStrategy:
         profit          = 0
         index           = 3 
         action          = ""
+        time_interval   = 900
         
         try :
             #print("basic bitch ")
@@ -172,7 +173,8 @@ class DayTradeStrategy:
                 volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )
                 if volume_increase  < 7 :  # 7 fold increase in volume seems excessive, needs more testing 
                     print( f"\t\t Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
-                    return False, action
+                    return False, action, time_interval
+                
                 #print( "\t\t * BUY SIGNAL " ) 
                 print( f"\t\t Volume increase OKAY : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                 if  account.Buy( ticker_row[0] , float(ticker_row[ index ])  )  :
@@ -180,6 +182,7 @@ class DayTradeStrategy:
                     self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] =  ticker_row[ index ]
                     self.Stocks[ ticker_row[0] ]['Volume']['Bought'] =  ticker_row[5]
                     action          = "bought"
+                    
 
 
             #SELL : In profit territory 
@@ -195,7 +198,7 @@ class DayTradeStrategy:
                         self.Stocks[ ticker_row[0] ]['Price' ]['High']   = 0
                         self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
                         action          = "closed"
-            
+                        
 
         
 
@@ -228,7 +231,12 @@ class DayTradeStrategy:
                 if float(ticker_row[ index]) > float(self.Stocks[ ticker_row[0] ]['Price']['High']) :
                     self.Stocks[ ticker_row[0] ]['Price']['High'] = float(ticker_row[ index])
 
-            return success , action
+            # CHANGE TO 5 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
+            if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 :
+                time_interval   = 300
+
+                
+            return success , action, time_interval 
             
         except:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
