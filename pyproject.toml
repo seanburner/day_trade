@@ -1,15 +1,24 @@
 [tool.poetry]
 name = "src"
 version = "0.1.0"
-description = "ORCiD Search"
+description = "Day_Trade"
 authors = ["Sean A. Burner"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python   = "^3.11"
-pandas   = "^2.0"
-requests = "^2.32"
-thefuzz  = "^0.22"
+python   	= "^3.11"
+pandas   	= "^2.0"
+requests 	= "^2.32"
+mysql-connector-python = "^9.4"
+mysqlclient            = "^2.2"
+pyodbc  	= "^5.2"
+pymssql  	= "^2.3"
+matplotlib   	= "^3.10"
+reportlab       = "^4.4"
+loguru          = "^0.7"
+selenium        = "^4.34"
+webdriver-manager = "^4.0"
+
 
 [tool.poetry.group.dev.dependencies]
 tox = "^4.26.0"

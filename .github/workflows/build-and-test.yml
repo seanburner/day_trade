@@ -1,4 +1,4 @@
-name: ORCiD Search Test
+name: Day_Trade Test
 
 on: [push, pull_request]
 

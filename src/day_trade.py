@@ -541,7 +541,7 @@ def email_report ( configs : dict , data : dict , account : object ) -> None :
 
 
 
-def business_logic_test( val1, val2 ,val4) -> int|float:
+def business_logic_test( val1, val2 ,val3) -> int|float:
     """
         TODO :: Scaffolding for testing
     """

@@ -1,0 +1,8 @@
+pip3 install requests, json , pandas, csv , thefuzz
+
+sudo dnf install python-reportlab*
+pip install reportlab*
+pip install reportlab* loguru
+pip install reportlab* loguru selenium
+pip install reportlab* loguru selenium chrome
+pip3 install webdriver-manager
