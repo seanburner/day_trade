@@ -382,11 +382,11 @@ def send_data_to_file( configs : dict , data: dict   )   -> None :
             contents    = "SYMBOL, DATETIME, LOW ,QUOTE, HIGH ,CLOSE , VOLUME , INTERVAL\n"
             for row in data[key]:
                 line = ""
-                for key2 in row:
+                for key2 in row.keys():
                     if len( line) > 1  :
                         line += ','
-                    line +=  data[key][key2] 
-                contents += line 
+                    line +=  row[key2] 
+                contents += line +'\n'
             with open( f"../data/{key}_{str(datetime.now())[:19]}.csv","w") as data_file:
                 data_file.write( contents ) 
     except:
@@ -429,7 +429,7 @@ def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
             for field in entry :
                 if len( line) > 1  :
                     line += ','
-                line +=  "'" +field +"'"
+                line +=  "'" + str(field) +"'"
             query += ( ',' if indx > 0 else '') + '(' + line + ')'
             indx += 1
             
@@ -475,7 +475,7 @@ def  live_test( configs: dict  ) -> None :
         time_interval = 900 
         while ( cont )  :
             current_time = datetime.now()
-            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :
+            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
                 cont = False
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
