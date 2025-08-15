@@ -67,6 +67,7 @@ class SchwabAccount :
 
         #self.UpdateTokensFile()
         self.Tokens = self.LoadTokensFile()
+       # print( self.Tokens ) 
        # self.Tokens['refresh_expires_at'] = datetime.now() + timedelta( seconds=900*96*5 ) 
         self.CheckAccessTokens()
        # self.UpdateTokensFile()
@@ -188,13 +189,13 @@ class SchwabAccount :
                                                         'period': period,
                                                         'frequencyType': frequencyType,
                                                         'frequency': frequency,
-                                                        'startDate': int(endDate.timestamp() * 1000 ),
+                                                        'startDate': int(startDate.timestamp() * 1000 ),
                                                         'endDate':  int(endDate.timestamp() * 1000 ) ,
                                                         'needExtendedHoursData': needExtendedHoursData,
                                                         'needPreviousClose': needPreviousClose}),
                             timeout=self.Timeout)
         
-            print(f"Schwab:QuoteByIntetval - {response} - {response.text}")
+            #print(f"Schwab:QuoteByInterval - {response} - {response.text}")
             return response
         
         except:   
@@ -317,6 +318,7 @@ class SchwabAccount :
         with open( ACCNT_TOKENS_FILE, 'wb') as file :
             pickle.dump( self.Tokens, file )
 
+        print ( "Updated the tokens file ", self.Tokens)
         return True
 
     def LoadTokensFile( self ) -> bool :
@@ -406,7 +408,7 @@ class SchwabAccount :
             
             self.Tokens                         = response.json()
             self.Tokens['expires_at']           = datetime.now() +  timedelta(seconds=1750)
-            self.Tokens['refresh_expires_at']   = refresh_current_expire
+            self.Tokens['refresh_expires_at']   = datetime.now() +  timedelta(hours=23.45*7)
            
         except:
             print("\t\t|EXCEPTION: MAIN::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )

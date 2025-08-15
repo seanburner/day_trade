@@ -21,7 +21,11 @@ import argparse
 import functools
 import requests
 
+
+import  matplotlib.pyplot   as plt
+
 from datetime                               import datetime
+
 
 import smtplib
 from email                                  import encoders
@@ -29,15 +33,24 @@ from email.mime.text                        import MIMEText
 from email.mime.base                        import MIMEBase
 from email.mime.multipart                   import MIMEMultipart
 
+
+
+
 from reportlab.lib                          import colors
 from reportlab.pdfgen                       import canvas
-from reportlab.platypus                     import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus                     import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,Image
+from reportlab.lib.units                    import inch
 from reportlab.lib.styles                   import getSampleStyleSheet
 from reportlab.lib.pagesizes                import letter
+
 
 # Import for charts
 from reportlab.graphics.shapes              import Drawing
 from reportlab.graphics.charts.piecharts    import Pie
+from reportlab.graphics.charts.linecharts   import LineChart
+from reportlab.graphics.charts.barcharts    import VerticalBarChart
+from reportlab.lib.colors                   import black, blue, red
+from reportlab.graphics.charts.axes         import XCategoryAxis, YValueAxis
 
 class PDFReport: 
     def __init__(self, fileName  : str  ) -> None :
@@ -92,8 +105,134 @@ class PDFReport:
         table.setStyle(table_style)
         self.Story.append( table )
 
+
+
+
+    def AddBarChart ( self, data : list, labels : list , chartType : str = 'bar', width : int = 200, height : int = 200 ) -> None :
+        """
+            Add a chart to the report
+            ARGS    :
+                        data      :  list of int 
+                        labels    :  list of string
+                        chartType :  type of chart to add [ bar / line ] 
+                        width     :  int
+                        height    :  int
+            RETURNS :
+                        nothing
+        """
+        chartTypes = {'bar': VerticalBarChart,  'line' : LineChart }
+        drawing = Drawing(width, height)
         
-    def AddPieChart( self, data : object, labels : list , pieColors : list = [colors.blue, colors.green, colors.red] ,
+        chart = chartTypes.get( chartType.lower(), VerticalBarChart )() 
+        chart.x = 50   # x-coordinate of the chart on the drawing
+        chart.y = 30   # y-coordinate of the chart on the drawing
+        chart.height    = height * .66
+        chart.width     = width  * .66
+        if chartType.lower() =='line':
+            chart.data      = data
+        else:
+            chart.data      = data
+        # 5. Configure the X-axis (category axis)
+        chart.categoryAxis                  = XCategoryAxis()
+        chart.categoryAxis.categoryNames    = labels
+        chart.categoryAxis.labels.boxAnchor = 'n' # Anchor labels at the top
+
+        # 6. Configure the Y-axis (value axis)
+        chart.valueAxis = YValueAxis()
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 60
+        chart.valueAxis.valueStep = 10
+        chart.valueAxis.labels.fontName = 'Helvetica'
+
+        # Add the chart to the drawing
+        drawing.add(chart)
+
+        self.Story.append ( chart )
+
+
+
+    def AddLineChart2 ( self, symbol : str , data : list, labels : list ,  width : int = 500, height : int = 200 ) -> None :
+        """
+            Add a chart to the report
+            ARGS    :
+                        symbol    :  str - name of stock symbol 
+                        data      :  list of int 
+                        labels    :  list of string
+                        width     :  int
+                        height    :  int
+            RETURNS :
+                        nothing
+        """
+        try:
+            print( 'Doing this ') 
+            
+            fig, ax = plt.subplots()
+            ax.plot(data, color='blue')
+
+            # Add labels and title to the axes
+            ax.set_xlabel('time')
+            ax.set_ylabel('dollars')
+            ax.set_title(symbol)
+            chart_graph = "../pix/graph1.png"
+            fig.savefig(chart_graph)
+            fig.show()
+            self.Story.append(  Image(chart_graph , width=6*inch, height=5*inch)    )
+        except:
+            print("\t\t|EXCEPTION: PDFReport::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+
+
+        
+
+    def AddLineChart ( self, data : list, labels : list ,  width : int = 200, height : int = 200 ) -> None :
+        """
+            Add a chart to the report
+            ARGS    :
+                        data      :  list of int 
+                        labels    :  list of string
+                        width     :  int
+                        height    :  int
+            RETURNS :
+                        nothing
+        """        
+        drawing = Drawing(width, height)
+        
+        chart = LineChart()
+        chart.x = 50   # x-coordinate of the chart on the drawing
+        chart.y = 30   # y-coordinate of the chart on the drawing
+        chart.height    = height * .66
+        chart.width     = width  * .66
+        for i, series in enumerate(data):
+            chart.add(line_colors[i], series)
+        
+        # 5. Configure the X-axis (category axis)
+        chart.categoryAxis                  = XCategoryAxis()
+        chart.categoryAxis.categoryNames    = labels
+        chart.categoryAxis.labels.boxAnchor = 'n' # Anchor labels at the top
+
+        # 6. Configure the Y-axis (value axis)
+        chart.valueAxis = YValueAxis()
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 60
+        chart.valueAxis.valueStep = 10
+        chart.valueAxis.labels.fontName = 'Helvetica'
+
+        # Add the chart to the drawing
+        drawing.add(chart)
+
+        self.Story.append ( chart )
+
+
+
+
+
+
+
+
+        
+    def AddPieChart( self, data : list, labels : list , pieColors : list = [colors.blue, colors.green, colors.red] ,
                                                      width : int = 200, height : int = 200,   style : str = 'h4',  alignment : int = 1  ) -> None:
         """
             Add Pie Chart table to report  - use a dictionary for the chart info  to allow for multiple as well as 
@@ -103,12 +242,16 @@ class PDFReport:
                             labels    :  list of string
                             colors    :  list of colors
                             width     :  int
-                            height    : int
+                            height    :  int
                             style     :  html style tags ( h1 / h2 )
                             alignment :  number represents alignment [ 1 = center ] 
             RETURNS    :
                             Nothing 
         """
+        if len( data) == 0  or data is None :
+            return
+
+        
         drawing = Drawing ( width, height )
         pie = Pie()
         pie.y = 100

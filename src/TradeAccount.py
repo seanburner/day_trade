@@ -70,7 +70,7 @@ class TradeAccount:
 
 
   
-    def Quote ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" ) -> requests.Response :
+    def Quote ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" , endDate : datetime = datetime.now()) -> requests.Response :
         """
             Abstraction to call the underlying client ( Schwab / ) to get a quote
             The last candle in candles:{} will be the most current one we want for frequency and timeframe
@@ -82,21 +82,29 @@ class TradeAccount:
         quote_info      = None
         periodTypes     = ["day","month","year","ytd"]
         frequencyTypes  = ["minute","daily","weekly","monthly"]
+        timeStamp       = 0
         try:
             #return self.Conn.Quote( stocks)
-            periodType = 'day'
-            period = 1
-            frequencyType = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
-            frequency = int (15 if frequency/60 == 0 else frequency/60 )
-            startDate = datetime.now() - timedelta( seconds = frequency * 60)
-            endDate = datetime.now()  
+            periodType      = 'day'
+            period          = 1
+            frequencyType   = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
+            frequency       = int (15 if frequency/60 == 0 else frequency/60 )
+            startDate       = endDate - timedelta( seconds = frequency * 60) #datetime.now() - timedelta( seconds = frequency * 60)
+            #endDate         = datetime.now()  
             print( f"Frequency : {frequency} ->  {frequency }"  )
             candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
            
             
-            print( f"\n->TradeAccount::" + str(inspect.currentframe().f_code.co_name) + f" -quote_info : { candles}")
+            #print( f"\n->TradeAccount::" + str(inspect.currentframe().f_code.co_name) + f" -quote_info : { candles}")
+            timeStamp = int(endDate.timestamp() * 1000)
             if 'candles' in candles :
+                for entry in candles['candles'] :                    
+                    if ( entry['datetime'] == timeStamp ):
+                         print ("\t\t\t ** FOUND : " , entry )
+                         quote_info = entry
+                         quote_info['symbol'] = candles['symbol']
+                         return quote_info
                 quote_info = candles['candles'][-1]
                 quote_info['symbol'] = candles['symbol']
                 new_quote_info = {}
@@ -271,7 +279,7 @@ class TradeAccount:
             if ( new_price  > self.InPlay[ stock ]['price'] ) :
                 diff = (new_price  - self.InPlay[ stock ]['price'] )/self.InPlay[ stock ]['price']
                 print ( f"\t\t DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
-                if diff < 0.0016 :    # ignore profit if less than % of investment 
+                if diff < 0.00016 :    # ignore profit if less than % of investment 
                     print(message_prefix + "  Not Selling - trying to be a little greedier ")
                     return False
             

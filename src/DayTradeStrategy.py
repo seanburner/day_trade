@@ -171,7 +171,7 @@ class DayTradeStrategy:
                     ( float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous'])  and
                                  float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
                 volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )
-                if volume_increase  < 7 :  # 7 fold increase in volume seems excessive, needs more testing 
+                if volume_increase  < 0.90 :  # 85% starts to see good results, but dont want to be too strict or too loose 
                     print( f"\t\t Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                     return False, action, time_interval
                 
