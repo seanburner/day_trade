@@ -184,6 +184,19 @@ class PDFReport:
 
 
 
+
+    def AddImage( self, imgFile : str = "../pix/graph1.png", width : int = 500, height : int = 300  ) -> None :
+        """
+            Add an image( file ) to the pdf document
+            ARGS    :
+                        imgFile : str - filename of the image file ( png ) 
+            RETURNS :
+                        Nothing 
+        """        
+        self.Story.append(  Image(  imgFile , width=6*inch, height=5*inch)    )
+            
+
+
         
 
     def AddLineChart ( self, data : list, labels : list ,  width : int = 200, height : int = 200 ) -> None :

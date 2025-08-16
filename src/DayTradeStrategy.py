@@ -171,12 +171,12 @@ class DayTradeStrategy:
                     ( float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous'])  and
                                  float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
                 volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )
-                if volume_increase  < 0.90 :  # 85% starts to see good results, but dont want to be too strict or too loose 
-                    print( f"\t\t Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
+                if volume_increase  < 0.10 :  # 85% starts to see good results, but dont want to be too strict or too loose 
+                    print( f"\t\t\t  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                     return False, action, time_interval
                 
                 #print( "\t\t * BUY SIGNAL " ) 
-                print( f"\t\t Volume increase OKAY : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
+                print( f"\t\t\t  Volume increase OKAY : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                 if  account.Buy( ticker_row[0] , float(ticker_row[ index ])  )  :
                     success = True
                     self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] =  ticker_row[ index ]
@@ -189,7 +189,7 @@ class DayTradeStrategy:
             if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and (float(ticker_row[ index ]) >  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) ) : 
                  profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
                  strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
-                 print( "\t\t * SELL SIGNAL : PROFIT : ", profit_trail_stop  )
+                 print( "\t\t\t  * SELL SIGNAL : PROFIT : ", profit_trail_stop  )
                  if ( ( float(ticker_row[ index ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
                  #   print( "\t\t * SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : {delta} : {0.10 *  account.GetLimit() }" )
                     if  account.Sell( ticker_row[0], float(ticker_row[ index ])   )  :
@@ -211,7 +211,7 @@ class DayTradeStrategy:
                  crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
                  # dont sell unless crashing AND atleast 80% purchase, try to wait it out 
                  if  (float(ticker_row[ index ]) > crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                 #   print( "\t\t * SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : {delta} : {0.10 *  account.GetLimit() }" )
+                 #   print( "\t\t\t  * SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : {delta} : {0.10 *  account.GetLimit() }" )
                     if  account.Sell( ticker_row[0], float(ticker_row[ index ])   )  :
                         success = True
                         self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0

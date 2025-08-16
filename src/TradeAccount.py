@@ -91,20 +91,23 @@ class TradeAccount:
             frequency       = int (15 if frequency/60 == 0 else frequency/60 )
             startDate       = endDate - timedelta( seconds = frequency * 60) #datetime.now() - timedelta( seconds = frequency * 60)
             #endDate         = datetime.now()  
-            print( f"Frequency : {frequency} ->  {frequency }"  )
+            #print( f"Frequency : {frequency} ->  {frequency }"  )
             candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
            
             
             #print( f"\n->TradeAccount::" + str(inspect.currentframe().f_code.co_name) + f" -quote_info : { candles}")
             timeStamp = int(endDate.timestamp() * 1000)
+            pos = 0
             if 'candles' in candles :
-                for entry in candles['candles'] :                    
+                for entry in candles['candles'] :
+                    pos += 1
                     if ( entry['datetime'] == timeStamp ):
-                         print ("\t\t\t ** FOUND : " , entry )
+                        # print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
                          quote_info = entry
                          quote_info['symbol'] = candles['symbol']
                          return quote_info
+                        
                 quote_info = candles['candles'][-1]
                 quote_info['symbol'] = candles['symbol']
                 new_quote_info = {}
@@ -223,7 +226,7 @@ class TradeAccount:
 
             # ACTUALLY BUY SOME NOW IF MODE='TRADE'
             if self.Mode.upper()  == "TRADE " :
-                print("\t\t - We are trading so sending commands to Brokerage" )
+                print("\t\t\t  ->  - We are trading so sending commands to Brokerage" )
 
             # UPDATE INTERNAL ELEMENTS     
             qty = int (( self.Funds * self.Limit ) / price )
@@ -240,7 +243,7 @@ class TradeAccount:
             if not( stock  in self.Performance.keys() ) :
                 self.Performance[stock] = []
                 
-            print ( "\t\t BOUGHT : " , self.InPlay )
+            print ( "\t\t\t  \-> BOUGHT : " , self.InPlay )
             success = True 
             return success 
         except: 
@@ -278,7 +281,7 @@ class TradeAccount:
             # WHEN PROFITABLE , ONLY SELL WHEN MORE THAN SPECIFIC PERCENT
             if ( new_price  > self.InPlay[ stock ]['price'] ) :
                 diff = (new_price  - self.InPlay[ stock ]['price'] )/self.InPlay[ stock ]['price']
-                print ( f"\t\t DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
+                print ( f"\t\t\t   -> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
                 if diff < 0.00016 :    # ignore profit if less than % of investment 
                     print(message_prefix + "  Not Selling - trying to be a little greedier ")
                     return False
@@ -292,7 +295,7 @@ class TradeAccount:
             p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
             self.Trades.append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
                              str(datetime.now()), new_price, p_l ] )
-            print ( f"\t\t SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
+            print ( f"\t\t\t \-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
             self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
             self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )
             success = True

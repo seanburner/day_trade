@@ -408,7 +408,10 @@ def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
                 configs : configuration dictionary
                 trades  : list of entries 
         RETURNS:
-                Nothing 
+                Nothing
+
+        create table orderbook ( id int auto_increment primary  key, yrmo  varchar(10), fulldate varchar(10) ,symbol varchar(10), initiatedAt varchar(20),bought decimal(10,2),qty int, closedAt varchar(20), sold  decimal(10,2), p_l decimal(10,2), time_interval int  );
+
     """    
     conn        = MySQLConn( )
     indx        = 0
@@ -424,14 +427,14 @@ def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
             return 
         
         conn.Connect(server =configs['sql_server'], database='trading', username =configs['sql_user'], passwd =configs['sql_password'] )
-        query = "INSERT INTO trading.transactions ( symbol, datetime, bought, qty, closed, sold, p_l) values "
+        query = "INSERT INTO trading.orderbook ( yrmo,fulldate,symbol, initiatedAt, bought, qty, closedAt, sold, p_l) values "
         
         for entry in trades :
-            line = ""          
+            line = f"'{entry[1][:7]}','{entry[1][:10]}'"          
             for field in entry :
                 if len( line) > 1  :
                     line += ','
-                line +=  "'" + str(field) +"'"
+                line +=  "'" + (str(field)[:19] if len(str(field)) > 19 else str(field) ) +"'"
             query += ( ',' if indx > 0 else '') + '(' + line + ')'
             indx += 1
             
@@ -474,26 +477,27 @@ def  replay_test( configs: dict  ) -> None :
         current_time = datetime.strptime( current_time, date_format)                                             
         time_interval = 900
         
-        while ( cont )  :        
+        while ( cont )  :
+            #print("\t\t\t\t + Current Time : " , current_time ) 
             if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
                 cont = False
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
             else:
-                print(f"\t\t -> Quote @ { current_time }" )
+               # print(f"\t\t -> Quote @ { current_time }" )
                 td = account.Quote ( symbols= configs['stock'],  frequency= time_interval , endDate = current_time)
                 if td != None:
                     ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}"]
                     data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low': float(td['low']),'quote':float(td['open']),
                                                              'high':float(td['high']),'close':float(td['close']),'volume':float(td['volume']), 'interval': time_interval/60 })
-                    print(f"\t\t\t->DATA : {ticker_row} " ) 
+                  #  print(f"\t\t\t->DATA : {ticker_row} " ) 
                     success , msg , time_interval = Strategies.Run(  ticker_row,  account )
                     if msg.upper() == "BOUGHT" :
                         print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
                     elif msg.upper() == "CLOSED" :
                         print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )                    
                     
-                    print(f"\t\t -> time interval { time_interval }" )
+                #    print(f"\t\t -> time interval { time_interval }" )
                     current_time = current_time + timedelta( seconds=time_interval)
                         
                 else:
@@ -508,7 +512,7 @@ def  replay_test( configs: dict  ) -> None :
 
         
         # SEND EMAIL OF PERFORMANCE
-        email_report( configs, data, account )
+        summary_report( configs, data, account )
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
@@ -532,11 +536,12 @@ def  live_test( configs: dict  ) -> None :
     cont        = True
     data        = {}
     success     = False    
-    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
-    
+    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])  
     
     
     account.SetFunds( 5000.00, 0.10 )
+
+    
     try:        
         print( '\t* About to live test: ', account )
         Strategies.Set( configs['strategy'] , account)        
@@ -553,7 +558,7 @@ def  live_test( configs: dict  ) -> None :
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
             else:
-                td = account.Quote ( configs['stock'],  time_interval)
+                td = account.Quote ( symbols=configs['stock'],  frequency=time_interval, endDate = current_time)
                 if td != None:
                     ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}"]
                     data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low': float(td['low']),'quote':float(td['open']),
@@ -579,7 +584,7 @@ def  live_test( configs: dict  ) -> None :
 
         
         # SEND EMAIL OF PERFORMANCE
-        email_report( configs, data, account )
+        summary_report( configs, data, account )
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
@@ -637,7 +642,7 @@ def  back_test( configs: dict  ) -> None :
                                                              'high':ticker_row[4],'close':ticker_row[4],'volume':ticker_row[5], 'interval': 15 })
             
             
-            print( f"\t\t Data :  {ticker_row} ")
+            #print( f"\t\t Data :  {ticker_row} ")
             success , msg , interval = Strategies.Run(  ticker_row,  account )
             if msg.upper() == "BOUGHT" :
                 print("\t\t\t In Play - should shift from 15 -> 5 min  : " )
@@ -646,7 +651,7 @@ def  back_test( configs: dict  ) -> None :
 
 
         # SEND EMAIL OF PERFORMANCE
-        email_report( configs, new_data, account )
+        summary_report( configs, new_data, account )
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
@@ -656,36 +661,44 @@ def  back_test( configs: dict  ) -> None :
 
 
         
-def email_report ( configs : dict , data : dict , account : object ) -> None :
+def summary_report ( configs : dict , data : dict , account : object ) -> None :
     """
         Prep and send report of trading 
     """
-
-  #  if data.get('high',0) == 0 :
-  #      print( "\t * Email Report  - no data to send ")
-  #      return
-    
     stock = configs['stock']
     report = PDFReport( f"../reports/{stock}_{str(datetime.now())[:19]}.pdf")
     try:
-        dt = []
+        dt1 = []
+        dt2 = []
         for entry in data[configs['stock']] :
-            dt.append( entry.get('high',0) )
-        report.AddLineChart2( configs['stock'],  dt  , ['A','B','C'])
+            dt1.append( entry.get('high',0) )
+        for entry in account.Trades:
+            if entry[0] == configs['stock'] :
+                dt2.append( entry[6] )
+            
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+        # GRAPH 1
+        ax1.plot(dt1, color='blue')
+        ax1.set_xlabel('time')
+        ax1.set_ylabel('dollars')
+        ax1.set_title(f"{configs['stock']} Activity ")
+        # GRAPH 2
+        ax2.plot(dt2, color='blue')
+        ax2.set_xlabel('index')
+        ax2.set_ylabel('dollars')
+        ax2.set_title(f"{configs['stock']} P & L")
         
-        # PLOT THE DATA
-        plt.plot(dt  )
-        # Add labels and a title
-        plt.xlabel('X-axis Label')
-        plt.ylabel('Y-axis Label')
-        plt.title( configs['stock'])
-
-        # Display the plot
-        #plt.show()        
-        #plt.savefig("../pix/graph1.png" )
-
+        chart_graph = "../pix/graph1.png"
+        plt.tight_layout()
+        plt.show()
+        fig.savefig( chart_graph )
+        report.AddImage( chart_graph ) 
+        #report.AddLineChart2( configs['stock'],  dt  , ['A','B','C'])
+        
+      
             
         # Pie chart
+        report.AddText( "Wins vs Losses ", "h1", 1)    
         stats = ''
         opts = ['WIN','LOSS' ]        
         for stock in account.Performance.keys() :
@@ -707,32 +720,16 @@ def email_report ( configs : dict , data : dict , account : object ) -> None :
 
         
         # LIST OF COMPLETED ORDERS
-        total_profit = 0
-        report.AddText( stock , "h1", 1)
-    
-        contents = ""
-        table = [
-                [ 'STOCK' ],
-                [ 'TIME' ] ,
-                [ 'PRICE' ],
-                [ 'QTY' ],
-                [ 'CLOSED' ],
-                [ 'ASK' ],
-                [ 'P&L']
-            ]
-    
+        report.AddText( "OrderBook ", "h1", 1)    
+        contents        = ""
+        total_profit    = 0
         for entry in account.Trades:
-            pos = 0    
-            for val in entry:                
-                table[pos].append(val)
-                pos += 1 
-            print("\t -  ", entry )
-            contents +=  f"\t -  {entry }\n"
+            print("\t -  ", entry )            
             total_profit += entry[6]
         print( "* Account : " , account  , " : " , account.Funds , " : " , total_profit)
         
-        report.AddTable( [['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']] +  table, "h3", 1 ) 
-        contents += f"* Account : {account}  : {account.Funds}  : {total_profit}"
+        report.AddTable( [['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']] +  account.Trades, "h3", 1 )        
+        contents = f"* FUNDS : ${account.Funds}           TOTAL PROFIT: ${total_profit}"
         report.AddText( contents , "h3", 2)
         report.Save()
     except:
