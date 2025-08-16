@@ -172,24 +172,28 @@ class DayTradeStrategy:
                                  float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
                 volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )
                 if volume_increase  < 0.10 :  # 85% starts to see good results, but dont want to be too strict or too loose 
-                    print( f"\t\t\t  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
+                    print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                     return False, action, time_interval
                 
                 #print( "\t\t * BUY SIGNAL " ) 
-                print( f"\t\t\t  Volume increase OKAY : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
+                print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
                 if  account.Buy( ticker_row[0] , float(ticker_row[ index ])  )  :
                     success = True
                     self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] =  ticker_row[ index ]
                     self.Stocks[ ticker_row[0] ]['Volume']['Bought'] =  ticker_row[5]
                     action          = "bought"
                     
-
+            
 
             #SELL : In profit territory 
             if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and (float(ticker_row[ index ]) >  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) ) : 
                  profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
                  strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
                  print( "\t\t\t  * SELL SIGNAL : PROFIT : ", profit_trail_stop  )
+                 if ( float(ticker_row[6]) - float(ticker_row[index]) ) < ( float( ticker_row[4]) - float(ticker_row[2]) ):  # More upward pressure than down
+                     print( f"\t\t\t  \-> SELL SIGNAL :  More upward than downward pressure : {float(ticker_row[6]) - float(ticker_row[index])} -> {float( ticker_row[4]) - float(ticker_row[2])} "  )
+                 #ticker_row[5] < self.Stocks[ ticker_row[0] ]['Volume' ]['Bought'] :  # VOLUME IS STILL MOVING UP SO DONT SELL RIGHT NOW
+                     return False, action, 300
                  if ( ( float(ticker_row[ index ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
                  #   print( "\t\t * SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : {delta} : {0.10 *  account.GetLimit() }" )
                     if  account.Sell( ticker_row[0], float(ticker_row[ index ])   )  :
@@ -219,7 +223,7 @@ class DayTradeStrategy:
                         self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
                         action          = "closed"
                         
-        
+            
                      
             # holding and what happens when price moves but voume is level , increasing  or decreasing ?     
 
@@ -234,7 +238,8 @@ class DayTradeStrategy:
             # CHANGE TO 5 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
             if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 :
                 time_interval   = 300
-
+            else:
+                time_interval   = 900
                 
             return success , action, time_interval 
             

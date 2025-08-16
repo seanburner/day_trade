@@ -193,7 +193,7 @@ class PDFReport:
             RETURNS :
                         Nothing 
         """        
-        self.Story.append(  Image(  imgFile , width=6*inch, height=5*inch)    )
+        self.Story.append(  Image(  imgFile , width=7*inch, height=5*inch)    )
             
 
 

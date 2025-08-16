@@ -484,21 +484,21 @@ def  replay_test( configs: dict  ) -> None :
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
             else:
-               # print(f"\t\t -> Quote @ { current_time }" )
+                print(f"\t\t\t\t\t -> Quote @ { current_time }" )
                 td = account.Quote ( symbols= configs['stock'],  frequency= time_interval , endDate = current_time)
                 if td != None:
-                    ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}"]
-                    data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low': float(td['low']),'quote':float(td['open']),
+                    ticker_row = [ stock,f"{current_time}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}",f"{td['high']}"]
+                    data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(td['low']),'quote':float(td['open']),
                                                              'high':float(td['high']),'close':float(td['close']),'volume':float(td['volume']), 'interval': time_interval/60 })
-                  #  print(f"\t\t\t->DATA : {ticker_row} " ) 
+                    print(f"\t\t\t->DATA : {ticker_row} " ) 
                     success , msg , time_interval = Strategies.Run(  ticker_row,  account )
                     if msg.upper() == "BOUGHT" :
-                        print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
+                        print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval} min  : " )                
                     elif msg.upper() == "CLOSED" :
-                        print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )                    
+                        print(f"\t\t\t   -> OUT Play - should shift from {time_interval} -> 15 min  : " )
+                        
                     
-                #    print(f"\t\t -> time interval { time_interval }" )
-                    current_time = current_time + timedelta( seconds=time_interval)
+                    current_time    = calculate_new_poll_time( current_time , time_interval)                    
                         
                 else:
                     cont = False
@@ -519,7 +519,30 @@ def  replay_test( configs: dict  ) -> None :
             print("\t\t >>   " + str(entry) )
 
 
+def calculate_new_poll_time( current_time : datetime = datetime.now(), time_interval : int = 900) -> datetime :
+    """
+        Calculate the new time to poll for quote from platform
+        ARGS    :
+                    current_time  : ( datetime ) the current time to use as base
+                    time_interval : ( int ) the time interval to use, it must end on the quarter or on the 5  depending on time_interval 
+        RETURNS :
+                    datetime
+    """
+    detlas      = 0
+    fake_time   = None 
+    try:
+        fake_time   = current_time + timedelta( seconds =time_interval)
+        deltas      = fake_time.minute % ( time_interval /60 )        
+        deltas      = time_interval - (deltas * 60 )
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
             
+    return current_time + timedelta( seconds =deltas )
+
+
+
 
 def  live_test( configs: dict  ) -> None :
     """
@@ -668,10 +691,17 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
     stock = configs['stock']
     report = PDFReport( f"../reports/{stock}_{str(datetime.now())[:19]}.pdf")
     try:
-        dt1 = []
-        dt2 = []
+        dt1     = []
+        dt1_2   = []
+        dt2     = []
+        off_on  = True
         for entry in data[configs['stock']] :
-            dt1.append( entry.get('high',0) )
+            dt1.append( entry.get('close',0)  )
+            if off_on :
+                dt1_2.append( entry.get('datetime',0)[11:16].replace(':','') )
+            else:
+                dt1_2.append( "")
+            off_on = not off_on
         for entry in account.Trades:
             if entry[0] == configs['stock'] :
                 dt2.append( entry[6] )
@@ -679,6 +709,7 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         fig, (ax1, ax2) = plt.subplots(2, 1)
         # GRAPH 1
         ax1.plot(dt1, color='blue')
+        #ax1.xticks([930,1100,1230,200,330,500,630])
         ax1.set_xlabel('time')
         ax1.set_ylabel('dollars')
         ax1.set_title(f"{configs['stock']} Activity ")
@@ -739,11 +770,20 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
 
 
 
-def business_logic_test( val1, val2 ,val3) -> int|float:
+def business_logic_test(current_time :str = "2025-08-16 15:27:35",  time_interval : int = 900 ) -> datetime:
     """
         TODO :: Scaffolding for testing
+        ARGS    :
+                    current_time  ( str ) the time to be altered
+                    time_interval ( int ) the interval of time to increase by in seconds 
+        RETURNS :
+                    datetime 
     """
-    return val1 + val2 +val3
+    date_format     = "%Y-%m-%d %H:%M:%S"
+    current_time    = datetime.strptime( current_time, date_format)
+    new_poll_time   = calculate_new_poll_time( current_time = current_time, time_interval  = 900)
+    print(f"\t\t * Business Logic Test: New Poll Time  {current_time} @ { time_interval}  == > {new_poll_time}")
+    return  new_poll_time
 
 
 
