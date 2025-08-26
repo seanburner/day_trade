@@ -37,7 +37,8 @@ class TradeAccount:
         self.Limit          = 0.0                      # MAX TO SPEND ON ANY ONE TRADE 
         self.TargetGoal     = 0                        # Dont get greedy, when reach this amount will quit trading for day
         self.Mode           = ""                       # Are we Testing or Trading or something else
-        self.Performance    = {}                       # Keep track of wins and loses  
+        self.Performance    = {}                       # Keep track of wins and loses
+        self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage  
 
         self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
 
@@ -49,7 +50,7 @@ class TradeAccount:
         """
             Returns string representation of the object 
         """
-        return f'\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit * self.Funds}'
+        return f'\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit} ->{self.Limit * self.Funds}'
     
     def __iter__(self) -> object:
         """
@@ -79,10 +80,11 @@ class TradeAccount:
             RETURNS : 
         """
         candles         = ""
+        timeStamp       = 0
         quote_info      = None
+        ticker_row      = None 
         periodTypes     = ["day","month","year","ytd"]
         frequencyTypes  = ["minute","daily","weekly","monthly"]
-        timeStamp       = 0
         try:
             #return self.Conn.Quote( stocks)
             periodType      = 'day'
@@ -106,23 +108,26 @@ class TradeAccount:
                         # print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
                          quote_info = entry
                          quote_info['symbol'] = candles['symbol']
-                         return quote_info
+                         print( f"\t| {quote_info} \n\t| {candles['candles'][-1]}")
+                         ticker_row = [candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
+                                        quote_info['open'],quote_info['volume'],quote_info['high']   ]
+                         return ticker_row
                         
                 quote_info = candles['candles'][-1]
                 quote_info['symbol'] = candles['symbol']
                 new_quote_info = {}
                 for key in quote_info.keys():                  
                     new_quote_info[key] =  float( quote_info[key]) if key in ['volume','open','close','high','low'] else quote_info[key]
-
+                ticker_row = [ candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
+                                        quote_info['open'],quote_info['volume'],quote_info['high']   ]
          
         except:            
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )
-                
-            print(f"\n-> ERROR: {candles}")
+                print("\t\t |   " + str(entry) )                
+            
         finally:
-            return quote_info
+          return ticker_row  
 
 
 
@@ -159,7 +164,7 @@ class TradeAccount:
         """
             Sets the mode of the application : TEST / TRADE 
         """
-        self.Mode = mode
+        self.Mode = self.Conn.Mode = mode
 
 
         
@@ -171,7 +176,8 @@ class TradeAccount:
             RETURNS     :
                             Nothing 
         """
-        self.Limit =  limit 
+        self.Limit      =  limit
+        self.DailyFunds = self.Limit * self.Funds 
         
 
 
@@ -190,7 +196,7 @@ class TradeAccount:
                 print("\t\t |   " + str(entry) )
 
 
-    def Buy( self, stock : str , price : float)  -> bool :
+    def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()))  -> bool :
         """
            Attempt to buy the stock under the confines of the limit , True = succeeded , False = failed
            Updates
@@ -198,8 +204,10 @@ class TradeAccount:
                * Funds
                * Limit
                
-           PARAMETER :
-                       stock : string 
+           ARGS      :
+                       stock ( string )     - the stock to purchase 
+                       price ( float )      - the current price
+                       current_time (str )  - date time to record the purchase 
            RETURNS   :
                        bool  : True / False 
         """
@@ -224,15 +232,16 @@ class TradeAccount:
                 print(message_prefix + "  Already holding, cant take any more ")
                 return success
 
+            qty         = int (( self.DailyFunds * self.Limit ) / price )       # instead of self.Funds, so we dont risk previous profits; might need to readjust if had a loss 
             # ACTUALLY BUY SOME NOW IF MODE='TRADE'
-            if self.Mode.upper()  == "TRADE " :
-                print("\t\t\t  ->  - We are trading so sending commands to Brokerage" )
+            success = self.Conn.Buy( stock , price , qty ) 
 
-            # UPDATE INTERNAL ELEMENTS     
-            qty = int (( self.Funds * self.Limit ) / price )
-            self.Funds -= qty * price            
-            self.InPlay[ stock ] = {
-                    'time'  : str( datetime.now() ) ,
+            # UPDATE INTERNAL ELEMENTS
+            if self.Mode.lower() == "test" or success  :
+                #print( f"FUNDS: {self.Funds} * {self.Limit} /{price} ==> {(( self.Funds * self.Limit ) / price )} ") 
+                self.Funds -= qty * price            
+                self.InPlay[ stock ] = {
+                    'time'  : current_time,
                     'price' : price ,
                     'qty'   : qty ,
                     'volume': 'not sure if needed ',
@@ -240,11 +249,13 @@ class TradeAccount:
                     'sold'  : 0,
                     'pl'    : 0 
                 }
-            if not( stock  in self.Performance.keys() ) :
-                self.Performance[stock] = []
+                if not( stock  in self.Performance.keys() ) :
+                    self.Performance[stock] = []
                 
-            print ( "\t\t\t  \-> BOUGHT : " , self.InPlay )
-            success = True 
+                print ( "\t\t\t  \-> BOUGHT : " , self.InPlay )
+                success = True
+            else:
+                print("\t\t --> Account level could not execute BUY properly ")
             return success 
         except: 
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -253,7 +264,7 @@ class TradeAccount:
 
 
 
-    def Sell( self, stock : str, new_price : float)  -> bool :
+    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()))  -> bool :
         """
            Sell the stock currently holding , True = succeeded , False = failed
            Updates
@@ -262,8 +273,10 @@ class TradeAccount:
                * Funds
                * Limit ( auto updated ) 
                
-           PARAMETER :
-                       stock : string 
+           ARGS      :
+                       stock ( string )     - the stock to purchase 
+                       price ( float )      - the current price
+                       current_time (str )  - date time to record the purchase 
            RETURNS   :
                        bool  : True / False 
         """
@@ -281,25 +294,28 @@ class TradeAccount:
             # WHEN PROFITABLE , ONLY SELL WHEN MORE THAN SPECIFIC PERCENT
             if ( new_price  > self.InPlay[ stock ]['price'] ) :
                 diff = (new_price  - self.InPlay[ stock ]['price'] )/self.InPlay[ stock ]['price']
-                print ( f"\t\t\t   -> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
+                print ( f"\t\t\t  \ ----> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
                 if diff < 0.00016 :    # ignore profit if less than % of investment 
                     print(message_prefix + "  Not Selling - trying to be a little greedier ")
                     return False
             
 
             # Sell the stock IF MODE='TRADE'
-            if self.Mode.upper()  == "TRADE " :
-                print("\t\t - We are trading so sending commands to Brokerage" )
+            success = self.Conn.Sell( stock, new_price , self.InPlay[ stock ]['qty'] ) 
                 
-            self.Funds += ( self.InPlay[stock]['qty'] * new_price )
-            p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
-            self.Trades.append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
-                             str(datetime.now()), new_price, p_l ] )
-            print ( f"\t\t\t \-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
-            self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
-            self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )
-            success = True
-            
+
+            if self.Mode.lower() == "test" or success:    
+                print('FUNDS: ', self.Funds , ' : ' , ( self.InPlay[stock]['qty'] * new_price ), ' = ' , ( self.InPlay[stock]['qty'] * new_price )+self.Funds)    
+                self.Funds += ( self.InPlay[stock]['qty'] * new_price )
+                p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
+                self.Trades.append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
+                            current_time, new_price, p_l ] )
+                print ( f"\t\t\t \-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
+                self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
+                self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )
+                success = True
+            else:
+                print ("\t\t --> Account  level did not Execute SELL properly ") 
             return success
         except: 
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )

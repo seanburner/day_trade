@@ -5,9 +5,9 @@
 ##  Install :   pip3 install requests  inspect platform argparse selenium webdriver-manager reportlab 
 ##  Example :
 ##              python3 day_trade.py --csv_config=files/config.csv --display_config 
-##              python3 day_trade.py --api_key=7LZZ6KE0XBTNIPBI --action=download  --stock=QQQ --csv_output=../data --interval=15min --display_config
-##              python3 day_trade.py --api_key=7LZZ6KE0XBTNIPBI --action=back_test --stock=QQQ --input_data=../data/QQQ_15min_.csv --interval=15min --display_config --account_api=xxxxxxx --strategy=basic  --list_strategies
-##              python3 day_trade.py --api_key=7LZZ6KE0XBTNIPBI --action=back_test --interval=15min --display_config --account_api=xxxxxxx --strategy=basic  --list_strategies --input_data=../data/intraday_15min_QQQ.csv --stock=QQQ
+##              python3 day_trade.py --api_key=XXXXXXXXXXXXXXX --action=download  --stock=QQQ --csv_output=../data --interval=15min --display_config
+##              python3 day_trade.py --api_key=XXXXXXXXXXXXXXX --action=back_test --stock=QQQ --input_data=../data/QQQ_15min_.csv --interval=15min --display_config --account_api=xxxxxxx --strategy=basic  --list_strategies
+##              python3 day_trade.py --api_key=XXXXXXXXXXXXXXX --action=back_test --interval=15min --display_config --account_api=xxxxxxx --strategy=basic  --list_strategies --input_data=../data/intraday_15min_QQQ.csv --stock=QQQ
 ##  Notes   :
 ## ###################################################################################################################
 import os
@@ -319,8 +319,7 @@ def parse_arguments() -> {} :
                         'strategy'          : { 'help': 'Strategy to use ',                         'action' : None },
                         'app_key'           : { 'help': 'Schwab application key ',                  'action' : None },
                         'app_secret'        : { 'help': 'Schwab application Secret ',               'action' : None },
-                        'trading_platform'  : { 'help': 'Platform of your trading account [ Schwab]','action' : None},
-                        'app_secret'        : { 'help': 'Schwab application Secret ',               'action' : None },
+                        'trading_platform'  : { 'help': 'Platform of your trading account [ Schwab]','action' : None},                        
                         'replay_date'       : { 'help': 'Date to pull quotes to do a replay_test',  'action' : None },
                         'sql_server'        : { 'help': 'The address of the sql server',            'action' : None},                        
                         'sql_user'          : { 'help': 'User account for SQL ',                    'action' : None},
@@ -446,78 +445,6 @@ def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
             print("\t\t >>   " + str(entry) )
 
 
-def  replay_test( configs: dict  ) -> None :
-    """
-        Test the strategy by using live data from a previous day
-        Provide  charts for confirmation
-        1. pull quotes 
-        2. 
-        PARAMETERS :                    
-                    configs     :  dictionary of configuration info                   
-        RETURNS    :
-                    Nothing 
-    """
-    msg             = ""
-    cont            = True
-    data            = {}
-    success         = False    
-    account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
-    date_format     = "%Y-%m-%d %H:%M:%S"
-    current_time    = ""
-    
-    account.SetFunds( 5000.00, 0.10 )
-    try:        
-        print( '\t* About to live test: ', account )
-        Strategies.Set( configs['strategy'] , account)        
-        account.SetMode( "TEST")
-        for stock in configs['stock'].split(",") :
-            data[stock] = []
-
-        current_time = configs['replay_date'][:10] + " 09:30:00"
-        current_time = datetime.strptime( current_time, date_format)                                             
-        time_interval = 900
-        
-        while ( cont )  :
-            #print("\t\t\t\t + Current Time : " , current_time ) 
-            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
-                cont = False
-                print("\t\t\t\t -> Outside of market hours ")
-                ## Sell whatever is InPlay
-            else:
-                print(f"\t\t\t\t\t -> Quote @ { current_time }" )
-                td = account.Quote ( symbols= configs['stock'],  frequency= time_interval , endDate = current_time)
-                if td != None:
-                    ticker_row = [ stock,f"{current_time}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}",f"{td['high']}"]
-                    data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(td['low']),'quote':float(td['open']),
-                                                             'high':float(td['high']),'close':float(td['close']),'volume':float(td['volume']), 'interval': time_interval/60 })
-                    print(f"\t\t\t->DATA : {ticker_row} " ) 
-                    success , msg , time_interval = Strategies.Run(  ticker_row,  account )
-                    if msg.upper() == "BOUGHT" :
-                        print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval} min  : " )                
-                    elif msg.upper() == "CLOSED" :
-                        print(f"\t\t\t   -> OUT Play - should shift from {time_interval} -> 15 min  : " )
-                        
-                    
-                    current_time    = calculate_new_poll_time( current_time , time_interval)                    
-                        
-                else:
-                    cont = False
-                    print( 'Just received  empty ticker info ')
-        
-        # SEND TRANSACTIONS TO SQL
-        send_transactions_to_sql( configs, account.Trades  )
-
-        # SEND DATA TO FILE
-        send_data_to_file( configs, data )
-
-        
-        # SEND EMAIL OF PERFORMANCE
-        summary_report( configs, data, account )
-    except:
-        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-        for entry in sys.exc_info():
-            print("\t\t >>   " + str(entry) )
-
 
 def calculate_new_poll_time( current_time : datetime = datetime.now(), time_interval : int = 900) -> datetime :
     """
@@ -539,7 +466,91 @@ def calculate_new_poll_time( current_time : datetime = datetime.now(), time_inte
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
             
-    return current_time + timedelta( seconds =deltas )
+    return current_time + timedelta( seconds =deltas ), deltas
+
+
+def  replay_test( configs: dict  ) -> None :
+    """
+        Test the strategy by using live data from a previous day
+        Provide  charts for confirmation
+        1. pull quotes 
+        2. 
+        PARAMETERS :                    
+                    configs     :  dictionary of configuration info                   
+        RETURNS    :
+                    Nothing 
+    """
+    msg             = ""
+    cont            = True
+    data            = {}
+    success         = False    
+    account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    date_format     = "%Y-%m-%d %H:%M:%S"
+    current_time    = ""
+    
+    account.SetFunds( 5000.00, 0.50 )
+    try:        
+        print( '\t* About to live test: ', account )
+        Strategies.Set( configs['strategy'] , account)        
+        account.SetMode( "TEST")
+        for stock in configs['stock'].split(",") :
+            data[stock] = []
+
+        current_time = configs['replay_date'][:10] + " 09:30:00"
+        current_time = datetime.strptime( current_time, date_format)                                             
+        time_interval = 900
+        
+        while ( cont )  :
+            #print("\t\t\t\t + Current Time : " , current_time ) 
+            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
+                cont = False
+                print("\t\t\t\t -> Outside of market hours ")
+                
+            elif ( current_time.hour >= 12 and current_time.hour < 14)  and False   :               ## between 12  -> 2 seems to be loss filled
+                sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
+                print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
+                current_time +=  timedelta( seconds =sleep_time) 
+            elif ( current_time.hour == 16 and current_time.minute >= 00)   :               ## Sell whatever is InPlay
+                if  account.InPlay != {} :
+                    stocks = set( account.InPlay.keys() )
+                    for stock in stocks:                        
+                        account.Sell( stock, float(ticker_row[3]) )
+                cont = False
+            else:
+               # print(f"\t\t\t\t\t -> Quote @ { current_time }" )
+                ticker_row = account.Quote ( symbols= configs['stock'],  frequency= time_interval , endDate = current_time)                
+                if ticker_row != None:                    
+                    data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
+                    print(f"\t\t\t->DATA : {ticker_row} " ) 
+                    success , msg , time_interval = Strategies.Run(  ticker_row,  account )
+                    if msg.upper() == "BOUGHT" :
+                        print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval} min  : " )
+                        #time_interval = 300
+                    elif msg.upper() == "CLOSED" :
+                        print(f"\t\t\t   -> OUT Play - should shift from {time_interval} -> 15 min  : " )
+                        #time_interval = 900
+                        
+                    
+                    current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
+                        
+                else:
+                    cont = False
+                    print( 'Just received  empty ticker info ')
+        
+        # SEND TRANSACTIONS TO SQL
+        #send_transactions_to_sql( configs, account.Trades  )
+
+        # SEND DATA TO FILE
+        send_data_to_file( configs, data )
+
+        
+        # SEND EMAIL OF PERFORMANCE
+        summary_report( configs, data, account )
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
 
 
 
@@ -562,7 +573,7 @@ def  live_test( configs: dict  ) -> None :
     account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])  
     
     
-    account.SetFunds( 5000.00, 0.10 )
+    account.SetFunds( 5000.00, 01.00 )
 
     
     try:        
@@ -571,36 +582,45 @@ def  live_test( configs: dict  ) -> None :
         account.SetMode( "TEST")
         for stock in configs['stock'].split(",") :
             data[stock] = []
-
          
-        time_interval = 900 
-        while ( cont )  :
-            current_time = datetime.now()
+        time_interval   = 900
+        current_time    = datetime.now()
+        
+        while ( cont )  :            
             if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
                 cont = False
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
+            elif ( current_time.hour == 16 and current_time.minute >= 15) and True :               
+                if  account.InPlay != {} :
+                    stocks = set( account.InPlay.keys() )
+                    for stock in stocks:                        
+                        account.Sell( stock, float(ticker_row[3]) )
+                cont = False
             else:
-                td = account.Quote ( symbols=configs['stock'],  frequency=time_interval, endDate = current_time)
-                if td != None:
-                    ticker_row = [ stock,f"{datetime.now()}",f"{td['low']}",f"{td['close']}",f"{td['open']}",f"{td['volume']}"]
-                    data[stock].append( {'stock':stock,'datetime':f"{datetime.now()}",'low': float(td['low']),'quote':float(td['open']),
-                                                             'high':float(td['high']),'close':float(td['close']),'volume':float(td['volume']), 'interval': time_interval/60 })
+                ticker_row = account.Quote ( symbols=configs['stock'],  frequency=time_interval, endDate = current_time)
+                if ticker_row != None:                    
+                    print(f"\t\t\tDATE :{ticker_row}")
+                    data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
                 
                     success , msg , time_interval = Strategies.Run(  ticker_row,  account )
                     if msg.upper() == "BOUGHT" :
                         print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
                     elif msg.upper() == "CLOSED" :
-                        print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )                    
-                    print(f"\t\t Sleeping from : {time_interval} - { datetime.now() }",  )
-                    time.sleep( time_interval )
-                    print(f"\t\t  AWAKE  : {time_interval} - { datetime.now() } -> {time_interval}",  )                
+                        print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )   
+                    current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                 
+                    print(f"\t\t | Sleeping from : {sleep_interval} - { datetime.now() }",  )
+                    time.sleep( sleep_interval )
+                    print(f"\t\t \\--> AWAKE  : {time_interval} - { datetime.now() } -> {sleep_interval}",  )                
                 else:
                     cont = False
                     print( 'Just received  empty ticker info ')
-        
+            current_time    = datetime.now()
+            
+            
         # SEND TRANSACTIONS TO SQL
-        send_transactions_to_sql( configs, account.Trades  )
+        #send_transactions_to_sql( configs, account.Trades  )
 
         # SEND DATA TO FILE
         send_data_to_file( configs, data )
@@ -653,7 +673,7 @@ def  back_test( configs: dict  ) -> None :
                 new_data[  configs['stock'] ]       = []
                 thorHammer [  configs['stock'] ]    = { 'high' : -1,'low':-1, 'close': -1,'volume': -1 }
             
-            ticker_row = [f"{configs['stock']}",f"{row['timestamp']}",float(row['high']),float(row['low']),float(row['close']),float(row['volume'])]
+            ticker_row = [f"{configs['stock']}",f"{row['timestamp']}",float(row['high']),float(row['low']),float(row['close']),float(row['volume']),float(row['high'])]
             """  figure if this is useful at all
             if ( row['open'] == row['low']) :
                 print(f"\t\t\t******* Thor's Hammer : {  configs['stock'] } -> { row }")
@@ -696,16 +716,15 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         dt2     = []
         off_on  = True
         for entry in data[configs['stock']] :
-            dt1.append( entry.get('close',0)  )
+            dt1.append( float( entry.get('close',0))  )
             if off_on :
                 dt1_2.append( entry.get('datetime',0)[11:16].replace(':','') )
             else:
                 dt1_2.append( "")
             off_on = not off_on
-        for entry in account.Trades:
+        for entry in account.Trades:            
             if entry[0] == configs['stock'] :
-                dt2.append( entry[6] )
-            
+                dt2.append( float(entry[6]) )                
         fig, (ax1, ax2) = plt.subplots(2, 1)
         # GRAPH 1
         ax1.plot(dt1, color='blue')
@@ -754,10 +773,18 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         report.AddText( "OrderBook ", "h1", 1)    
         contents        = ""
         total_profit    = 0
+        print("\t ORDERBOOK")
         for entry in account.Trades:
             print("\t -  ", entry )            
             total_profit += entry[6]
+
+        # LIST OF INPLAY
+        print("\t InPLAY")
+        for inplay in account.InPlay:
+            print( "\t -  " , inplay ) 
+
         print( "* Account : " , account  , " : " , account.Funds , " : " , total_profit)
+
         
         report.AddTable( [['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']] +  account.Trades, "h3", 1 )        
         contents = f"* FUNDS : ${account.Funds}           TOTAL PROFIT: ${total_profit}"
@@ -779,10 +806,10 @@ def business_logic_test(current_time :str = "2025-08-16 15:27:35",  time_interva
         RETURNS :
                     datetime 
     """
-    date_format     = "%Y-%m-%d %H:%M:%S"
-    current_time    = datetime.strptime( current_time, date_format)
-    new_poll_time   = calculate_new_poll_time( current_time = current_time, time_interval  = 900)
-    print(f"\t\t * Business Logic Test: New Poll Time  {current_time} @ { time_interval}  == > {new_poll_time}")
+    date_format         = "%Y-%m-%d %H:%M:%S"
+    current_time        = datetime.strptime( current_time, date_format)
+    new_poll_time, _    = calculate_new_poll_time( current_time = current_time, time_interval  = 900) 
+    print(f"\t\t * Business Logic Test: New Poll Time  {current_time} @ { time_interval}  == > {new_poll_time }")
     return  new_poll_time
 
 

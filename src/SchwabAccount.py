@@ -146,7 +146,7 @@ class SchwabAccount :
         success  : bool  = False
         
         # Needs to add expires at for refresh token
-        if self.Tokens['refresh_expires_at'] < datetime.now() :
+        if self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens:
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
@@ -163,15 +163,15 @@ class SchwabAccount :
             Gets the price history of a stock, this seems more useful for the 15 / 5 / 1 min candles than getting the quotes 
 
             Args:
-                symbol (str): ticker symbol
-                periodType (str): period type ("day"|"month"|"year"|"ytd")
-                period (int): period
-                frequencyType (str): frequency type ("minute"|"daily"|"weekly"|"monthly")
-                frequency (int): frequency (frequencyType: options), (minute: 1, 5, 10, 15, 30), (daily: 1), (weekly: 1), (monthly: 1)
-                startDate (datetime.pyi | str): start date
-                endDate (datetime.pyi | str): end date
+                symbol                (str): ticker symbol
+                periodType            (str): period type ("day"|"month"|"year"|"ytd")
+                period                (int): period
+                frequencyType         (str): frequency type ("minute"|"daily"|"weekly"|"monthly")
+                frequency             (int): frequency (frequencyType: options), (minute: 1, 5, 10, 15, 30), (daily: 1), (weekly: 1), (monthly: 1)
+                startDate             (datetime.pyi | str): start date
+                endDate               (datetime.pyi | str): end date
                 needExtendedHoursData (bool): need extended hours data (True|False)
-                needPreviousClose (bool): need previous close (True|False)
+                needPreviousClose     (bool): need previous close (True|False)
 
             Returns:
                 request.Response: Dictionary containing candle history
@@ -266,10 +266,12 @@ class SchwabAccount :
         fields = None
         temp = ""
         try:
+            print("\t\t * Linked Accounts ") 
             temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params="", #self._params_parser({'fields': fields}),
                             timeout=self.Timeout).json()
+            print(f"\t\t  -> { temp } ")
         except:
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -318,8 +320,10 @@ class SchwabAccount :
         with open( ACCNT_TOKENS_FILE, 'wb') as file :
             pickle.dump( self.Tokens, file )
 
-        print ( "Updated the tokens file ", self.Tokens)
+        #print ( "Updated the tokens file ", self.Tokens)
         return True
+
+
 
     def LoadTokensFile( self ) -> bool :
         """
@@ -344,6 +348,8 @@ class SchwabAccount :
                            }
         
         return self.Tokens
+
+
 
                          
     def Authenticate( self ) -> bool :
@@ -420,6 +426,108 @@ class SchwabAccount :
 
 
 
+
+    def Buy( self, symbol : str , price : float, qty : int  ) -> bool :
+        """
+            Interface with Schwab account to place a BUY order for the symbol
+            ARGS    :
+                        symbol (str )   - stock symbol to buy
+                        price  ( float) - price to buy stock for
+                        qty    ( int )  - number of shares of the stock to purchase 
+            RETURNS  :
+                        True/False ( success ) 
+        """
+        success = False 
+        if self.Mode.lower()  == "test":
+            print( "\t\t\t   \\-> BUY Command : in test mode ")
+            return True
+        
+        accnt =  list(self.Accounts.keys())[0] 
+        buy_order = {
+            "orderType"                 : "LIMIT",
+            "session"                   : "NORMAL",
+            "duration"                  : "DAY",
+            "price"                     : price,
+            "orderStrategyType"         : "SINGLE",
+            "complexOrderStrategyType"  : "NONE",
+            "orderLegCollection"        : [
+                    {
+                        "instruction"   : "BUY",
+                        "quantity"      : qty,  # Number of shares
+                        "instrument"    : {
+                                                "symbol": symbol,
+                                                "assetType": "EQUITY"
+                                            }
+                        }
+                    ]
+            }
+        try:            
+            buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ accnt}/orders', # self.Accounts[accnt]["hashValue"]}
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            data=buy_order)            
+            print(f"\t\t * BUY ORDER Response: {buy_response} " )
+            success = True 
+        except Exception as e:                      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )   
+
+        return success
+
+
+
+
+    def Sell( self, symbol : str , price : float, qty : int  ) -> bool :
+        """
+            Interface with Schwab account to place a SELL order for the symbol
+            ARGS    :
+                        symbol (str )   - stock symbol to SELL
+                        price  ( float) - price to SELL stock for
+                        qty    ( int )  - number of shares of the stock to purchase 
+            RETURNS  :
+                        True/False ( success ) 
+        """
+        success = False 
+        if self.Mode.lower()  == "test":
+            print( "\t\t\t   \\-> SELL Command : in test mode ")
+            return True
+        
+        accnt =  list(self.Accounts.keys())[0] 
+        sell_order = {
+                    "orderType"                 : "LIMIT",
+                    "session"                   : "NORMAL",
+                    "duration"                  : "DAY",
+                    "price"                     : price,
+                    "orderStrategyType"         : "SINGLE",
+                    "complexOrderStrategyType"  : "NONE",
+                    "orderLegCollection": [
+                        {
+                                "instruction"       : "SELL",
+                                "quantity"          : qty,  # Number of shares
+                                "instrument"        : {
+                                                "symbol"    : symbol,
+                                                "assetType" : "EQUITY"
+                                }
+                        }
+                    ]
+            }
+        try:            
+            sell_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ accnt}/orders', # self.Accounts[accnt]["hashValue"]}
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            data=sell_order)            
+            print(f"\t\t * SELL ORDER  Response: {sell_response} " )
+            success = True 
+        except Exception as e:                      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )   
+
+        return success
+
+
+
+
+    
         
     def __str__(self ) -> str :
         """
