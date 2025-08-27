@@ -213,7 +213,7 @@ class TradeAccount:
         """
         qty             = 0
         success         = False
-        message_prefix  = "\t\t\t* TradeAccount::" + str(inspect.currentframe().f_code.co_name) 
+        message_prefix  = "\t\t\t* TradeAccount::" + str(inspect.currentframe().f_code.co_name)
 
         try :
             # IF MADE TARGET PERCENT THEN DONT BUY ANY MORE 
@@ -232,7 +232,9 @@ class TradeAccount:
                 print(message_prefix + "  Already holding, cant take any more ")
                 return success
 
-            qty         = int (( self.DailyFunds * self.Limit ) / price )       # instead of self.Funds, so we dont risk previous profits; might need to readjust if had a loss 
+            working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
+            print ( f"\t\t\t  \-> Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
+            qty             = int (working_capital / price )       # instead of self.Funds, so we dont risk previous profits; might need to readjust if had a loss 
             # ACTUALLY BUY SOME NOW IF MODE='TRADE'
             success = self.Conn.Buy( stock , price , qty ) 
 

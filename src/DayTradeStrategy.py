@@ -199,7 +199,7 @@ class DayTradeStrategy:
                  #ticker_row[5] < self.Stocks[ ticker_row[0] ]['Volume' ]['Bought'] :  # VOLUME IS STILL MOVING UP SO DONT SELL RIGHT NOW
                      return False, action, 900 #300
                  if ( ( float(ticker_row[ index ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                     print( f"\t\t\t   * SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : {delta} : {0.10 *  account.GetLimit() }" )
+                     print( f"\t\t\t   * SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : Profit_Trail_Stop : {profit_trail_stop} " )
                      if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ])  , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
                          success = True
                          self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0
