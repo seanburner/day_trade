@@ -50,7 +50,7 @@ class TradeAccount:
         """
             Returns string representation of the object 
         """
-        return f'\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit} ->{self.Limit * self.Funds}'
+        return f'\n\t\t |Mode : {self.Mode}\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit} ->{self.Limit * self.Funds} \n\t\t |DailyFunds : {self.DailyFunds}\n\t\t |TargetGoal : {self.TargetGoal}'
     
     def __iter__(self) -> object:
         """
