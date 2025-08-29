@@ -316,7 +316,7 @@ def parse_arguments() -> {} :
 			'end_date'          : { 'help': 'End date' ,  			            'action' : None}, 
 			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None }, 
 			'input_data'        : { 'help': 'Data file to be used during back_test',    'action' : None },
-                        'strategy'          : { 'help': 'Strategy to use ',                         'action' : None },
+                        'strategy'          : { 'help': 'Strategy to use [ basic/basic15/basicXm ]','action' : None },
                         'app_key'           : { 'help': 'Schwab application key ',                  'action' : None },
                         'app_secret'        : { 'help': 'Schwab application Secret ',               'action' : None },
                         'trading_platform'  : { 'help': 'Platform of your trading account [ Schwab]','action' : None},                        
@@ -504,12 +504,11 @@ def  replay_test( configs: dict  ) -> None :
             #print("\t\t\t\t + Current Time : " , current_time ) 
             if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
                 cont = False
-                print("\t\t\t\t -> Outside of market hours ")
-                
-            elif ( current_time.hour >= 12 and current_time.hour < 14)  and False   :               ## between 12  -> 2 seems to be loss filled
-                sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
-                print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
-                current_time +=  timedelta( seconds =sleep_time) 
+                print("\t\t\t\t -> Outside of market hours ")                  
+            #elif ( current_time.hour >= 12 and current_time.hour < 14)  and False   :               ## between 12  -> 2 seems to be loss filled
+            #    sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
+            #    print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
+            #    current_time +=  timedelta( seconds =sleep_time)            
             elif ( current_time.hour == 16 and current_time.minute >= 00)   :               ## Sell whatever is InPlay
                 if  account.InPlay != {} :
                     stocks = set( account.InPlay.keys() )

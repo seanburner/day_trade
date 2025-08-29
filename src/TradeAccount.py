@@ -108,7 +108,7 @@ class TradeAccount:
                         # print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
                          quote_info = entry
                          quote_info['symbol'] = candles['symbol']
-                         print( f"\t| {quote_info} \n\t| {candles['candles'][-1]}")
+                         #print( f"\t| {quote_info} \n\t| {candles['candles'][-1]}")
                          ticker_row = [candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
                                         quote_info['open'],quote_info['volume'],quote_info['high']   ]
                          return ticker_row
@@ -218,6 +218,7 @@ class TradeAccount:
         try :
             # IF MADE TARGET PERCENT THEN DONT BUY ANY MORE 
             if self.Funds > self.TargetGoal :
+                print("\t\t\t + TradeAccount::BUY -  Have already hit the TargetGoal  : { self.TargetGoal} " ) 
                 return False
 
             
@@ -233,7 +234,7 @@ class TradeAccount:
                 return success
 
             working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
-            print ( f"\t\t\t  \-> Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
+            print ( f"\t\t\t  \\-> Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
             qty             = int (working_capital / price )       # instead of self.Funds, so we dont risk previous profits; might need to readjust if had a loss 
             # ACTUALLY BUY SOME NOW IF MODE='TRADE'
             success = self.Conn.Buy( stock , price , qty ) 
@@ -254,7 +255,7 @@ class TradeAccount:
                 if not( stock  in self.Performance.keys() ) :
                     self.Performance[stock] = []
                 
-                print ( "\t\t\t  \-> BOUGHT : " , self.InPlay )
+                print ( "\t\t\t    \\-> BOUGHT : " , self.InPlay )
                 success = True
             else:
                 print("\t\t --> Account level could not execute BUY properly ")
@@ -312,7 +313,7 @@ class TradeAccount:
                 p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
                 self.Trades.append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
                             current_time, new_price, p_l ] )
-                print ( f"\t\t\t \-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
+                print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )
                 success = True

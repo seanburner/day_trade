@@ -1,6 +1,6 @@
 ## ###################################################################################################################
 ##  Program :   Day_Trade_Test
-##  Author  :
+##  Author  :   Sean A. Burner
 ##  Install :   pip3 install requests  inspect platform argparse 
 ##  Example :	Scaffolding for tests 
 ##  Notes   :

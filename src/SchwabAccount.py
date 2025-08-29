@@ -223,7 +223,7 @@ class SchwabAccount :
                                  'indicative': False},
                             timeout=self.Timeout)
         
-        print(f"Schwab:Quote - {response} - {response.text}")
+        #print(f"Schwab:Quote - {response} - {response.text}")
 
         return response.json()
 
