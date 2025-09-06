@@ -76,7 +76,7 @@ class MySQLConn:
                                         self.Results = list(self.Cursor.fetchall())
                                         if self.Results != None:
                                                 self.ResultSize = len(self.Results)
-                                                print ('Retrieved: ', self.ResultSize, ' : ' , self.Cursor.description)
+                                              #  print ('Retrieved: ', self.ResultSize, ' : ' , self.Cursor.description)
                                                 self.Groups = dict()
                                         else:
                                                 print ("Did not get results for this query: " + query )
@@ -91,7 +91,7 @@ class MySQLConn:
 			
 			
 	
-	def Write(self,query : str) -> None :
+	def Write(self,query : str) -> int | None :
                 """
                         SEND QUERY TO SERVER THAT MKES CHANGES TO DATABASE
                         ARGS   :
@@ -103,16 +103,22 @@ class MySQLConn:
                         if self.Conn != None :
                                 self.Cursor = self.Conn.cursor()
                                 self.Cursor.execute(query)
-                                self.Conn.commit()					#MIGHT HAVE TO SPIT INTO SOME THAT SELECTS AND SOMETHAT THAT INSERTS/UPDATES 
+                                self.Conn.commit()					#MIGHT HAVE TO SPIT INTO SOME THAT SELECTS AND SOMETHAT THAT INSERTS/UPDATES
+                                return self.Cursor.lastrowid
 			
                         self.Results = None
-                        self.ResultSize = 0 				
+                        self.ResultSize = 0
+                        
+                        return None
                 except:
                         e = sys.exc_info()[0]
                         f = sys.exc_info()[1]
                         print("\t\t|EXCEPTION: MySQLConn -WRITE() Ran into an exception" + str(e) + " : "  + str(f) ) #+ "\n\t\t|> " + query) 
 			# pymssql.Error as err: 
 			#print('\t| DVR ERR: ',err, "\n\t| SQL ERR : " , self.Cursor.description ,'\n\t| QUERY >> ', query)
+
+
+
 			
 	def WriteMany(self,header : str  , contents : str ) -> None : 
                 """
@@ -125,8 +131,8 @@ class MySQLConn:
                 try:
                         if self.Conn != None :
                                 self.Cursor = self.Conn.cursor()
-                                self.Cursor.executemany(header, contents)	
-			#	self.Conn.commit()					#MIGHT HAVE TO SPIT INTO SOME THAT SELECTS AND SOMETHAT THAT INSERTS/UPDATES 
+                                self.Cursor.executemany(header, contents)
+                                self.Conn.commit()					#MIGHT HAVE TO SPIT INTO SOME THAT SELECTS AND SOMETHAT THAT INSERTS/UPDATES 
 			
                         self.Results = None
                         self.ResultSize = 0 				

@@ -134,7 +134,17 @@ class SchwabAccount :
 #                raise ValueError(f"Unsupported time format: {format}")
 
 
-
+    def __str__(self ) -> str :
+        """
+            Returns string representation of the object
+        """
+        contents = "ACCOUNT  \t\t "
+        
+        for accnt in self.Accounts.keys():
+            contents += accnt + str(self.Accounts[accnt]['details'].keys())
+            
+        return "" #contents
+    
 
     def CheckAccessTokens(self) -> bool :
         """
@@ -234,8 +244,9 @@ class SchwabAccount :
             ARGS   :
             RETURNS: 
         """
-        if len( self.Accounts) > 0 :         
-            return self.Accounts[ list( self.Accounts.keys())[0]][ 'initialBalances'  ]['cashAvailableForTrading' ]
+        if len( self.Accounts) > 0 :
+            #print(self.Accounts[ list( self.Accounts.keys())[0]])
+            return self.Accounts[ list( self.Accounts.keys())[0]]['details'][ 'initialBalances'  ]['cashAvailableForTrading' ]
         else:
             return 0.0
 
@@ -250,9 +261,16 @@ class SchwabAccount :
         temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             timeout=self.Timeout).json()
-        
+        if 'errors' in temp :
+            print(f'\t\t\t SchwabAcccount::LinkedAccounts() - returned error from request : {temp} - Re-Authorizing')
+            success = self.Authenticate()
+            temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            timeout=self.Timeout).json()
+             
+            
         for entry in temp:
-            self.Accounts[ entry['accountNumber'] ] = {'hashValue' : entry['hashValue']}
+            self.Accounts[ entry['accountNumber'] ] = {'hashValue' : entry['hashValue'], 'details' : None }
             
         
 
@@ -271,12 +289,25 @@ class SchwabAccount :
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params="", #self._params_parser({'fields': fields}),
                             timeout=self.Timeout).json()
-            print(f"\t\t  -> { temp } ")
+            if 'errors' in temp :
+                print(f'\t\t\t SchwabAcccount::AccountDetails() - returned error from request : {temp}')
+                return
+
+            for accntDetail in temp :
+             #   print( f"ACCOUNTDETAIL  {accntDetail}  ") 
+             #   print( f"ACCOUNTDETAIL  KEYS {accntDetail.keys()}  ") 
+                for accntType in accntDetail.keys():   
+             #       print( f"ACCOUNT TYPE  {accntType} -> {accntDetail[accntType]} ")                  
+                    for accnt in self.Accounts.keys() :
+                        if ( ( 'accountNumber' in accntDetail[accntType] ) and (accnt == accntDetail[accntType]['accountNumber']) ) :
+              #              print( f"{accntType} -> {accnt}  ") 
+                            self.Accounts[ accnt ]['details'] = accntDetail[accntType]
+                            continue 
         except:
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
-                
+        """        
         for entry in temp:
             for currentKey in entry.keys():                
                 for accntKey in self.Accounts.keys():                
@@ -284,7 +315,7 @@ class SchwabAccount :
                         self.Accounts[ accntKey ] ['AccountType'] = currentKey
                         for key in entry[currentKey].keys() :
                             self.Accounts[accntKey][key] = entry[currentKey][key]
-       
+        """       
 
 
     def AccountOrders ( self, accountHash : str , fromTime : str , toTime : str , status : str = "open"  ) -> {}:

@@ -50,7 +50,9 @@ class TradeAccount:
         """
             Returns string representation of the object 
         """
-        return f'\n\t\t |Mode : {self.Mode}\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit} ->{self.Limit * self.Funds} \n\t\t |DailyFunds : {self.DailyFunds}\n\t\t |TargetGoal : {self.TargetGoal}'
+        return (f'\n\t\t |Mode : {self.Mode}' +
+                f'\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit} ->{self.Limit * self.Funds} ' +
+                f'\n\t\t |DailyFunds : {self.DailyFunds}\n\t\t |TargetGoal : {self.TargetGoal}' ) #+ f"{self.Conn}")
     
     def __iter__(self) -> object:
         """
@@ -69,8 +71,33 @@ class TradeAccount:
 
 
 
-
-  
+    def ExtractQuoteEntry( self, candles : dict , timeStamp :  int ) -> dict :        
+        """
+            The quote info returned has a lot of entries , need to find the specific one for the proper time period
+            ARGS    :
+                        candles     ( dict ) - response dictionary from quote request
+                        timeStamp   ( int  ) - unix formatted timestamp 
+            RETURNS :
+                        quote_info  ( dict ) 
+        """
+        pos         = 0 
+        ticker_row  = None
+        
+        for entry in candles['candles'] :
+            pos += 1
+            #print("TradeAccount :: QuoteByInterval() - TimeStamps : ",
+            #      str(datetime.fromtimestamp(entry['datetime']/1000)) , " - > ",
+            #      str(datetime.fromtimestamp(timeStamp/1000)) , " : " , entry['datetime']/1000, " -> ", timeStamp/1000, " = " , entry )
+            if ( entry['datetime']/1000 == timeStamp/1000 ):
+               print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
+               quote_info = entry
+               print( f"\tFOUND | {quote_info} -> {datetime.fromtimestamp(entry['datetime']/1000)}\n\t LAST | {candles['candles'][-1]} -> {datetime.fromtimestamp(candles['candles'][-1]['datetime']/1000)}")
+               quote_info['symbol'] = candles['symbol']
+               ticker_row = [candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
+                         quote_info['open'],quote_info['volume'],quote_info['high']   ]
+                        
+        return ticker_row
+    
     def Quote ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" , endDate : datetime = datetime.now()) -> requests.Response :
         """
             Abstraction to call the underlying client ( Schwab / ) to get a quote
@@ -85,15 +112,14 @@ class TradeAccount:
         ticker_row      = None 
         periodTypes     = ["day","month","year","ytd"]
         frequencyTypes  = ["minute","daily","weekly","monthly"]
+        
         try:
-            #return self.Conn.Quote( stocks)
             periodType      = 'day'
             period          = 1
             frequencyType   = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
             frequency       = int (15 if frequency/60 == 0 else frequency/60 )
-            startDate       = endDate - timedelta( seconds = frequency * 60) #datetime.now() - timedelta( seconds = frequency * 60)
-            #endDate         = datetime.now()  
-            #print( f"Frequency : {frequency} ->  {frequency }"  )
+            startDate       = endDate - timedelta( seconds = frequency * 60) 
+            
             candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
            
@@ -102,23 +128,26 @@ class TradeAccount:
             timeStamp = int(endDate.timestamp() * 1000)
             pos = 0
             if 'candles' in candles :
-                for entry in candles['candles'] :
-                    pos += 1
-                    if ( entry['datetime'] == timeStamp ):
-                        # print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
-                         quote_info = entry
-                         quote_info['symbol'] = candles['symbol']
-                         #print( f"\t| {quote_info} \n\t| {candles['candles'][-1]}")
-                         ticker_row = [candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
-                                        quote_info['open'],quote_info['volume'],quote_info['high']   ]
-                         return ticker_row
-                        
-                quote_info = candles['candles'][-1]
-                quote_info['symbol'] = candles['symbol']
-                new_quote_info = {}
-                for key in quote_info.keys():                  
-                    new_quote_info[key] =  float( quote_info[key]) if key in ['volume','open','close','high','low'] else quote_info[key]
-                ticker_row = [ candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
+                ticker_row = self.ExtractQuoteEntry( candles , timeStamp)
+                # A SECOND ATTEMPT INCASE THE FIRST WAS UNSUCCESSFUL
+                if ticker_row == None :
+                    candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
+                                              frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
+                    if 'candles' in candles :
+                        ticker_row = self.ExtractQuoteEntry( candles ,timeStamp)
+           
+                
+                #IF PROPER STILL IS NOT FOUND, THEN GET THE LAST ENTRY IN THE SERIES /RESPONSE DICT
+                if ticker_row == None :
+                    print(" **********  FAKING IT ************")
+                    for entry in candles['candles'] :
+                        print( f"\t>> {entry} -> {datetime.fromtimestamp(entry['datetime']/1000)}")
+                    quote_info = candles['candles'][-1]
+                    quote_info['symbol'] = candles['symbol']
+                    new_quote_info = {}
+                    for key in quote_info.keys():                  
+                        new_quote_info[key] =  float( quote_info[key]) if key in ['volume','open','close','high','low'] else quote_info[key]
+                    ticker_row = [ candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
                                         quote_info['open'],quote_info['volume'],quote_info['high']   ]
          
         except:            
@@ -213,28 +242,28 @@ class TradeAccount:
         """
         qty             = 0
         success         = False
-        message_prefix  = "\t\t\t* TradeAccount::" + str(inspect.currentframe().f_code.co_name)
+        message_prefix  = "\t\t\t   \\-> TradeAccount::" + str(inspect.currentframe().f_code.co_name)
 
         try :
             # IF MADE TARGET PERCENT THEN DONT BUY ANY MORE 
             if self.Funds > self.TargetGoal :
-                print("\t\t\t + TradeAccount::BUY -  Have already hit the TargetGoal  : { self.TargetGoal} " ) 
+                print(f"{message_prefix}   BUY -  Have already hit the TargetGoal  : { self.TargetGoal} " ) 
                 return False
 
             
             # CHECK IF CAN AFFORD TO BUY
             #print( "Check : " , str( type( price )) , " : " , str( type( self.Funds * self.Limit ))   )
             if price > ( self.Funds * self.Limit ):
-                print(message_prefix + f" Cant even buy ONE stock : {( self.Funds * self.Limit )}  " )
+                print(f"{message_prefix}   Cant even buy ONE stock : {( self.Funds * self.Limit )}  " )
                 return success
 
             # CHECK IF ALREADY HOLDING 
             if stock in self.InPlay.keys() :
-                print(message_prefix + "  Already holding, cant take any more ")
+                print(f"{message_prefix}   Already holding, cant take any more ")
                 return success
 
             working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
-            print ( f"\t\t\t  \\-> Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
+            print ( f"{message_prefix}   Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
             qty             = int (working_capital / price )       # instead of self.Funds, so we dont risk previous profits; might need to readjust if had a loss 
             # ACTUALLY BUY SOME NOW IF MODE='TRADE'
             success = self.Conn.Buy( stock , price , qty ) 
@@ -255,7 +284,7 @@ class TradeAccount:
                 if not( stock  in self.Performance.keys() ) :
                     self.Performance[stock] = []
                 
-                print ( "\t\t\t    \\-> BOUGHT : " , self.InPlay )
+                print ( f"{message_prefix}   BOUGHT : " , self.InPlay )
                 success = True
             else:
                 print("\t\t --> Account level could not execute BUY properly ")

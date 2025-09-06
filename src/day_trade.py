@@ -29,9 +29,10 @@ import pandas               as pd
 #import numpy  as np 
 import  matplotlib.pyplot   as plt
 
-from MySQLConn          import MySQLConn
+
 from datetime           import datetime, timedelta
 from PDFReport          import PDFReport
+from TraderDB           import TraderDB
 from TradeAccount       import TradeAccount
 from DayTradeStrategy   import DayTradeStrategy
 
@@ -134,7 +135,8 @@ def blank_config() -> dict:
                     'app_key'           : '',
                     'app_secret'        : '',
                     'email'             : '',
-                    'replay_date'       : '', 
+                    'replay_date'       : '',
+                    'volume_threshold'  : 70000,
                     'csv_input_fields'  : False,                    
                     'display_config'    : False,
                     'list_strategies'   : False,
@@ -321,9 +323,10 @@ def parse_arguments() -> {} :
                         'app_secret'        : { 'help': 'Schwab application Secret ',               'action' : None },
                         'trading_platform'  : { 'help': 'Platform of your trading account [ Schwab]','action' : None},                        
                         'replay_date'       : { 'help': 'Date to pull quotes to do a replay_test',  'action' : None },
+                        'volume_threshold'  : { 'help': 'Threshold for determining position entry', 'action' : None},
                         'sql_server'        : { 'help': 'The address of the sql server',            'action' : None},                        
                         'sql_user'          : { 'help': 'User account for SQL ',                    'action' : None},
-                        'sql_password'      : { 'help': 'Password for SQL account',                 'action' : None},
+                        'sql_password'      : { 'help': 'Password for SQL account',                 'action' : None},                  
 			'csv_input_fields'  : { 'help': 'Display the fields for the csv file',      'action' : 'store_true'},			
 			'display_config'    : { 'help': 'Display the configuration', 	            'action' : 'store_true'},
                         'list_strategies'   : { 'help': 'Display available strategies', 	    'action' : 'store_true'},
@@ -356,11 +359,24 @@ def system_test( configs : dict ) -> None :
     """
         Transiant - tests the integration of different code 
     """
-    account = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    email       = 'seanburner@gmail.com'
+    orderbook   = [
+                    ['OPEN', '2025-09-05 10:45:00', 6.1501, 406, '2025-09-05 11:00:00', 6.325, 71.00940000000037],
+                    ['OPEN', '2025-09-05 11:15:00', 6.442, 388, '2025-09-05 11:45:00', 6.4725, 11.833999999999833],
+                    ['OPEN', '2025-09-05 12:15:00', 6.46, 386, '2025-09-05 12:45:00', 6.515, 21.230000000000018],
+                    ['OPEN', '2025-09-05 13:15:00', 6.585, 379, '2025-09-05 13:30:00', 6.6254, 15.311599999999999],
+                    ['OPEN', '2025-09-05 13:45:00', 6.7375, 371, '2025-09-05 14:45:00', 6.655, -30.607499999999618],
+                    ['OPEN', '2025-09-05 15:00:00', 6.69, 373, '2025-09-05 15:30:00', 6.6, -33.57000000000062],
+                    ['OPEN', '2025-09-05 15:45:00', 6.64, 376, '2025-09-05 18:39:47.841177', 6.64, 0.0]
+        ]
+    #account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
 
+    traderDB.InsertOrderbook( orderbook = orderbook , email =email )
 
+    #print ( "UserID : " , traderDB.InsertUser ( userName = 'seanburner', email =email )  )
 
-
+    #traderDB.InsertDate( datetime.now() ) 
 
 
 
@@ -396,54 +412,11 @@ def send_data_to_file( configs : dict , data: dict   )   -> None :
             print("\t\t >>   " + str(entry) )
 
 
-
-
-
-    
-def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
+def send_transactions_to_sql( configs : dict , trades: list  ) -> None :
     """
-        SEND THE COMPLETED TRANSACTIONS TO SQL FOR REPORTING AND ANALYSIS LATER
-        ARGS   :
-                configs : configuration dictionary
-                trades  : list of entries 
-        RETURNS:
-                Nothing
-
-        create table orderbook ( id int auto_increment primary  key, yrmo  varchar(10), fulldate varchar(10) ,symbol varchar(10), initiatedAt varchar(20),bought decimal(10,2),qty int, closedAt varchar(20), sold  decimal(10,2), p_l decimal(10,2), time_interval int  );
-
-    """    
-    conn        = MySQLConn( )
-    indx        = 0
-    line        = ""
-    query       = ""
-
-    
-    try:
-        if len( trades ) == 0 :
-            return
-
-        if configs['sql_server'] == "" or  configs['sql_user'] == ""  or configs['sql_password'] == "" :
-            return 
-        
-        conn.Connect(server =configs['sql_server'], database='trading', username =configs['sql_user'], passwd =configs['sql_password'] )
-        query = "INSERT INTO trading.orderbook ( yrmo,fulldate,symbol, initiatedAt, bought, qty, closedAt, sold, p_l) values "
-        
-        for entry in trades :
-            line = f"'{entry[1][:7]}','{entry[1][:10]}'"          
-            for field in entry :
-                if len( line) > 1  :
-                    line += ','
-                line +=  "'" + (str(field)[:19] if len(str(field)) > 19 else str(field) ) +"'"
-            query += ( ',' if indx > 0 else '') + '(' + line + ')'
-            indx += 1
-            
-        print(f" QUERY : { query } " )
-        conn.Write( query ) 
-    except:
-        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-        for entry in sys.exc_info():
-            print("\t\t >>   " + str(entry) )
-
+        Use TraderDB class to properly normalize transactions and save 
+    """
+    traderDb = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
 
 
 def calculate_new_poll_time( current_time : datetime = datetime.now(), time_interval : int = 900) -> datetime :
@@ -516,13 +489,13 @@ def  replay_test( configs: dict  ) -> None :
                         account.Sell( stock, float(ticker_row[3]) )
                 cont = False
             else:
-               # print(f"\t\t\t\t\t -> Quote @ { current_time }" )
+               # print(f"\t\t\t\t\t -> Quote @ { current_time }" )      
                 ticker_row = account.Quote ( symbols= configs['stock'],  frequency= time_interval , endDate = current_time)                
                 if ticker_row != None:                    
                     data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
                     print(f"\t\t\t->DATA : {ticker_row} " ) 
-                    success , msg , time_interval = Strategies.Run(  ticker_row,  account )
+                    success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs['volume_threshold'])
                     if msg.upper() == "BOUGHT" :
                         print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval} min  : " )
                         #time_interval = 300
@@ -568,17 +541,18 @@ def  live_test( configs: dict  ) -> None :
     msg         = ""
     cont        = True
     data        = {}
-    success     = False    
+    success     = False
+    date_format     = "%Y-%m-%d %H:%M:%S"
     account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])  
     
     
     account.SetFunds( 5000.00, 01.00 )
 
     
-    try:        
-        print( '\t* About to live test: ', account )
+    try:  
         Strategies.Set( configs['strategy'] , account)        
-        account.SetMode( "TEST")
+        account.SetMode( "TEST")      
+        print( '\t* About to live test: ', account )
         for stock in configs['stock'].split(",") :
             data[stock] = []
          
@@ -597,6 +571,7 @@ def  live_test( configs: dict  ) -> None :
                         account.Sell( stock, float(ticker_row[3]) )
                 cont = False
             else:
+                current_time = datetime.strptime( str(current_time)[:17] +"00", date_format)  
                 ticker_row = account.Quote ( symbols=configs['stock'],  frequency=time_interval, endDate = current_time)
                 if ticker_row != None:                    
                     print(f"\t\t\tDATE :{ticker_row}")
@@ -615,6 +590,7 @@ def  live_test( configs: dict  ) -> None :
                 else:
                     cont = False
                     print( 'Just received  empty ticker info ')
+                    
             current_time    = datetime.now()
             
             
@@ -708,7 +684,10 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         Prep and send report of trading 
     """
     stock = configs['stock']
-    report = PDFReport( f"../reports/{stock}_{str(datetime.now())[:19]}.pdf")
+    if not os.path.exists(f"../reports/{configs['action']}/"):
+        os.mkdir(f"../reports/{configs['action']}/")
+        
+    report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{configs['strategy']}_{stock}.pdf")
     try:
         dt1     = []
         dt1_2   = []
@@ -723,8 +702,10 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
             off_on = not off_on
         for entry in account.Trades:            
             if entry[0] == configs['stock'] :
-                dt2.append( float(entry[6]) )                
-        fig, (ax1, ax2) = plt.subplots(2, 1)
+                dt2.append( float(entry[6]) )
+                
+        pixplt =plt
+        fig, (ax1, ax2) = pixplt.subplots(2, 1)
         # GRAPH 1
         ax1.plot(dt1, color='blue')
         #ax1.xticks([930,1100,1230,200,330,500,630])
@@ -738,8 +719,8 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         ax2.set_title(f"{configs['stock']} P & L")
         
         chart_graph = "../pix/graph1.png"
-        plt.tight_layout()
-        plt.show()
+        pixplt.tight_layout()
+        #pixplt.show()
         fig.savefig( chart_graph )
         report.AddImage( chart_graph ) 
         #report.AddLineChart2( configs['stock'],  dt  , ['A','B','C'])
@@ -789,6 +770,9 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         contents = f"* FUNDS : ${account.Funds}           TOTAL PROFIT: ${total_profit}"
         report.AddText( contents , "h3", 2)
         report.Save()
+
+        # DISPLAY AT THE END OF THINGS
+        pixplt.show()
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
