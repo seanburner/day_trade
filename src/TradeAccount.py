@@ -38,7 +38,8 @@ class TradeAccount:
         self.TargetGoal     = 0                        # Dont get greedy, when reach this amount will quit trading for day
         self.Mode           = ""                       # Are we Testing or Trading or something else
         self.Performance    = {}                       # Keep track of wins and loses
-        self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage  
+        self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage
+        self.LossLimit      = 0                        # HOW MUCH IS TOO MUH TO LOSE ON ONE TRADE   
 
         self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
 
@@ -185,7 +186,7 @@ class TradeAccount:
                         Nothing 
         """
         self.TargetGoal =  self.Funds  + (target * self.Funds) # ONLY NEED 1 % AT A TIME /DAILY
-
+        self.LossLimit  =  (target * self.Funds)
 
         
 
@@ -344,7 +345,10 @@ class TradeAccount:
                             current_time, new_price, p_l ] )
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
-                self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )
+                self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
+                if ( ( p_l * -1 ) > self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
+                    print( f"**Lost TOO MUCH on one deal : { p_l}  - > {self.LossLimit} ")
+                    self.TargetGoal = 0 
                 success = True
             else:
                 print ("\t\t --> Account  level did not Execute SELL properly ") 

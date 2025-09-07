@@ -79,6 +79,7 @@ class SchwabAccount :
        
         self.LinkedAccounts()
         self.AccountDetails()
+        self.AccountID = list(self.Accounts.keys())[0]
 
         """
         print ("\t\t\t -> Orders ")
@@ -482,9 +483,9 @@ class SchwabAccount :
             print( "\t\t\t   \\-> BUY Command : in test mode ")
             return True
         
-        accnt =  list(self.Accounts.keys())[0] 
+        accnt =  self.AccountID #list(self.Accounts.keys())[0] 
         buy_order = {
-            "orderType"                 : "LIMIT",
+            "orderType"                 : "MARKET",
             "session"                   : "NORMAL",
             "duration"                  : "DAY",            
             "price"                     : price,
@@ -533,7 +534,7 @@ class SchwabAccount :
             print( "\t\t\t   \\-> SELL Command : in test mode ")
             return True
         
-        accnt =  list(self.Accounts.keys())[0] 
+        accnt =  self.AccountID  #list(self.Accounts.keys())[0] 
         sell_order = {
                     "orderType"                 : "LIMIT",
                     "session"                   : "NORMAL",
@@ -554,7 +555,7 @@ class SchwabAccount :
             }
         try:            
             sell_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ accnt}/orders', # self.Accounts[accnt]["hashValue"]}
-                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             data=sell_order)            
             print(f"\t\t * SELL ORDER  Response: {sell_response} " )
             success = True 

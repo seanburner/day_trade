@@ -291,7 +291,7 @@ class DayTradeStrategy:
             #account.SetLimit( limit )
 
             # if volume is less than 1M there is no point in playing with it
-            if ticker_row[5] < 1000000 :
+            if ticker_row[5] < int(volume_threshold): #200000: #1000000 :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
                 return False, action, time_interval
 
@@ -391,7 +391,7 @@ class DayTradeStrategy:
 
     def DayTradeBasic_Xm ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
         """
-            Sets the limits for the account
+            Sets the limits for the account -> 5m to 1 min
 
             PARAMETER  :
                         ticker_row   : information about the stock and current price and volume
@@ -405,7 +405,7 @@ class DayTradeStrategy:
         action              = ""
         success             = False
         risk_percent        = 0.00015
-        time_interval       = 900
+        time_interval       = 300
         crash_out_percent   = 0.85      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
         
         try :
@@ -413,7 +413,7 @@ class DayTradeStrategy:
             #account.SetLimit( limit )
 
             # if volume is less than 2M there is no point in playing with it;  Might need to factor in MARKETCAP
-            if ticker_row[5] < 2000000 :
+            if ticker_row[5] < int(volume_threshold): #200000: #1000000 :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
                 return False, action, time_interval
 
@@ -497,11 +497,11 @@ class DayTradeStrategy:
                 if float(ticker_row[ index]) > float(self.Stocks[ ticker_row[0] ]['Price']['High']) :
                     self.Stocks[ ticker_row[0] ]['Price']['High'] = float(ticker_row[ index])
 
-            # CHANGE TO 5 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
+            # CHANGE TO 1 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
             if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 :
-                time_interval   = 300
+                time_interval   = 60
             else:
-                time_interval   = 900
+                time_interval   = 300
                 
             return success , action, time_interval 
             
