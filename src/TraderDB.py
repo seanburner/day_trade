@@ -212,15 +212,18 @@ class TraderDB:
             RETURNS :
                         dateId (int ) - date entry id from the dates table 
         """
-        query           = f"select dateId from dates where date = '{date}' ;"
+        query           = ""
         dateId          = None
         date_format     = "%Y-%m-%d %H:%M:%S"
         
+        if isinstance( date, str ) :
+            date = datetime.strptime( date[:19],  date_format)
+            
+        query           = f"select dateId from dates where date = '{date}' ;"    
+        
         self.Conn.Send( query )
         if self.Conn.Results == [] :
-            query =f"INSERT INTO dates( date, yearmo, year, month,day {self.InsertMetaFields( 0) }  ) values  ("            
-            if isinstance( date, str ) :
-                date = datetime.strptime( date[:19],  date_format)     
+            query =f"INSERT INTO dates( date, yearmo, year, month,day {self.InsertMetaFields( 0) }  ) values  ("       
             query += f"'{date}','{date.year}{date.month:02d}','{date.year}','{date.month:02d}','{date.day:02d}'"
             #else:
             #    query += f"'{date}','{datetime(date).year}{datetime(date).month}','{datetime(date).year}','{datetime(date).month}','{datetime(date).day}' "
@@ -290,62 +293,18 @@ class TraderDB:
             closeDateId = self.InsertDate(  date   = order[4] )
             self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
             if self.Conn.Results != [] :
-                print("\t Found PreExisting OrderBook Entry : ", order )
+                print("\t\t\t   | Found PreExisting OrderBook Entry : ", order )
                 dupeNum += 1
             else:
                 contents.append( [userId, initDateId,stockId,order[2],order[3],closeDateId,order[5],order[6], *self.InsertMetaFields(2)  ] )
                 numRec += 1
+
+        if contents != []:
+            self.Conn.WriteMany( header = header, contents = contents )
         
-        self.Conn.WriteMany( header = header, contents = contents )
-        
-        print (f"\t\t\t -> Inserted {numRec} entries  with  {dupeNum} duplicates  into orderbook" )
+        print (f"\t\t\t -> Inserted {numRec} entries, while ignoring {dupeNum} duplicates in orderbook" )
 
 
 
 
-    
-def send_transactions_to_sql( configs : dict , trades: list  )   -> None :
-    """
-        SEND THE COMPLETED TRANSACTIONS TO SQL FOR REPORTING AND ANALYSIS LATER
-        ARGS   :
-                configs : configuration dictionary
-                trades  : list of entries 
-        RETURNS:
-                Nothing
-
-        create table orderbook ( id int auto_increment primary  key, yrmo  varchar(10), fulldate varchar(10) ,symbol varchar(10), initiatedAt varchar(20),bought decimal(10,2),qty int, closedAt varchar(20), sold  decimal(10,2), p_l decimal(10,2), time_interval int  );
-
-    """    
-    conn        = MySQLConn( )
-    indx        = 0
-    line        = ""
-    query       = ""
-
-    
-    try:
-        if len( trades ) == 0 :
-            return
-
-        if configs['sql_server'] == "" or  configs['sql_user'] == ""  or configs['sql_password'] == "" :
-            return 
-        
-        conn.Connect(server =configs['sql_server'], database='trading', username =configs['sql_user'], passwd =configs['sql_password'] )
-        query = "INSERT INTO trading.orderbook ( yrmo,fulldate,symbol, initiatedAt, bought, qty, closedAt, sold, p_l) values "
-        
-        for entry in trades :
-            line = f"'{entry[1][:7]}','{entry[1][:10]}'"          
-            for field in entry :
-                if len( line) > 1  :
-                    line += ','
-                line +=  "'" + (str(field)[:19] if len(str(field)) > 19 else str(field) ) +"'"
-            query += ( ',' if indx > 0 else '') + '(' + line + ')'
-            indx += 1
-            
-        print(f" QUERY : { query } " )
-        conn.Write( query ) 
-    except:
-        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-        for entry in sys.exc_info():
-            print("\t\t >>   " + str(entry) )
-
-        
+  

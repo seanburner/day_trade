@@ -369,13 +369,20 @@ def system_test( configs : dict ) -> None :
                     ['OPEN', '2025-09-05 15:00:00', 6.69, 373, '2025-09-05 15:30:00', 6.6, -33.57000000000062],
                     ['OPEN', '2025-09-05 15:45:00', 6.64, 376, '2025-09-05 18:39:47.841177', 6.64, 0.0]
         ]
-    #account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
-    traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+    account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    account.SetFunds( 5000.00, 0.50 )    
+    account.SetTargetGoal( 0.025  )
+    account.SetMode("LIVE")
+    #print( account.Conn.Accounts['88867477']['hashValue'])
+    #account.Conn.AccountOrders(account.Conn.Accounts[0][) 
+    #account.Conn.Buy( symbol ='OPEN', price=6.00, qty =1 )
 
-    traderDB.InsertOrderbook( orderbook = orderbook , email =email )
+    
+    #traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+
+    #traderDB.InsertOrderbook( orderbook = orderbook , email =email )
 
     #print ( "UserID : " , traderDB.InsertUser ( userName = 'seanburner', email =email )  )
-
     #traderDB.InsertDate( datetime.now() ) 
 
 
@@ -428,7 +435,7 @@ def calculate_new_poll_time( current_time : datetime = datetime.now(), time_inte
         RETURNS :
                     datetime
     """
-    detlas      = 0
+    deltas      = 0
     fake_time   = None 
     try:
         fake_time   = current_time + timedelta( seconds =time_interval)

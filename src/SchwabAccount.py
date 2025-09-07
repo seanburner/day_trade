@@ -79,11 +79,20 @@ class SchwabAccount :
        
         self.LinkedAccounts()
         self.AccountDetails()
-       
-        for accnt in self.Accounts.keys() :
-            self.AccountOrders ( self.Accounts[accnt]['hashValue'], "","","") #str( datetime.now()) , str( datetime.now()) ,  status  = "open"  )
 
-   
+        """
+        print ("\t\t\t -> Orders ")
+        statuses = ['AWAITING_PARENT_ORDER', 'AWAITING_CONDITION', 'AWAITING_STOP_CONDITION', 'AWAITING_MANUAL_REVIEW',
+                  'ACCEPTED', 'AWAITING_UR_OUT', 'PENDING_ACTIVATION', 'QUEUED', 'WORKING','REJECTED', 'PENDING_CANCEL',
+                  'CANCELED', 'PENDING_REPLACE', 'REPLACED', 'FILLED', 'EXPIRED', 'NEW', 'AWAITING_RELEASE_TIME',
+                  'PENDING_ACKNOWLEDGEMENT', 'PENDING_RECALL','UNKNOWN']
+        for accnt in self.Accounts.keys() :
+            print ("\t\t\t   |  ", accnt )
+            for status in statuses:
+                print ("\t\t\t\t   \\->  ", status)
+                self.AccountOrders ( self.Accounts[accnt]['hashValue'], "2025-08-07T23:43:02.120605Z","2025-09-07T23:43:02.120605Z",status) #str( datetime.now()) , str( datetime.now()) ,  status  = "open"  )
+
+        """
 
 
 
@@ -330,11 +339,11 @@ class SchwabAccount :
         temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params={'maxResults': 50,
-                                 'fromEnteredTime': str( datetime.now() - timedelta( days = 30) ),
-                                 'toEnteredTime'  : str( datetime.now() ),
+                                 'fromEnteredTime': fromTime ,#str( datetime.now() - timedelta( days = 30) ),
+                                 'toEnteredTime'  : toTime, # str( datetime.now() ),
                                  'status': status},
                             timeout=self.Timeout)
-
+        print("\t\t\t\t      * ", temp.json() )
         
 
 
@@ -477,10 +486,10 @@ class SchwabAccount :
         buy_order = {
             "orderType"                 : "LIMIT",
             "session"                   : "NORMAL",
-            "duration"                  : "DAY",
+            "duration"                  : "DAY",            
             "price"                     : price,
             "orderStrategyType"         : "SINGLE",
-            "complexOrderStrategyType"  : "NONE",
+        #    "complexOrderStrategyType"  : "NONE",
             "orderLegCollection"        : [
                     {
                         "instruction"   : "BUY",
@@ -492,11 +501,12 @@ class SchwabAccount :
                         }
                     ]
             }
+        print ( buy_order )
         try:            
             buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ accnt}/orders', # self.Accounts[accnt]["hashValue"]}
-                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             data=buy_order)            
-            print(f"\t\t * BUY ORDER Response: {buy_response} " )
+            print(f"\t\t * BUY ORDER Response: {buy_response.json()} " )
             success = True 
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
