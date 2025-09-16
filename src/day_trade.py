@@ -375,7 +375,7 @@ def system_test( configs : dict ) -> None :
     account.SetMode("LIVE")
     #print( account.Conn.Accounts['88867477']['hashValue'])
     #account.Conn.AccountOrders(account.Conn.Accounts[0][) 
-    #account.Conn.Buy( symbol ='OPEN', price=6.00, qty =1 )
+    account.Conn.Buy( symbol ='OPEN', price=6.00, qty =1 )
 
     
     #traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
@@ -533,8 +533,18 @@ def  replay_test( configs: dict  ) -> None :
 
 
 
-
-def  live_test( configs: dict  ) -> None :
+def  live_trade( configs : dict  ) -> None :
+    """
+        Trade live on the trading platform ( buys and sells ) - Set params to move to the next level
+        ARGS   :
+                    configs  ( dict ) - configuration values 
+        RETURNS:
+                    nothing 
+    """
+    params  = { 'mode' : 'LIVE' , 'time_interval' : 900}
+    trade_center( configs , params  )
+    
+def  live_test ( configs : dict  ) -> None :
     """
         Test the strategy by using live data 
         Provide  charts for confirmation
@@ -545,6 +555,19 @@ def  live_test( configs: dict  ) -> None :
         RETURNS    :
                     Nothing 
     """
+    params  = { 'mode' : 'TEST','time_interval' : 900 }
+
+    trade_center( configs , params  )
+    
+def  trade_center( configs :  dict , params : dict ) -> None :
+    """
+        Accept configs and params to decide to live trade or test trade
+        ARGS   :
+                    configs  ( dict ) - system wide configuration for trading
+                    params   ( dict ) - parameters for test mode or live mode 
+        RETURNS:
+                    nothing 
+    """    
     msg         = ""
     cont        = True
     data        = {}
@@ -553,17 +576,17 @@ def  live_test( configs: dict  ) -> None :
     account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])  
     
     
-    account.SetFunds( 5000.00, 01.00 )
+    account.SetFunds( 5000.00, 0.50 )
 
     
     try:  
         Strategies.Set( configs['strategy'] , account)        
-        account.SetMode( "TEST")      
+        account.SetMode( params['mode'] )      
         print( '\t* About to live test: ', account )
         for stock in configs['stock'].split(",") :
             data[stock] = []
          
-        time_interval   = 900
+        time_interval   = params['time_interval']
         current_time    = datetime.now()
         
         while ( cont )  :            
@@ -599,13 +622,13 @@ def  live_test( configs: dict  ) -> None :
                     print( 'Just received  empty ticker info ')
                     
             current_time    = datetime.now()
-            
-            
-        # SEND TRANSACTIONS TO SQL
-        #send_transactions_to_sql( configs, account.Trades  )
+                    
+        if params['mode']  == 'LIVE':
+            # SEND TRANSACTIONS TO SQL
+            send_transactions_to_sql( configs, account.Trades  )
 
-        # SEND DATA TO FILE
-        send_data_to_file( configs, data )
+            # SEND DATA TO FILE
+            send_data_to_file( configs, data )
 
         
         # SEND EMAIL OF PERFORMANCE
@@ -844,11 +867,12 @@ def main() -> None :
 
         # ACTION == DOWNLOAD / BACK_TEST / TRADE
         hub = {
-                'download'  : download_stock_data,
-                'back_test' : back_test,
-                'test'      : system_test,
-                'live_test' : live_test,
-                'replay_test': replay_test
+                'download'      : download_stock_data,
+                'back_test'     : back_test,
+                'test'          : system_test,
+                'live_test'     : live_test,
+                'live_trade'    : live_trade,
+                'replay_test'   : replay_test
             }
 
         hub[ configs ['action'] ] ( configs  ) 

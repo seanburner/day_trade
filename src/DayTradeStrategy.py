@@ -310,6 +310,14 @@ class DayTradeStrategy:
                     print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " )
                     self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0 
                     return False, action, time_interval
+
+                #  IF THE CANDLES CLOSES LOWER THAN IT OPENS THEN DONT BUY                
+                if ( float(ticker_row[3]) <  float(ticker_row[4]) ) :  #  PRICE CLOSED LOWER THAN IT OPENED
+                    print( f"\t\t\t  *  BUY:: PRICE CLOSED LOWER THAN IT OPENED : CLOSED={ticker_row[ 3 ]} OPENED={ticker_row[4] }   LOW={ticker_row[2] }  HIGH={ticker_row[6] }  " )
+                    self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0 
+                    return False, action, time_interval
+
+                
                 
                 self.Stocks[ ticker_row[0]]['Price']['Occur']  += 1
                 if self.Stocks[ ticker_row[0]]['Price']['Occur']  < 1 :  # TWO consecutive upward moves with appropriate volume 
@@ -432,6 +440,9 @@ class DayTradeStrategy:
                     print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " )
                     self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0
                     return False, action, time_interval
+
+                #  IF THE CANDLES CLOSES LOWER THAN IT OPENS THEN DONT BUY 
+
                 
                 self.Stocks[ ticker_row[0]]['Price']['Occur']  += 1
                 if self.Stocks[ ticker_row[0]]['Price']['Occur']  < 1 :  # TWO consecutive upward moves with appropriate volume 

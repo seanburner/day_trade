@@ -478,17 +478,21 @@ class SchwabAccount :
             RETURNS  :
                         True/False ( success ) 
         """
-        success = False 
+        return True
+        success = False
+        
         if self.Mode.lower()  == "test":
             print( "\t\t\t   \\-> BUY Command : in test mode ")
             return True
+
+        
         
         accnt =  self.AccountID #list(self.Accounts.keys())[0] 
         buy_order = {
             "orderType"                 : "MARKET",
             "session"                   : "NORMAL",
             "duration"                  : "DAY",            
-            "price"                     : price,
+         #   "price"                     : price,
             "orderStrategyType"         : "SINGLE",
         #    "complexOrderStrategyType"  : "NONE",
             "orderLegCollection"        : [
@@ -502,13 +506,20 @@ class SchwabAccount :
                         }
                     ]
             }
-        print ( buy_order )
+        
         try:            
-            buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ accnt}/orders', # self.Accounts[accnt]["hashValue"]}
+            buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]["hashValue"]}/orders',  
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
-                            data=buy_order)            
-            print(f"\t\t * BUY ORDER Response: {buy_response.json()} " )
-            success = True 
+                            json=buy_order)
+
+            print(f"\t\t * BUY ORDER Response: {buy_response.content} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            
+            if buy_response.status_code == 201 :
+                print("\t\t   -> SchwabAccount -  BUY ORDER submitted successsfully ")
+                success = True
+            else:
+                print("\t\t   -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
+                
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -536,10 +547,10 @@ class SchwabAccount :
         
         accnt =  self.AccountID  #list(self.Accounts.keys())[0] 
         sell_order = {
-                    "orderType"                 : "LIMIT",
+                    "orderType"                 : "MARKET",
                     "session"                   : "NORMAL",
                     "duration"                  : "DAY",
-                    "price"                     : price,
+                  #  "price"                     : price,           # PRICE IS ONLY VALID WITH ORDERTYPE =LIMIT
                     "orderStrategyType"         : "SINGLE",
                     "complexOrderStrategyType"  : "NONE",
                     "orderLegCollection": [
@@ -554,11 +565,18 @@ class SchwabAccount :
                     ]
             }
         try:            
-            sell_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ accnt}/orders', # self.Accounts[accnt]["hashValue"]}
+            sell_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ self.Accounts[accnt]["hashValue"]}/orders', 
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
-                            data=sell_order)            
+                            json=sell_order)
+            
             print(f"\t\t * SELL ORDER  Response: {sell_response} " )
-            success = True 
+            
+            if sell_response.status_code == 201 :
+                print("\t\t   -> SchwabAccount -  SELL ORDER submitted successsfully ")
+                success = True
+            else:
+                print("\t\t   -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
+
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():

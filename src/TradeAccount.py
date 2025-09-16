@@ -192,7 +192,11 @@ class TradeAccount:
 
     def SetMode ( self, mode : str ) -> None :
         """
-            Sets the mode of the application : TEST / TRADE 
+            Sets the mode of the application : TEST / TRADE
+            ARGS   :
+                        mode  ( str )  - test/live
+            RETURNS:
+                        nothing 
         """
         self.Mode = self.Conn.Mode = mode
 
@@ -247,7 +251,7 @@ class TradeAccount:
 
         try :
             # IF MADE TARGET PERCENT THEN DONT BUY ANY MORE 
-            if self.Funds > self.TargetGoal :
+            if self.TargetGoal  == 0  :#and self.Funds > self.TargetGoal :
                 print(f"{message_prefix}   BUY -  Have already hit the TargetGoal  : { self.TargetGoal} " ) 
                 return False
 
@@ -346,8 +350,8 @@ class TradeAccount:
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
-                if ( ( p_l * -1 ) > self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
-                    print( f"**Lost TOO MUCH on one deal : { p_l}  - > {self.LossLimit} ")
+                if ( ( p_l * -1 ) > 0.01 * self.DailyFunds ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
+                    print( f"**Lost TOO MUCH on one deal : { p_l}  -> {self.LossLimit} ")
                     self.TargetGoal = 0 
                 success = True
             else:
