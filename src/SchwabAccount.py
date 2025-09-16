@@ -166,7 +166,7 @@ class SchwabAccount :
         success  : bool  = False
         
         # Needs to add expires at for refresh token
-        if self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens:
+        if self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens  and 'refresh_token' in self.Tokens):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
