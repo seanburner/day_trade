@@ -267,6 +267,13 @@ class TradeAccount:
                 print(f"{message_prefix}   Already holding, cant take any more ")
                 return success
 
+            #IF THE CURRENT PRICE IS BELOW THE PREVIOUS PRICE WE BOUGHT AT , SHOULD WE BE BUYING ????            
+            if len( self.Trades ) > 0 :
+                lenth = len( self.Trades ) - 1 
+                if self.Trades[ lenth][2] > price :
+                    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[lenth][2]} ")
+                    return success 
+
             working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
             print ( f"{message_prefix}   Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
             qty             = int (working_capital / price )       # instead of self.Funds, so we dont risk previous profits; might need to readjust if had a loss 

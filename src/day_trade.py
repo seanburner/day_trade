@@ -353,22 +353,107 @@ def parse_arguments() -> {} :
 
 
 
+from schwab.auth import easy_client
+from schwab.client import Client
+from schwab.streaming import StreamClient
+
+import asyncio
+import json
 
 
-def system_test( configs : dict ) -> None :
+
+async def read_stream( stream_client):
+    await stream_client.login()
+
+    def print_message(message):
+      print(json.dumps(message, indent=4))
+
+    # Always add handlers before subscribing because many streams start sending
+    # data immediately after success, and messages with no handlers are dropped.
+    stream_client.add_nasdaq_book_handler(print_message)
+    await stream_client.nasdaq_book_subs(['GOOG'])
+
+    while True:
+        await stream_client.handle_message()
+
+
+
+
+def system_test( configs : dict  ) -> None :
+    account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    print('Preferences: ', account.Conn.Preference )
+
+    account.Conn.Quote('AMD')
+
+"""
+/trader/v1/userPreference 
+{
+    "requests":[
+        {
+            "requestid" :'1",
+            "service" : "ADMIN",
+            "command" :"LOGIN",
+            "SchwabClientCustomerId":"XXX",
+            "SchwabClientCorrelId" : "XXX",
+            "parameters":{
+                "Authorization" :"access-token ",
+                "SchwabClientChannel":"N9",
+                'SchwabClientFundtionId" :"APIAPP"
+                },
+            }
+        ]
+    }
+{
+    "requests":[
+        {            
+            "service" : "LEVELONE_EQUITIES",
+            "requestid" : 1, << incremented for each request
+            "command" :"ADD",  << unsub / view
+            "SchwabClientCustomerId":"XXX",
+            "SchwabClientCorrelId" : "XXX",
+            "parameters":{
+                "keys" :"AMD,INTC",
+                "fields" : '0,1,2,3,4,5,8"
+                },
+            }
+        ]
+    }
+"""
+
+
+def system_test1( configs : dict  ) -> None :
+
+    #account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+   
+    client = easy_client(
+        api_key      = configs['app_key'],
+        app_secret   = configs['app_secret'],
+        callback_url ='https://127.0.0.1:8114',
+        token_path   ='/files/account_tokens.json',
+        interactive=False)
+    
+    stream_client = StreamClient(client, account_id=88867477, show_linked=False)
+
+    print ( stream_client.quote("AMD").json() )
+    
+    asyncio.run(read_stream( stream_client))
+
+
+
+def system_test_old( configs : dict ) -> None :
     """
         Transiant - tests the integration of different code 
     """
     email       = 'seanburner@gmail.com'
     orderbook   = [
-                    ['OPEN', '2025-09-05 10:45:00', 6.1501, 406, '2025-09-05 11:00:00', 6.325, 71.00940000000037],
-                    ['OPEN', '2025-09-05 11:15:00', 6.442, 388, '2025-09-05 11:45:00', 6.4725, 11.833999999999833],
-                    ['OPEN', '2025-09-05 12:15:00', 6.46, 386, '2025-09-05 12:45:00', 6.515, 21.230000000000018],
-                    ['OPEN', '2025-09-05 13:15:00', 6.585, 379, '2025-09-05 13:30:00', 6.6254, 15.311599999999999],
-                    ['OPEN', '2025-09-05 13:45:00', 6.7375, 371, '2025-09-05 14:45:00', 6.655, -30.607499999999618],
-                    ['OPEN', '2025-09-05 15:00:00', 6.69, 373, '2025-09-05 15:30:00', 6.6, -33.57000000000062],
-                    ['OPEN', '2025-09-05 15:45:00', 6.64, 376, '2025-09-05 18:39:47.841177', 6.64, 0.0]
-        ]
+                    ['OPEN', '2025-09-05 10:45:00', 6.1501, 406, '2025-09-05 11:00:00', 6.325,  71.00940000000037],
+                    ['OPEN', '2025-09-05 11:15:00', 6.442,  388, '2025-09-05 11:45:00', 6.4725, 11.833999999999833],
+                    ['OPEN', '2025-09-05 12:15:00', 6.46,   386, '2025-09-05 12:45:00', 6.515,  21.230000000000018],
+                    ['OPEN', '2025-09-05 13:15:00', 6.585,  379, '2025-09-05 13:30:00', 6.6254, 15.311599999999999],
+                    ['OPEN', '2025-09-05 13:45:00', 6.7375, 371, '2025-09-05 14:45:00', 6.655,  -30.607499999999618],
+                    ['OPEN', '2025-09-05 15:00:00', 6.69,   373, '2025-09-05 15:30:00', 6.6,    -33.57000000000062],
+                    ['OPEN', '2025-09-05 15:45:00', 6.64,   376, '2025-09-05 18:39:47', 6.64,   0.0]
+                ]
     account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
     account.SetFunds( 5000.00, 0.50 )    
     account.SetTargetGoal( 0.025  )
@@ -424,6 +509,11 @@ def send_transactions_to_sql( configs : dict , trades: list  ) -> None :
         Use TraderDB class to properly normalize transactions and save 
     """
     traderDb = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+
+    traderDB.InsertOrderbook(orderbook=trades , email=configs['email']  )
+
+
+
 
 
 def calculate_new_poll_time( current_time : datetime = datetime.now(), time_interval : int = 900) -> datetime :
@@ -541,8 +631,10 @@ def  live_trade( configs : dict  ) -> None :
         RETURNS:
                     nothing 
     """
-    params  = { 'mode' : 'LIVE' , 'time_interval' : 900}
+    params  = { 'mode' : 'TRADE' , 'time_interval' : 900}
     trade_center( configs , params  )
+
+
     
 def  live_test ( configs : dict  ) -> None :
     """
@@ -558,6 +650,9 @@ def  live_test ( configs : dict  ) -> None :
     params  = { 'mode' : 'TEST','time_interval' : 900 }
 
     trade_center( configs , params  )
+
+
+
     
 def  trade_center( configs :  dict , params : dict ) -> None :
     """
@@ -568,21 +663,21 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         RETURNS:
                     nothing 
     """    
-    msg         = ""
-    cont        = True
-    data        = {}
-    success     = False
-    date_format     = "%Y-%m-%d %H:%M:%S"
-    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])  
+    msg             = ""
+    cont            = True
+    data            = {}
+    account         = TradeAccount(funds=100, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    success         = False
+    date_format     = "%Y-%m-%d %H:%M:%S"  
     
     
-    account.SetFunds( 5000.00, 0.50 )
+    account.SetFunds( 100, 1.0 )  #5000.00, 0.50 )
 
     
     try:  
         Strategies.Set( configs['strategy'] , account)        
         account.SetMode( params['mode'] )      
-        print( '\t* About to live test: ', account )
+        print( f'\t* About to live {params["mode"]}: ', account )
         for stock in configs['stock'].split(",") :
             data[stock] = []
          
@@ -623,7 +718,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                     
             current_time    = datetime.now()
                     
-        if params['mode']  == 'LIVE':
+        if params['mode']  == 'TRADE':
             # SEND TRANSACTIONS TO SQL
             send_transactions_to_sql( configs, account.Trades  )
 

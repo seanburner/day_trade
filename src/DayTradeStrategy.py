@@ -154,16 +154,16 @@ class DayTradeStrategy:
         profit              = 0
         action              = ""
         success             = False
-        risk_percent        = 0.00015
+        risk_percent        = 0.0015
         time_interval       = 900
-        crash_out_percent   = 0.85      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
+        crash_out_percent   = 0.92      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
         
         try :
             #print("basic bitch ")
             #account.SetLimit( limit )
 
-            # if volume is less than 1M there is no point in playing with it
-            if ticker_row[5] < int(volume_threshold): #200000: #1000000 :
+            # if volume is less than 1M there is no point in playing with it --  SHOULD THIS ONLY BE FOR THE BUYS / STOP FROM BUYING WHEN VOLUME IS TOO LOW ???
+            if ticker_row[5] < int(volume_threshold)   and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0  : #200000: #1000000 :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
                 return False, action, time_interval
 
@@ -226,12 +226,13 @@ class DayTradeStrategy:
             #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
             if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and( ( (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) )  or
                      (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) )  )  and
-                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):                 
+                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):
+                 print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : Current price is below what we bought for  or  ( lower than previous and the volume is lower than previous) "   )
                  profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
                  strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
                  crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
-                 # dont sell unless crashing AND atleast 80% purchase, try to wait it out 
-                 if  (float(ticker_row[ index ]) > crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
+                 # dont sell unless crashing AND atleast 80% purchase, try to wait it out , BOXL fell fast and did not trigger this  so need to FIX 
+                 if  (float(ticker_row[ index ]) < crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
                      print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP :{ profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
                      if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ]) , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
                          success = True

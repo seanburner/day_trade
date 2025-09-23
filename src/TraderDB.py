@@ -51,10 +51,10 @@ class TraderDB:
         users   = ("DELIMITER // "+
                     " CREATE PROCEDURE createTableUsers( INOUT dbName  varchar(20)  )  " +
                     " BEGIN  " +
-                    " create table if not exists  users ( userId int auto_increment PRIMARY KEY not null, " +
-                       " firstName varchar(20) , lastName  varchar(20),username varchar(20), passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
-                       "active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date ); "+
-                    " INSERT INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
+                    " create table if not exists  users ( userId int auto_increment not null, " +
+                       " firstName varchar(20) , lastName  varchar(20),username varchar(20) PRIMARY KEY NOT NULL, passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
+                       "active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date ); "+                   
+                    " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
                     "end // " +
                     "DELIMITER; " )
         verifyUser = (" DELIMITER // " +
@@ -81,35 +81,31 @@ class TraderDB:
                     " end // "+ 
                     "DELIMITER; ")
 
-        encryptKeys = ("DELIMITER // " +
-                        " CREATE PROCEDURE createTableEncKeys( INOUT dbName  varchar(20)  ) " +  
-                        " BEGIN  " +
-                        "  create table if not exists encryptKeys( encKeyId int auto_increment PRIMARY KEY not null, " +
-                        "       userId int not null, enckey varchar(255), " +
-                        "       active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date," +
-                        "       FOREIGN KEY(userId) REFERENCES users(userId)  ); "+
-                        " end // "+ 
-                        "DELIMITER; " )
-                            
-        orderbook = ("create table orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null, stockId not null, " +
-                    "bid decimal(10,4) not null , qty  int not null ,  closed  int not null,  ask  decimal(10,4), p_l decimal(10,4) , " +                    
-                    " active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date,  " +
-                    "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
-                    "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
-                    "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
-                    "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); ")
 
-        v_orderbook = ("DELIMITER // "+
+        orderbook = ("DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderBook(  INOUT dbName  varchar(20)  )   " +
                         " BEGIN  "+
-                        "     create table orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, " +
-                        "         initiated  int  not null, stockId  int not null, bid decimal(10,4) not null , qty  int not null ,  " +
-                        "         closed  int not null,  ask  decimal(10,4), p_l decimal(10,4) ,                     " +
-                        "         active  tinyint , createdBy varchar(20), createdDate varchar(20), modBy varchar(20), modDate varchar(20) ,  " +
-                        "        FOREIGN KEY ( userId )   REFERENCES users(userId)   , " +
-                        "        FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) ,  " + 
-                        "        FOREIGN KEY ( initiated) REFERENCES dates(dateId)   ,  " +
-                        "        FOREIGN KEY ( closed)    REFERENCES dates(dateId)  );  " +
+                             "create table orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null, stockId int not null, " +
+                                "bid decimal(10,4) not null , qty  int not null ,  closed  int not null,  ask  decimal(10,4), p_l decimal(10,4) , " +                    
+                                " active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date,  " +
+                                "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
+                                "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
+                                "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
+                                "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); " +
+                        "     END //  "+
+                        "     DELIMITER ;  ")
+
+        v_orderbook = ("DELIMITER // "+
+                        " CREATE PROCEDURE createTable_vOrderBook(   )   " +
+                        " BEGIN  "+
+                        "     create view v_orderbook  as" +
+                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.qty,d2.date as closed ,o.ask , " +
+                        "          o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "     from orderbook o " +
+                        "     inner join dates d on o.initiated =d.dateid "+
+                        "     inner join dates d2 on o.closed = d2.dateid  "+
+                        "     inner join stocks s on o.stockid =s.stockid  "+
+                        "     inner join users u on o.userid=u.userid; "+
                         "     END //  "+
                         "     DELIMITER ;  ")
         p_createTables = ("DELIMITER // "+

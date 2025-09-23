@@ -12,20 +12,17 @@
 import os
 import re
 import sys
+import json
 import time
-import webbrowser
+import pickle
 import base64
-#import pandas       as pd
-#import numpy        as np 
 import getpass
 import inspect
 import platform
-#import argparse
-#import functools
 import requests
-import pickle
+import webbrowser
 
-#from flask      import Request
+
 from loguru     import logger
 from datetime   import datetime, timedelta
 
@@ -80,6 +77,7 @@ class SchwabAccount :
         self.LinkedAccounts()
         self.AccountDetails()
         self.AccountID = list(self.Accounts.keys())[0]
+        self.Preference()
 
         """
         print ("\t\t\t -> Orders ")
@@ -154,8 +152,9 @@ class SchwabAccount :
             contents += accnt + str(self.Accounts[accnt]['details'].keys())
             
         return "" #contents
-    
 
+
+        
     def CheckAccessTokens(self) -> bool :
         """
             Check if the connection is still valid  before making a request
@@ -166,7 +165,7 @@ class SchwabAccount :
         success  : bool  = False
         
         # Needs to add expires at for refresh token
-        if self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens  and 'refresh_token' in self.Tokens):
+        if self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
@@ -227,25 +226,34 @@ class SchwabAccount :
 
 
   
-    def Quote ( self, stocks :  list  ) -> requests.Response :
+    def Quote ( self, symbol :  str  ) -> requests.Response :
         """
             Gets the quote for list of stocks
             ARGS    :
-                        stocks : list of stock abbrev
+                        symbol : ( str )  stock abbrev
             RETURNS :
                         dictionary of stock quote information 
         """
-        self.CheckAccessTokens() 
-        response = requests.get(f'{self._base_api_url}/marketdata/v1/quotes',
+        quote_response = []
+
+        try:
+            self.CheckAccessTokens()
+            response = requests.get(f'{self._base_api_url}/marketdata/v1/quotes',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
-                            params={'symbols': str(stocks),
+                            params={'symbols': symbol,
                                  'fields': ['quote','regular'],
                                  'indicative': False},
-                            timeout=self.Timeout)
+                            timeout=self.Timeout)        
+            #print(f"Schwab:Quote - {response} - {response.text}")
+            details = response.json()[symbol]['quote']
+            quote_response = [details["totalVolume"],details["openPrice"],details['closePrice'],details['highPrice'],details['lowPrice']] 
         
-        #print(f"Schwab:Quote - {response} - {response.text}")
-
-        return response.json()
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        finally:
+            return quote_response
 
         
     def CashForTrading( self ) -> float :
@@ -283,8 +291,30 @@ class SchwabAccount :
             self.Accounts[ entry['accountNumber'] ] = {'hashValue' : entry['hashValue'], 'details' : None }
             
         
+    def Preference( self ) -> dict :
+        """
+            To stream data from Schwab you need to get the preferences first 
+        """
+        try:
+            url = f'{self._base_api_url}/trader/v1/userPreference'
+            
+            self.Preference = requests.get(url,
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'}
+                                ).json()
+                            #params="", #self._params_parser({'fields': fields}),
+                            #timeout=self.Timeout).json()
 
-        
+
+            
+            
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+
+
+                
     def  AccountDetails( self) -> None :
         """
             Details on each of the linked accounts
@@ -361,6 +391,7 @@ class SchwabAccount :
         with open( ACCNT_TOKENS_FILE, 'wb') as file :
             pickle.dump( self.Tokens, file )
 
+            
         #print ( "Updated the tokens file ", self.Tokens)
         return True
 
@@ -387,6 +418,10 @@ class SchwabAccount :
                                        'id_token': '',
                                        'refresh_expires_at':''
                            }
+        # BACKUP JSON FILE
+        theseTokens = self.Tokens | {'expires_at' : None , 'refresh_expires_at' : None }
+        with open( '../files/account_tokens.json', 'w') as file :
+            json.dump( theseTokens, file )            
         
         return self.Tokens
 
@@ -478,7 +513,6 @@ class SchwabAccount :
             RETURNS  :
                         True/False ( success ) 
         """
-        return True
         success = False
         
         if self.Mode.lower()  == "test":
@@ -512,7 +546,7 @@ class SchwabAccount :
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             json=buy_order)
 
-            print(f"\t\t * BUY ORDER Response: {buy_response.content} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            print(f"\t\t * BUY ORDER Response: {buy_response.json()} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
             
             if buy_response.status_code == 201 :
                 print("\t\t   -> SchwabAccount -  BUY ORDER submitted successsfully ")
@@ -569,7 +603,7 @@ class SchwabAccount :
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             json=sell_order)
             
-            print(f"\t\t * SELL ORDER  Response: {sell_response} " )
+            print(f"\t\t * SELL ORDER  Response: {sell_response.json()} " )
             
             if sell_response.status_code == 201 :
                 print("\t\t   -> SchwabAccount -  SELL ORDER submitted successsfully ")
