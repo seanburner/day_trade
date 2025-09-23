@@ -351,7 +351,7 @@ def parse_arguments() -> {} :
             print("\t\t >>   " + str(entry) )
 
 
-
+"""
 
 from schwab.auth import easy_client
 from schwab.client import Client
@@ -377,7 +377,7 @@ async def read_stream( stream_client):
         await stream_client.handle_message()
 
 
-
+"""
 
 def system_test( configs : dict  ) -> None :
     account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
@@ -420,7 +420,7 @@ def system_test( configs : dict  ) -> None :
     }
 """
 
-
+"""
 def system_test1( configs : dict  ) -> None :
 
     #account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
@@ -437,7 +437,7 @@ def system_test1( configs : dict  ) -> None :
     print ( stream_client.quote("AMD").json() )
     
     asyncio.run(read_stream( stream_client))
-
+"""
 
 
 def system_test_old( configs : dict ) -> None :
