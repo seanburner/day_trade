@@ -458,7 +458,7 @@ def system_test_old( configs : dict ) -> None :
     account.SetFunds( 5000.00, 0.50 )    
     account.SetTargetGoal( 0.025  )
     account.SetMode("LIVE")
-    #print( account.Conn.Accounts['88867477']['hashValue'])
+    #print( account.Conn.Accounts['xxxxx']['hashValue'])
     #account.Conn.AccountOrders(account.Conn.Accounts[0][) 
     account.Conn.Buy( symbol ='OPEN', price=6.00, qty =1 )
 
