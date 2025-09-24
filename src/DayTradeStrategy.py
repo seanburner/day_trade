@@ -36,6 +36,8 @@ class DayTradeStrategy:
         """
         self.Strategies = {
                                 'basic'         :{ 'detail' : 'Basic Bitch of the group',                           'method': self.DayTradeBasic},
+                                'basic1'        :{ 'detail' : 'Basic Bitch of the group based on 1 min candles',    'method': self.DayTradeBasic_1Min},
+                                'basic5'        :{ 'detail' : 'Basic Bitch of the group based on 5 min candles',    'method': self.DayTradeBasic_5Min},
                                 'basic15'       :{ 'detail' : 'Basic Bitch of the group based on 15min candles',    'method': self.DayTradeBasic_15m},
                                 'basicXm'       :{ 'detail' : 'Basic Bitch of the group based on Varying candles',  'method': self.DayTradeBasic_Xm},
                                 'opening_range' :{ 'detail' : 'Use first candle to provide range of interest',      'method': self.OpeningRange} 
@@ -139,31 +141,158 @@ class DayTradeStrategy:
         return  trigger_price 
 
 
+
+
+
+    def BaseParams (self ) -> dict :
+        """
+            Provide the params dictionary with base values
+            ARGS   :
+                    nothing
+            RETURNS:
+                    params (dict) - standard values for the day trading parameters 
+        """
+        return {   "index"                  : 3,        # THE CLOSE PRICE LOCATION INTHE TICKER ROW  
+                   "limit"                  : 0.20,     # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE                   
+                   "risk_percent"           : 0.0015,   # Useful when price starts to fall and need to know when to bail 
+                   "time_interval"          : 60,       # Standard Time interval to use
+                   "time_interval_bought"   : 60,       # After buying do we need to change time_interval 
+                   "crash_out_percent"      : 0.97,     # If the price is crashing this percent of the price we purchased for, then bail ( 100 * .97 => 97 less than or equal we bail 
+                   "price_move_change"      : 0.02,     # Price needs to move by this much before we start doing something
+                   "volume_change_ratio"    : 0.70,     # Ratio of new volume to previous volume  ( may be unnecessary  unless building out trends )
+                   "volume_change_avg_ratio": -0.30,    # Quantifying the change in volume to act ( probably over thinking things )
+                   "bounce_up_min"          : 1 ,       # Checks how many consecutive moves upwards before acting 
+                }
+
+
+
+
     def DayTradeBasic ( self, ticker_row : list, account : object , volume_threshold : int = 70000) -> (bool, str) :
         """
-            Sets the limits for the account
+            Set the params for the DayTrade 15 min  version  , then call the function
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete    
+        """
+        params = self.BaseParams()
+        params['time_interval']         = 900
+        params['time_interval_bought']  = 900
+        
+        #print("\t *Strategy : basic bitch 15 min ")
+        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
 
-            PARAMETER  :
-                        ticker_row   : information about the stock and current price and volume
-                        account      : the trading account for BUYS and SELLS 
+
+    
+    def DayTradeBasic_1Min ( self, ticker_row : list, account : object , volume_threshold : int = 70000) -> (bool, str) :
+        """
+            Set the params for the DayTrade 1 min  version  , then call the function
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                                    
+        """
+        params = self.BaseParams()
+        params['time_interval']         = 60
+        params['time_interval_bought']  = 60
+        
+        
+        #print("\t *Strategy : basic bitch 1 min ")
+        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+
+
+
+    def DayTradeBasic_5Min ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
+        """
+            Sets the limits for the account
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
             RETURNS    :
                         bool: True/False - in case something breaks or could not complete                         
         """
-        index               = 3 
-        limit               = 0.20        # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE
+        params = self.BaseParams()
+        params['time_interval']         = 300
+        params['time_interval_bought']  = 300
+        
+        
+        #print("\t *Strategy : basic bitch 5 min ")
+        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+
+
+    def DayTradeBasic_15m ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
+        """
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                         
+        """
+        params = self.BaseParams()
+        
+        params['time_interval']             = 900
+        params['time_interval_bought']      = 900
+        params['crash_out_percent']         = 0.85 
+        params['volume_change_avg_ratio']   = 0.10 
+
+
+
+
+
+
+    def DayTradeBasic_Xm ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
+        """
+            Sets the limits for the account -> 5m to 1 min
+
+            PARAMETER  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                         
+        """
+        params = self.BaseParams()
+        params['time_interval']         = 300
+        params['time_interval_bought']  = 60
+        
+        
+        #print("\t *Strategy : basic bitch 5 -> 1 min ")
+        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+        
+
+
+    
+    def DayTradeBasicModule ( self, ticker_row : list, account : object, params : dict  , volume_threshold : int = 70000) -> (bool, str) :
+        """
+            Sets the limits for the account
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+                        params            ( dicts ) parameters to customize the run 
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                         
+        """
+        index               = params['index'] 
+        limit               = params['limit']        # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE
         profit              = 0
         action              = ""
         success             = False
-        risk_percent        = 0.0015
-        time_interval       = 900
-        crash_out_percent   = 0.92      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
+        risk_percent        = params['risk_percent']
+        time_interval       = params['time_interval']
+        crash_out_percent   = params['crash_out_percent']      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
         
         try :
-            #print("basic bitch ")
             #account.SetLimit( limit )
 
             # if volume is less than 1M there is no point in playing with it --  SHOULD THIS ONLY BE FOR THE BUYS / STOP FROM BUYING WHEN VOLUME IS TOO LOW ???
-            if ticker_row[5] < int(volume_threshold)   and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0  : #200000: #1000000 :
+            if ticker_row[5] < int(volume_threshold)   and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0  : 
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
                 return False, action, time_interval
 
@@ -176,11 +305,10 @@ class DayTradeStrategy:
             #BUY : if the price goes from neg to positive  by $0.10 and volume is higher
             #print(f" Volume percent : {(float(ticker_row[5])  /  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )}")
             if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0 and (#float(ticker_row[ index ]) > 568  and 
-                    ( float(ticker_row[ index ]) -  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) > 0.02 )  and  # Atleast a $0.02 move before entering into a new position
-                        (float(ticker_row[5])  /  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) > 0.70  ):
-                        #         (float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
+                    ( float(ticker_row[ index ]) -  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) > params["price_move_change"] )  and  # Atleast a $0.02 move before entering into a new position
+                        (float(ticker_row[5])  /  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) > params["volume_change_ratio"]  ):                        
                 volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )                
-                if volume_increase  < -0.30 :#< 0.10 :  # 85% starts to see good results, but dont want to be too strict or too loose 
+                if volume_increase  < params["volume_change_avg_ratio"] : # 85% starts to see good results, but dont want to be too strict or too loose 
                     print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " )
                     self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0 
                     return False, action, time_interval
@@ -189,7 +317,7 @@ class DayTradeStrategy:
                     self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0 
                     return False, action, time_interval
                 self.Stocks[ ticker_row[0]]['Price']['Occur']  += 1
-                if self.Stocks[ ticker_row[0]]['Price']['Occur']  < 1 :  # TWO consecutive upward moves with appropriate volume 
+                if self.Stocks[ ticker_row[0]]['Price']['Occur']  < params["bounce_up_min"] :  # TWO consecutive upward moves with appropriate volume 
                     print( f"\t\t\t  *  BUY:: Consecutive upward moves with volues : {self.Stocks[ ticker_row[0]]['Price']['Occur']} " )
                     return False, action, time_interval
                 #print( "\t\t * BUY SIGNAL " ) 
@@ -210,7 +338,8 @@ class DayTradeStrategy:
                  if ( float(ticker_row[6]) - float(ticker_row[index]) ) < ( float( ticker_row[4]) - float(ticker_row[2]) ):  # More upward pressure than down
                      print( f"\t\t\t  \\-> SELL SIGNAL :  More upward than downward pressure : {float(ticker_row[6]) - float(ticker_row[index])} -> {float( ticker_row[4]) - float(ticker_row[2])} "  )
                  #ticker_row[5] < self.Stocks[ ticker_row[0] ]['Volume' ]['Bought'] :  # VOLUME IS STILL MOVING UP SO DONT SELL RIGHT NOW
-                     return False, action, 900 #300
+                     return False, action, params["time_interval"]
+                    
                  if ( ( float(ticker_row[ index ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
                      print( f"\t\t\t   \\-> SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : Profit_Trail_Stop : {profit_trail_stop} " )
                      if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ])  , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
@@ -220,20 +349,20 @@ class DayTradeStrategy:
                          self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
                          action          = "closed"
                         
-
         
 
             #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
             if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and( ( (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) )  or
                      (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) )  )  and
-                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):
+                         (float(ticker_row[ 5 ]) <  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):
                  print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : Current price is below what we bought for  or  ( lower than previous and the volume is lower than previous) "   )
                  profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
                  strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
                  crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
-                 # dont sell unless crashing AND atleast 80% purchase, try to wait it out , BOXL fell fast and did not trigger this  so need to FIX 
-                 if  (float(ticker_row[ index ]) < crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                     print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP :{ profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
+                 # dont sell unless crashing AND atleast 80% purchase, try to wait it out , BOXL fell fast and did not trigger this  so need to FIX
+                 print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : CHECKING PROFIT_STOP :  STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
+                 if  (float(ticker_row[ index ]) <= crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
+                     print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP : SAFETY SELL  -> { profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
                      if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ]) , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
                          success = True
                          self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0
@@ -255,273 +384,19 @@ class DayTradeStrategy:
 
             # CHANGE TO 5 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
             if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 :
-                time_interval   = 900 #300
+                time_interval   = params['time_interval_bought']
             else:
-                time_interval   = 900
+                time_interval   = params['time_interval']
                 
-            return success , action, time_interval 
+
             
         except:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
 
-
-
-    def DayTradeBasic_15m ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
-        """
-            Sets the limits for the account
-
-            PARAMETER  :
-                        ticker_row   : information about the stock and current price and volume
-                        account      : the trading account for BUYS and SELLS 
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                         
-        """
-        index               = 3 
-        limit               = 0.20        # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE
-        profit              = 0
-        action              = ""
-        success             = False
-        risk_percent        = 0.00015
-        time_interval       = 900
-        crash_out_percent   = 0.85      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
-        
-        try :
-            #print("basic bitch ")
-            #account.SetLimit( limit )
-
-            # if volume is less than 1M there is no point in playing with it
-            if ticker_row[5] < int(volume_threshold): #200000: #1000000 :
-                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
-                return False, action, time_interval
-
-            # ADD STOCK ENTRY IF NOT INPLAY
-            if not ( ticker_row[0] in self.Stocks.keys() ) :
-                self.Stocks[ ticker_row[0] ]  = {                        
-                                    'Price' :  {'Previous': ticker_row[ index ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ index ], 'Occur' : 0 },
-                                    'Volume' : {'Previous': ticker_row[5], 'Slope' : 1 , 'Bought' : 0}
-                             }
-            #BUY : if the price goes from neg to positive  by $0.10 and volume is higher
-            if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0 and (#float(ticker_row[ index ]) > 568  and 
-                    ( float(ticker_row[ index ]) -  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) > 0.02 )  and  # Atleast a $0.02 move before entering into a new position
-                                 (float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
-                volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )                
-                if volume_increase  < 0.10 :  # 85% starts to see good results, but dont want to be too strict or too loose 
-                    print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " )
-                    self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0 
-                    return False, action, time_interval
-
-                #  IF THE CANDLES CLOSES LOWER THAN IT OPENS THEN DONT BUY                
-                if ( float(ticker_row[3]) <  float(ticker_row[4]) ) :  #  PRICE CLOSED LOWER THAN IT OPENED
-                    print( f"\t\t\t  *  BUY:: PRICE CLOSED LOWER THAN IT OPENED : CLOSED={ticker_row[ 3 ]} OPENED={ticker_row[4] }   LOW={ticker_row[2] }  HIGH={ticker_row[6] }  " )
-                    self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0 
-                    return False, action, time_interval
-
-                
-                
-                self.Stocks[ ticker_row[0]]['Price']['Occur']  += 1
-                if self.Stocks[ ticker_row[0]]['Price']['Occur']  < 1 :  # TWO consecutive upward moves with appropriate volume 
-                    print( f"\t\t\t  *  BUY:: Consecutive upward moves with volues : {self.Stocks[ ticker_row[0]]['Price']['Occur']} " )
-                    return False, action, time_interval
-                #print( "\t\t * BUY SIGNAL " ) 
-                print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ 5 ]} from previous  {float(ticker_row[ index ]) -  float(self.Stocks[ ticker_row[0]]['Price']['Previous'])}   Volume :  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
-                if  account.Buy( stock=ticker_row[0] , price=float(ticker_row[ index ])  , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
-                    success = True
-                    self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] =  ticker_row[ index ]
-                    self.Stocks[ ticker_row[0] ]['Volume']['Bought'] =  ticker_row[5]
-                    action          = "bought"
-                    
-            
-
-            #SELL : In profit territory 
-            if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and (float(ticker_row[ index ]) >  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) ) : 
-                 profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
-                 strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
-                 print( f"\t\t\t  * SELL SIGNAL : PROFIT_STOP :{ profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
-                 if ( float(ticker_row[6]) - float(ticker_row[index]) ) < ( float( ticker_row[4]) - float(ticker_row[2]) ):  # More upward pressure than down
-                     print( f"\t\t\t  \\-> SELL SIGNAL :  More upward than downward pressure : {float(ticker_row[6]) - float(ticker_row[index])} -> {float( ticker_row[4]) - float(ticker_row[2])} "  )
-                 #ticker_row[5] < self.Stocks[ ticker_row[0] ]['Volume' ]['Bought'] :  # VOLUME IS STILL MOVING UP SO DONT SELL RIGHT NOW
-                     return False, action, 900 #300
-                 if ( ( float(ticker_row[ index ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                     print( f"\t\t\t   \\-> SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : Profit_Trail_Stop : {profit_trail_stop} " )
-                     if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ])  , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
-                         success = True
-                         self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0
-                         self.Stocks[ ticker_row[0] ]['Price' ]['High']   = 0
-                         self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
-                         action          = "closed"
-                        
-
-        
-
-            #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
-            if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and( ( (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) )  or
-                     (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) )  )  and
-                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):                 
-                 profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
-                 strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
-                 crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
-                 # dont sell unless crashing AND atleast 80% purchase, try to wait it out 
-                 if  (float(ticker_row[ index ]) > crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                     print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP :{ profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
-                     if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ]) , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
-                         success = True
-                         self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0
-                         self.Stocks[ ticker_row[0] ]['Price' ]['High']   = 0
-                         self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
-                         action          = "closed"
-                        
-            
-                     
-            # holding and what happens when price moves but voume is level , increasing  or decreasing ?     
-
-
-            # UPDATE THE STOCK INFO WITH THE CURRENT PRICE / VOLUME
-            if action != "bought" :
-                self.Stocks[ ticker_row[0] ]['Price' ]['Previous'] =  ticker_row[ index ]
-                self.Stocks[ ticker_row[0] ]['Volume']['Previous'] =  ticker_row[5]
-                if float(ticker_row[ index]) > float(self.Stocks[ ticker_row[0] ]['Price']['High']) :
-                    self.Stocks[ ticker_row[0] ]['Price']['High'] = float(ticker_row[ index])
-
-            # CHANGE TO 5 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
-            if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 :
-                time_interval   = 900 #300
-            else:
-                time_interval   = 900
-                
+        finally :
             return success , action, time_interval 
-            
-        except:
-            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-            for entry in sys.exc_info():
-                print("\t\t >>   " + str(entry) )
-
-
-    def DayTradeBasic_Xm ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
-        """
-            Sets the limits for the account -> 5m to 1 min
-
-            PARAMETER  :
-                        ticker_row   : information about the stock and current price and volume
-                        account      : the trading account for BUYS and SELLS 
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                         
-        """
-        index               = 3 
-        limit               = 0.20        # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE
-        profit              = 0
-        action              = ""
-        success             = False
-        risk_percent        = 0.00015
-        time_interval       = 300
-        crash_out_percent   = 0.85      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
-        
-        try :
-            #print("basic bitch ")
-            #account.SetLimit( limit )
-
-            # if volume is less than 2M there is no point in playing with it;  Might need to factor in MARKETCAP
-            if ticker_row[5] < int(volume_threshold): #200000: #1000000 :
-                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
-                return False, action, time_interval
-
-            # ADD STOCK ENTRY IF NOT INPLAY
-            if not ( ticker_row[0] in self.Stocks.keys() ) :
-                self.Stocks[ ticker_row[0] ]  = {                        
-                                    'Price' :  {'Previous': ticker_row[ index ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ index ], 'Occur' : 0 },
-                                    'Volume' : {'Previous': ticker_row[5], 'Slope' : 1 , 'Bought' : 0}
-                             }
-            #BUY : if the price goes from neg to positive  by $0.10 and volume is higher
-            if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0 and (#float(ticker_row[ index ]) > 568  and 
-                    ( float(ticker_row[ index ]) -  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) > 0.02 )  and  # Atleast a $0.02 move before entering into a new position
-                                 (float(ticker_row[5])  >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) )  ):
-                volume_increase = (float( ticker_row[ 5 ]) - float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] ) ) / float(self.Stocks[ ticker_row[0]]['Volume']['Previous'] )                
-                if volume_increase  < 0.10 :  # 85% starts to see good results, but dont want to be too strict or too loose 
-                    print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ 5 ]}  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " )
-                    self.Stocks[ ticker_row[0]]['Price']['Occur'] = 0
-                    return False, action, time_interval
-
-                #  IF THE CANDLES CLOSES LOWER THAN IT OPENS THEN DONT BUY 
-
-                
-                self.Stocks[ ticker_row[0]]['Price']['Occur']  += 1
-                if self.Stocks[ ticker_row[0]]['Price']['Occur']  < 1 :  # TWO consecutive upward moves with appropriate volume 
-                    print( f"\t\t\t  *  BUY:: Consecutive upward moves with volues : {self.Stocks[ ticker_row[0]]['Price']['Occur']} " )
-                    return False, action, time_interval
-                #print( "\t\t * BUY SIGNAL " ) 
-                print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ 5 ]} from previous  {float(ticker_row[ index ]) -  float(self.Stocks[ ticker_row[0]]['Price']['Previous'])}   Volume :  from {self.Stocks[ ticker_row[0]]['Volume']['Previous'] } ==> {volume_increase} " ) 
-                if  account.Buy( stock=ticker_row[0] , price=float(ticker_row[ index ])  , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
-                    success = True
-                    self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] =  ticker_row[ index ]
-                    self.Stocks[ ticker_row[0] ]['Volume']['Bought'] =  ticker_row[5]
-                    action          = "bought"
-                    
-            
-
-            #SELL : In profit territory 
-            if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and (float(ticker_row[ index ]) >  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) ) : 
-                 profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
-                 strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
-                 print( f"\t\t\t  * SELL SIGNAL : PROFIT_STOP :{ profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
-                 if ( float(ticker_row[6]) - float(ticker_row[index]) ) < ( float( ticker_row[4]) - float(ticker_row[2]) ):  # More upward pressure than down
-                     print( f"\t\t\t  \\-> SELL SIGNAL :  More upward than downward pressure : {float(ticker_row[6]) - float(ticker_row[index])} -> {float( ticker_row[4]) - float(ticker_row[2])} "  )
-                 #ticker_row[5] < self.Stocks[ ticker_row[0] ]['Volume' ]['Bought'] :  # VOLUME IS STILL MOVING UP SO DONT SELL RIGHT NOW
-                     return False, action, 900 #300
-                 if ( ( float(ticker_row[ index ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                     print( f"\t\t\t   \\-> SELL SIGNAL : {self.Stocks[ ticker_row[0]]['Price']['Bought']}  > {ticker_row[ index ]}  : Profit_Trail_Stop : {profit_trail_stop} " )
-                     if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ])  , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
-                         success = True
-                         self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0
-                         self.Stocks[ ticker_row[0] ]['Price' ]['High']   = 0
-                         self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
-                         action          = "closed"
-                        
-
-        
-
-            #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
-            if action != 'bought' and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 and( ( (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Bought']) )  or
-                     (float(ticker_row[ index ]) <  float(self.Stocks[ ticker_row[0]]['Price']['Previous']) )  )  and
-                         (float(ticker_row[ 5 ]) >  float(self.Stocks[ ticker_row[0]]['Volume']['Previous']) ) ):                 
-                 profit_trail_stop      =  self.ProfitTrailStop( ticker_row[0], risk_percent  )
-                 strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
-                 crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
-                 # dont sell unless crashing AND atleast 80% purchase, try to wait it out 
-                 if  (float(ticker_row[ index ]) > crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
-                     print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP :{ profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
-                     if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ]) , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :
-                         success = True
-                         self.Stocks[ ticker_row[0] ]['Price' ]['Bought'] = 0
-                         self.Stocks[ ticker_row[0] ]['Price' ]['High']   = 0
-                         self.Stocks[ ticker_row[0] ]['Volume']['Bought'] = 0
-                         action          = "closed"
-                        
-            
-                     
-            # holding and what happens when price moves but voume is level , increasing  or decreasing ?     
-
-
-            # UPDATE THE STOCK INFO WITH THE CURRENT PRICE / VOLUME
-            if action != "bought" :
-                self.Stocks[ ticker_row[0] ]['Price' ]['Previous'] =  ticker_row[ index ]
-                self.Stocks[ ticker_row[0] ]['Volume']['Previous'] =  ticker_row[5]
-                if float(ticker_row[ index]) > float(self.Stocks[ ticker_row[0] ]['Price']['High']) :
-                    self.Stocks[ ticker_row[0] ]['Price']['High'] = float(ticker_row[ index])
-
-            # CHANGE TO 1 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
-            if float(self.Stocks[ ticker_row[0]]['Price']['Bought']) > 0 :
-                time_interval   = 60
-            else:
-                time_interval   = 300
-                
-            return success , action, time_interval 
-            
-        except:
-            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-            for entry in sys.exc_info():
-                print("\t\t >>   " + str(entry) )
-
 
 
 

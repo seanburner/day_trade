@@ -545,15 +545,15 @@ class SchwabAccount :
             buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]["hashValue"]}/orders',  
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             json=buy_order)
-
-            print(f"\t\t * BUY ORDER Response: {buy_response.json()} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
             
-            if buy_response.status_code == 201 :
+            if buy_response.status_code == 201  or buy_response.status_code == 200:
                 print("\t\t   -> SchwabAccount -  BUY ORDER submitted successsfully ")
                 success = True
             else:
                 print("\t\t   -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
                 
+            print(f"\t\t * BUY ORDER Response: {buy_response.status_code}  {buy_response.text} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -603,13 +603,13 @@ class SchwabAccount :
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             json=sell_order)
             
-            print(f"\t\t * SELL ORDER  Response: {sell_response.json()} " )
-            
-            if sell_response.status_code == 201 :
+            if sell_response.status_code == 201 or sell_response.status_code == 200 :
                 print("\t\t   -> SchwabAccount -  SELL ORDER submitted successsfully ")
                 success = True
             else:
                 print("\t\t   -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
+            
+            print(f"\t\t * SELL ORDER  Response: {sell_response.status_code} -> {sell_response.text} " )
 
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )

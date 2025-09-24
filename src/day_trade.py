@@ -508,7 +508,7 @@ def send_transactions_to_sql( configs : dict , trades: list  ) -> None :
     """
         Use TraderDB class to properly normalize transactions and save 
     """
-    traderDb = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+    traderDB = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
 
     traderDB.InsertOrderbook(orderbook=trades , email=configs['email']  )
 
@@ -631,7 +631,7 @@ def  live_trade( configs : dict  ) -> None :
         RETURNS:
                     nothing 
     """
-    params  = { 'mode' : 'TRADE' , 'time_interval' : 900}
+    params  = { 'mode' : 'TRADE' , 'time_interval' : 900, 'account_funds' : 100 , 'account_limit' : 1.0}
     trade_center( configs , params  )
 
 
@@ -647,7 +647,7 @@ def  live_test ( configs : dict  ) -> None :
         RETURNS    :
                     Nothing 
     """
-    params  = { 'mode' : 'TEST','time_interval' : 900 }
+    params  = { 'mode' : 'TEST','time_interval' : 900 , 'account_funds' : 5000 , 'account_limit' : 0.50}
 
     trade_center( configs , params  )
 
