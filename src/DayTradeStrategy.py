@@ -85,12 +85,13 @@ class DayTradeStrategy:
         return True
 
     
-    def Run( self,  ticker_row : list, account : object, volume_threshold : int = 70000 ) -> bool :
+    def Run( self,  ticker_row : list, account : object, configs : dict  ) -> bool :
         """
             Switching station to control which strategy gets used
             ARGS  :
                     ticker_row : list of fields for stock quote
                     account    : initiated account object
+                    configs    : dictionary of configurations 
             RETURNS:
                     success : True/False
         """
@@ -98,7 +99,7 @@ class DayTradeStrategy:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Strategy does not exist : ", self.StrategyName )
             return False 
         
-        return self.Strategies[ self.StrategyName  ]['method'] ( ticker_row, account, volume_threshold )
+        return self.Strategies[ self.StrategyName  ]['method'] ( ticker_row, account, configs )
 
             
     def ProfitTrailStop( self, stock : str, risk_percent : float) -> float :
@@ -161,76 +162,80 @@ class DayTradeStrategy:
                    "price_move_change"      : 0.02,     # Price needs to move by this much before we start doing something
                    "volume_change_ratio"    : 0.70,     # Ratio of new volume to previous volume  ( may be unnecessary  unless building out trends )
                    "volume_change_avg_ratio": -0.30,    # Quantifying the change in volume to act ( probably over thinking things )
-                   "bounce_up_min"          : 1 ,       # Checks how many consecutive moves upwards before acting 
+                   "bounce_up_min"          : 1 ,       # Checks how many consecutive moves upwards before acting
+                   "volume_threshold"       : 70000     # Safety net to consider when appropriate to enter a trade, but may not be necessary 
                 }
 
 
 
 
-    def DayTradeBasic ( self, ticker_row : list, account : object , volume_threshold : int = 70000) -> (bool, str) :
+    def DayTradeBasic ( self, ticker_row : list, account : object , configs : dict ) -> (bool, str) :
         """
             Set the params for the DayTrade 15 min  version  , then call the function
             ARGS  :
-                        ticker_row        ( list ) information about the stock and current price and volume
-                        account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
-            RETURNS    :
+                        ticker_row ( list ) information about the stock and current price and volume
+                        account    ( TradeAccount )  the trading account for BUYS and SELLS
+                        configs    (  dict)    configurations 
+            RETURNS:
                         bool: True/False - in case something breaks or could not complete    
         """
         params = self.BaseParams()
         params['time_interval']         = 900
         params['time_interval_bought']  = 900
+        params['volume_threshold']      = configs['volume_threshold']
         
         #print("\t *Strategy : basic bitch 15 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+        return self.DayTradeBasicModule ( ticker_row , account, params  )
 
 
     
-    def DayTradeBasic_1Min ( self, ticker_row : list, account : object , volume_threshold : int = 70000) -> (bool, str) :
+    def DayTradeBasic_1Min ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
         """
             Set the params for the DayTrade 1 min  version  , then call the function
             ARGS  :
-                        ticker_row        ( list ) information about the stock and current price and volume
-                        account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+                        ticker_row ( list ) information about the stock and current price and volume
+                        account    ( TradeAccount )  the trading account for BUYS and SELLS
+                        configs    (  dict)    configurations                   
             RETURNS    :
                         bool: True/False - in case something breaks or could not complete                                    
         """
         params = self.BaseParams()
         params['time_interval']         = 60
         params['time_interval_bought']  = 60
+        params['volume_threshold']      = configs['volume_threshold']
         
         
         #print("\t *Strategy : basic bitch 1 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+        return self.DayTradeBasicModule ( ticker_row , account, params     )
 
 
 
-    def DayTradeBasic_5Min ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
+    def DayTradeBasic_5Min ( self, ticker_row : list, account : object, configs : dict) -> (bool, str) :
         """
             Sets the limits for the account
             ARGS  :
-                        ticker_row        ( list ) information about the stock and current price and volume
-                        account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+                        ticker_row    ( list ) information about the stock and current price and volume
+                        account       ( TradeAccount )  the trading account for BUYS and SELLS
+                        configs       (  dict)    configurations                   
             RETURNS    :
                         bool: True/False - in case something breaks or could not complete                         
         """
         params = self.BaseParams()
         params['time_interval']         = 300
         params['time_interval_bought']  = 300
+        params['volume_threshold']      = configs['volume_threshold']
         
         
         #print("\t *Strategy : basic bitch 5 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+        return self.DayTradeBasicModule ( ticker_row , account, params    )
 
 
-    def DayTradeBasic_15m ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
+    def DayTradeBasic_15m ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
         """
             ARGS  :
                         ticker_row        ( list ) information about the stock and current price and volume
                         account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+                        configs           (  dict)    configurations                   
             RETURNS    :
                         bool: True/False - in case something breaks or could not complete                         
         """
@@ -239,36 +244,39 @@ class DayTradeStrategy:
         params['time_interval']             = 900
         params['time_interval_bought']      = 900
         params['crash_out_percent']         = 0.85 
+        params['volume_threshold']          = configs['volume_threshold']
         params['volume_change_avg_ratio']   = 0.10 
 
+        #print("\t *Strategy : basic bitch 15 min ")
+        return self.DayTradeBasicModule ( ticker_row , account, params    )
 
 
 
 
-
-    def DayTradeBasic_Xm ( self, ticker_row : list, account : object, volume_threshold : int = 70000 ) -> (bool, str) :
+    def DayTradeBasic_Xm ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
         """
             Sets the limits for the account -> 5m to 1 min
 
             PARAMETER  :
                         ticker_row        ( list ) information about the stock and current price and volume
                         account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+                        configs           (  dict)    configurations                   
             RETURNS    :
                         bool: True/False - in case something breaks or could not complete                         
         """
         params = self.BaseParams()
         params['time_interval']         = 300
         params['time_interval_bought']  = 60
+        params['volume_threshold']      = configs['volume_threshold']
         
         
         #print("\t *Strategy : basic bitch 5 -> 1 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params  , volume_threshold   )
+        return self.DayTradeBasicModule ( ticker_row , account, params    )
         
 
 
     
-    def DayTradeBasicModule ( self, ticker_row : list, account : object, params : dict  , volume_threshold : int = 70000) -> (bool, str) :
+    def DayTradeBasicModule ( self, ticker_row : list, account : object, params : dict  ) -> (bool, str) :
         """
             Sets the limits for the account
             ARGS  :
@@ -292,7 +300,7 @@ class DayTradeStrategy:
             #account.SetLimit( limit )
 
             # if volume is less than 1M there is no point in playing with it --  SHOULD THIS ONLY BE FOR THE BUYS / STOP FROM BUYING WHEN VOLUME IS TOO LOW ???
-            if ticker_row[5] < int(volume_threshold)   and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0  : 
+            if ticker_row[5] < int(params['volume_threshold'])   and float(self.Stocks[ ticker_row[0]]['Price']['Bought']) == 0  : 
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[5] } " )
                 return False, action, time_interval
 
@@ -360,7 +368,7 @@ class DayTradeStrategy:
                  strike_price_stop      =  self.StrikePriceStop( ticker_row[0], risk_percent  )
                  crash_trail_stop       =  crash_out_percent * float(self.Stocks[ ticker_row[0]]['Price']['Bought'])
                  # dont sell unless crashing AND atleast 80% purchase, try to wait it out , BOXL fell fast and did not trigger this  so need to FIX
-                 print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : CHECKING PROFIT_STOP :  STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
+                 print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : CHECKING PROFIT_STOP :  STRIKE_PRICE_STOP : { strike_price_stop}   profit_trail_stop: { profit_trail_stop}   CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
                  if  (float(ticker_row[ index ]) <= crash_trail_stop  ) and  ( ( float(ticker_row[ index ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ index ]) )  ):
                      print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP : SAFETY SELL  -> { profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ ticker_row[0]]['Price']['Bought']}   NEW PRICE : {ticker_row[ index ]} "   )
                      if  account.Sell( stock=ticker_row[0], new_price=float(ticker_row[ index ]) , current_time=str( ticker_row[1] if account.Mode.lower() =="test" else datetime.now()   ) )  :

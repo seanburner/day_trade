@@ -340,7 +340,12 @@ def parse_arguments() -> {} :
         args = parser.parse_args()
 
         for key in matrix.keys() :
-            configs[key]   = update_args_field (  getattr(args, key) , configs[key]) 
+            configs[key]   = update_args_field (  getattr(args, key) , configs[key])
+            
+            # CHECK IF THE STOCK SYMBOL IS SINGULAR OR PLURAL 
+            if key == 'stock' :                
+                values = configs[key].split(',')
+                configs[key] = list ( values )
 
 
         return configs
@@ -539,88 +544,6 @@ def calculate_new_poll_time( current_time : datetime = datetime.now(), time_inte
     return current_time + timedelta( seconds =deltas ), deltas
 
 
-def  replay_test( configs: dict  ) -> None :
-    """
-        Test the strategy by using live data from a previous day
-        Provide  charts for confirmation
-        1. pull quotes 
-        2. 
-        PARAMETERS :                    
-                    configs     :  dictionary of configuration info                   
-        RETURNS    :
-                    Nothing 
-    """
-    msg             = ""
-    cont            = True
-    data            = {}
-    success         = False    
-    account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
-    date_format     = "%Y-%m-%d %H:%M:%S"
-    current_time    = ""
-    
-    account.SetFunds( 5000.00, 0.50 )
-    try:        
-        print( '\t* About to live test: ', account )
-        Strategies.Set( configs['strategy'] , account)        
-        account.SetMode( "TEST")
-        for stock in configs['stock'].split(",") :
-            data[stock] = []
-
-        current_time = configs['replay_date'][:10] + " 09:30:00"
-        current_time = datetime.strptime( current_time, date_format)                                             
-        time_interval = 900
-        
-        while ( cont )  :
-            #print("\t\t\t\t + Current Time : " , current_time ) 
-            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
-                cont = False
-                print("\t\t\t\t -> Outside of market hours ")                  
-            #elif ( current_time.hour >= 12 and current_time.hour < 14)  and False   :               ## between 12  -> 2 seems to be loss filled
-            #    sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
-            #    print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
-            #    current_time +=  timedelta( seconds =sleep_time)            
-            elif ( current_time.hour == 16 and current_time.minute >= 00)   :               ## Sell whatever is InPlay
-                if  account.InPlay != {} :
-                    stocks = set( account.InPlay.keys() )
-                    for stock in stocks:                        
-                        account.Sell( stock, float(ticker_row[3]) )
-                cont = False
-            else:
-               # print(f"\t\t\t\t\t -> Quote @ { current_time }" )      
-                ticker_row = account.Quote ( symbols= configs['stock'],  frequency= time_interval , endDate = current_time)                
-                if ticker_row != None:                    
-                    data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
-                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
-                    print(f"\t\t\t->DATA : {ticker_row} " ) 
-                    success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs['volume_threshold'])
-                    if msg.upper() == "BOUGHT" :
-                        print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval} min  : " )
-                        #time_interval = 300
-                    elif msg.upper() == "CLOSED" :
-                        print(f"\t\t\t   -> OUT Play - should shift from {time_interval} -> 15 min  : " )
-                        #time_interval = 900
-                        
-                    
-                    current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
-                        
-                else:
-                    cont = False
-                    print( 'Just received  empty ticker info ')
-        
-        # SEND TRANSACTIONS TO SQL
-        #send_transactions_to_sql( configs, account.Trades  )
-
-        # SEND DATA TO FILE
-        send_data_to_file( configs, data )
-
-        
-        # SEND EMAIL OF PERFORMANCE
-        summary_report( configs, data, account )
-    except:
-        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
-        for entry in sys.exc_info():
-            print("\t\t >>   " + str(entry) )
-
 
 
 def  live_trade( configs : dict  ) -> None :
@@ -631,7 +554,7 @@ def  live_trade( configs : dict  ) -> None :
         RETURNS:
                     nothing 
     """
-    params  = { 'mode' : 'TRADE' , 'time_interval' : 900, 'account_funds' : 100 , 'account_limit' : 1.0}
+    params  = { 'mode' : 'TRADE' , 'time_interval' : 900, 'account_funds' : 250 , 'funds_ratio': 1.0}
     trade_center( configs , params  )
 
 
@@ -647,7 +570,7 @@ def  live_test ( configs : dict  ) -> None :
         RETURNS    :
                     Nothing 
     """
-    params  = { 'mode' : 'TEST','time_interval' : 900 , 'account_funds' : 5000 , 'account_limit' : 0.50}
+    params  = { 'mode' : 'TEST','time_interval' : 900 , 'account_funds' : 5000 , 'funds_ratio' : 0.50}
 
     trade_center( configs , params  )
 
@@ -671,7 +594,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     date_format     = "%Y-%m-%d %H:%M:%S"  
     
     
-    account.SetFunds( 100, 1.0 )  #5000.00, 0.50 )
+    account.SetFunds( params['account_funds'], params['funds_ratio'] )  #5000.00, 0.50 )
 
     
     try:  
@@ -703,7 +626,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                     data[stock].append( {'stock':stock,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
                 
-                    success , msg , time_interval = Strategies.Run(  ticker_row,  account )
+                    success , msg , time_interval = Strategies.Run(  ticker_row,  account, configs )
                     if msg.upper() == "BOUGHT" :
                         print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
                     elif msg.upper() == "CLOSED" :
@@ -732,6 +655,97 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
+
+
+
+
+
+def  replay_test( configs: dict  ) -> None :
+    """
+        Test the strategy by using live data from a previous day
+        Provide  charts for confirmation
+        1. pull quotes 
+        2. 
+        PARAMETERS :                    
+                    configs     :  dictionary of configuration info                   
+        RETURNS    :
+                    Nothing 
+    """
+    msg             = ""
+    cont            = True
+    data            = {}
+    success         = False
+    account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    date_format     = "%Y-%m-%d %H:%M:%S"
+    current_time    = ""
+    
+    account.SetFunds( 5000.00, 0.50 )
+    try:        
+        print( '\t* About to live test: ', account )
+        Strategies.Set( configs['strategy'] , account)        
+        account.SetMode( "TEST")
+        for stock in ( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
+            data.update({ stock :  [] } )
+
+        current_time = configs['replay_date'][:10] + " 09:30:00"
+        current_time = datetime.strptime( current_time, date_format)                                             
+        time_interval = 900
+        
+        while ( cont )  :
+            #print("\t\t\t\t + Current Time : " , current_time ) 
+            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
+                cont = False
+                print("\t\t\t\t -> Outside of market hours ")                  
+            #elif ( current_time.hour >= 12 and current_time.hour < 14)  and False   :               ## between 12  -> 2 seems to be loss filled
+            #    sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
+            #    print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
+            #    current_time +=  timedelta( seconds =sleep_time)            
+            elif ( current_time.hour == 16 and current_time.minute >= 00)   :               ## Sell whatever is InPlay
+                if  account.InPlay != {} :
+                    stocks = set( account.InPlay.keys() )
+                    for stock in stocks:                        
+                        account.Sell( stock, float(ticker_row[3]) )
+                cont = False
+            else:
+                symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
+                for symbol in symbols:
+                    print(f"-> Quote @ { current_time } {stock} " )
+                    ticker_row = account.Quote ( symbols= symbol,  frequency= time_interval , endDate = current_time)                
+                    if ticker_row != None:                    
+                        data[stock].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
+                        print(f"\t\t\t->DATA : {ticker_row} " ) 
+                        success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs)
+                        if msg.upper() == "BOUGHT" :
+                            print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval} min  : " )                        
+                        elif msg.upper() == "CLOSED" :
+                            print(f"\t\t\t   -> OUT Play - should shift from {time_interval} -> 15 min  : " )
+                        
+                        
+                    
+                current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
+                        
+                #else:
+                #    cont = False
+                #    print( 'Just received  empty ticker info ')
+        
+        # SEND TRANSACTIONS TO SQL
+        #send_transactions_to_sql( configs, account.Trades  )
+
+        # SEND DATA TO FILE
+        send_data_to_file( configs, data )
+
+        
+        # SEND EMAIL OF PERFORMANCE
+        summary_report( configs, data, account )
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
+
 
 
 
@@ -803,22 +817,55 @@ def  back_test( configs: dict  ) -> None :
 
 
 
-        
 def summary_report ( configs : dict , data : dict , account : object ) -> None :
     """
-        Prep and send report of trading 
+        Prep and send report of trading
+        ARGS   :
+                    configs  ( dict )         - configuration info
+                    data     ( dict )         - quote entries to store in csv file
+                    account  ( TradeAccount ) - Trading Account that abstracts Schwab 
+        RETURNS:
+                    nothing 
     """
-    stock = configs['stock']
-    if not os.path.exists(f"../reports/{configs['action']}/"):
-        os.mkdir(f"../reports/{configs['action']}/")
-        
-    report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{configs['strategy']}_{stock}.pdf")
+    try:
+        #CONFIRM THE REPORT FOLDER EXISTS        
+        if not os.path.exists(f"../reports/{configs['action']}/"):
+            os.mkdir(f"../reports/{configs['action']}/")
+
+        if isinstance( configs['stock'] ,str ) :
+            report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{configs['strategy']}_{ configs['stock']  }.pdf")
+            summary_report_engine(  configs['stock']  , data  , account  , report  ) 
+        elif isinstance( configs['stock'] , list ) :
+            for symbol in configs['stock'] :
+                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{configs['strategy']}_{symbol}.pdf")
+                summary_report_engine( symbol  , data  , account  , report  ) 
+
+    except: 
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
+            
+def summary_report_engine(symbol : str, data : dict , account : object , report : object ) -> None :
+    """
+        The contents ofthe summary report process that allows it to be repeatable if necessary
+        ARGS   :
+                    symbol   ( str )          - stock symbol 
+                    data     ( dict )         - quote entries to store in csv file
+                    account  ( TradeAccount ) - Trading Account that abstracts Schwab
+                    report   ( PDFReport )    - PDF Report class for the symbol 
+        RETURNS:
+                    nothing 
+    """
     try:
         dt1     = []
         dt1_2   = []
         dt2     = []
         off_on  = True
-        for entry in data[configs['stock']] :
+
+        for entry in data[symbol] :
             dt1.append( float( entry.get('close',0))  )
             if off_on :
                 dt1_2.append( entry.get('datetime',0)[11:16].replace(':','') )
@@ -826,7 +873,7 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
                 dt1_2.append( "")
             off_on = not off_on
         for entry in account.Trades:            
-            if entry[0] == configs['stock'] :
+            if entry[0] == symbol :
                 dt2.append( float(entry[6]) )
                 
         pixplt =plt
@@ -836,12 +883,12 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         #ax1.xticks([930,1100,1230,200,330,500,630])
         ax1.set_xlabel('time')
         ax1.set_ylabel('dollars')
-        ax1.set_title(f"{configs['stock']} Activity ")
+        ax1.set_title(f"{symbol} Activity ")
         # GRAPH 2
         ax2.plot(dt2, color='blue')
         ax2.set_xlabel('index')
         ax2.set_ylabel('dollars')
-        ax2.set_title(f"{configs['stock']} P & L")
+        ax2.set_title(f"{symbol} P & L")
         
         chart_graph = "../pix/graph1.png"
         pixplt.tight_layout()

@@ -338,7 +338,7 @@ class TradeAccount:
             # WHEN PROFITABLE , ONLY SELL WHEN MORE THAN SPECIFIC PERCENT
             if ( new_price  > self.InPlay[ stock ]['price'] ) :
                 diff = (new_price  - self.InPlay[ stock ]['price'] )/self.InPlay[ stock ]['price']
-                print ( f"\t\t\t  \ ----> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
+                print ( f"\t\t\t  \\----> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
                 if diff < 0.00016 :    # ignore profit if less than % of investment 
                     print(message_prefix + "  Not Selling - trying to be a little greedier ")
                     return False

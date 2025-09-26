@@ -37,7 +37,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, WebDriverException
 
 ACCNT_TOKENS_FILE = "../files/account_tokens"
-
+BLANK_TOKENS    = {'expires_in': 0, 'token_type': 'Bearer', 'scope': 'api',
+                               'expires_at' : datetime.now(),
+                                'refresh_token': '',
+                                   'access_token': '',
+                                       'id_token': '',
+                                       'refresh_expires_at':''
+                           }
 class SchwabAccount :
     
     def __init__(self, app_key : str,  app_secret : str ) -> None :
@@ -163,9 +169,9 @@ class SchwabAccount :
                         Nothing 
         """
         success  : bool  = False
-        
+        print("\t\t \\-> Access Schwab Tokens ")
         # Needs to add expires at for refresh token
-        if self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()):
+        if self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
@@ -387,13 +393,21 @@ class SchwabAccount :
                         nothing 
             RETURNS :
                         bool of success True/False 
-        """       
-        with open( ACCNT_TOKENS_FILE, 'wb') as file :
-            pickle.dump( self.Tokens, file )
+        """
+        success  = False
 
-            
-        #print ( "Updated the tokens file ", self.Tokens)
-        return True
+        try:
+            with open( ACCNT_TOKENS_FILE, 'wb') as file :
+                pickle.dump( self.Tokens, file )
+
+            success = True 
+            #print ( "Updated the tokens file ", self.Tokens)
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        finally:
+            return success 
 
 
 
@@ -404,26 +418,29 @@ class SchwabAccount :
                         nothing 
             RETURNS :
                         bool of success True/False 
-        """       
-        
-        if os.path.exists( ACCNT_TOKENS_FILE ):
-            print( "Reading from Tokens file ")
-            with open( ACCNT_TOKENS_FILE, 'rb') as file :
-                self.Tokens = pickle.load(  file )
-        else:
-            self.Tokens = {'expires_in': 0, 'token_type': 'Bearer', 'scope': 'api',
-                               'expires_at' : datetime.now(),
-                                'refresh_token': '',
-                                   'access_token': '',
-                                       'id_token': '',
-                                       'refresh_expires_at':''
-                           }
-        # BACKUP JSON FILE
-        theseTokens = self.Tokens | {'expires_at' : None , 'refresh_expires_at' : None }
-        with open( '../files/account_tokens.json', 'w') as file :
-            json.dump( theseTokens, file )            
-        
-        return self.Tokens
+        """
+        try:
+            print("\t\t\\ -> Loading Schwab Tokens ")
+            if os.path.exists( ACCNT_TOKENS_FILE ):
+                print( "Reading from Tokens file ")
+                with open( ACCNT_TOKENS_FILE, 'rb') as file :
+                    self.Tokens = pickle.load(  file )
+            else:
+                self.Tokens = BLANK_TOKENS
+
+            
+            # BACKUP JSON FILE
+            theseTokens = self.Tokens | {'expires_at' : None , 'refresh_expires_at' : None }
+            with open( '../files/account_tokens.json', 'w') as file :
+                json.dump( theseTokens, file )
+
+                
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        finally:
+            return self.Tokens
 
 
 
