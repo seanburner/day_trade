@@ -135,6 +135,7 @@ def blank_config() -> dict:
                     'app_key'           : '',
                     'app_secret'        : '',
                     'email'             : '',
+                    'username'          : '',
                     'replay_date'       : '',
                     'volume_threshold'  : 70000,
                     'csv_input_fields'  : False,                    
@@ -316,6 +317,7 @@ def parse_arguments() -> {} :
 			'action'            : { 'help': 'Options: download/back_test/trade/test/live_test' ,  'action' : None}, 
 			'start_date'        : { 'help': 'Start date', 	                            'action' : None}, 
 			'end_date'          : { 'help': 'End date' ,  			            'action' : None}, 
+                        'username'          : { 'help', 'Username to associate with session',       'action' : None},
 			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None }, 
 			'input_data'        : { 'help': 'Data file to be used during back_test',    'action' : None },
                         'strategy'          : { 'help': 'Strategy to use [ basic/basic15/basicXm ]','action' : None },
@@ -513,10 +515,15 @@ def send_transactions_to_sql( configs : dict , trades: list  ) -> None :
     """
         Use TraderDB class to properly normalize transactions and save 
     """
-    traderDB = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+    try:
+        traderDB = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
 
-    traderDB.InsertOrderbook(orderbook=trades , email=configs['email']  )
+        traderDB.InsertOrderbook(orderbook=trades , email=configs['email'] , username=configs['username'] )
 
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
 
 
 
@@ -601,8 +608,8 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         Strategies.Set( configs['strategy'] , account)        
         account.SetMode( params['mode'] )      
         print( f'\t* About to live {params["mode"]}: ', account )
-        for stock in configs['stock'].split(",") :
-            data[stock] = []
+        for stock in ( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
+            data.update({ stock :  [] } )
          
         time_interval   = params['time_interval']
         current_time    = datetime.now()
@@ -828,16 +835,17 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
                     nothing 
     """
     try:
-        #CONFIRM THE REPORT FOLDER EXISTS        
+        #CONFIRM THE REPORT FOLDER EXISTS
+        username = configs['username'] if configs['username'] != '' else configs['email']
         if not os.path.exists(f"../reports/{configs['action']}/"):
             os.mkdir(f"../reports/{configs['action']}/")
 
         if isinstance( configs['stock'] ,str ) :
-            report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{configs['strategy']}_{ configs['stock']  }.pdf")
+            report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{ configs['stock']  }.pdf")
             summary_report_engine(  configs['stock']  , data  , account  , report  ) 
         elif isinstance( configs['stock'] , list ) :
             for symbol in configs['stock'] :
-                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{configs['strategy']}_{symbol}.pdf")
+                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{symbol}.pdf")
                 summary_report_engine( symbol  , data  , account  , report  ) 
 
     except: 
@@ -895,7 +903,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         #pixplt.show()
         fig.savefig( chart_graph )
         report.AddImage( chart_graph ) 
-        #report.AddLineChart2( configs['stock'],  dt  , ['A','B','C'])
+        #report.AddLineChart2( symbol ,  dt  , ['A','B','C'])
         
       
             
@@ -907,7 +915,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
             for opt in opts :
                 stats = [account.Performance[stock].count( opt ) for opt in opts ]            
             plt.pie( stats, labels=opts, autopct='%1.1f%%', startangle=90)
-            plt.title( stock )
+            plt.title( stock  )
             plt.axis ('equal')
             #plt.show ()        
         report.AddPieChart( stats, opts)

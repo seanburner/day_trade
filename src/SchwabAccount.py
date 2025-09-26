@@ -228,7 +228,7 @@ class SchwabAccount :
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
 
-            print(f"\n-> ERROR: {response.text}")
+            print(f"\n-> ERROR: {response if isinstance(response, str) else response.text}")
 
 
   

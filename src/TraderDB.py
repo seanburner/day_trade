@@ -144,13 +144,17 @@ class TraderDB:
         userId = None
         query  = f"select userId from users where username ='{self.Sanitize(userName)}' or email ='{self.Sanitize(userName)}' ;"
 
-        
-        self.Conn.Send( query )
-        if self.Conn.Results != [] :
-            userId = self.Conn.Results[0][0]
-        
-
-        return userId 
+        try:
+            self.Conn.Send( query )
+            if self.Conn.Results != [] :
+                userId = self.Conn.Results[0][0]
+                
+        except:      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )     
+        finally:
+            return userId 
 
     def InsertMetaFields ( self, aspect : int = 0  ) -> str | tuple:
         """
@@ -184,19 +188,23 @@ class TraderDB:
         """
         query   = f"select userId from users where username  = '{self.Sanitize(userName)}'  or email ='{self.Sanitize(email)}' or email = '{self.Sanitize(userName)}';"
         userId  = None
-        
-        self.Conn.Send( query )
-        if self.Conn.Results == [] :
-            query =f"INSERT INTO users( username, firstName, lastName, passwd,pwd_hash,email {self.InsertMetaFields( 0) } ) values  ("            
+        try:
+            self.Conn.Send( query )
+            if self.Conn.Results == [] :
+                query =f"INSERT INTO users( username, firstName, lastName, passwd,pwd_hash,email {self.InsertMetaFields( 0) } ) values  ("            
             
-            query += f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}','{self.Sanitize(passwd)}','{sha2(passwd,256)}','{self.Sanitize(email)}'"
-            query += f" {InsertMetaFields(1) } ); "
+                query += f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}','{self.Sanitize(passwd)}',sha2({passwd},256),'{self.Sanitize(email)}'"
+                query += f" {InsertMetaFields(1) } ); "
             
-            userId  = self.Conn.Write( query)
-        else:
-            userId = self.Conn.Results[0][0]
-
-        return userId
+                userId  = self.Conn.Write( query)
+            else:
+                userId = self.Conn.Results[0][0]
+        except :      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )     
+        finally:
+            return userId
 
         
     def InsertDate( self, date : datetime | str ) -> int | None  :
@@ -211,25 +219,30 @@ class TraderDB:
         query           = ""
         dateId          = None
         date_format     = "%Y-%m-%d %H:%M:%S"
-        
-        if isinstance( date, str ) :
-            date = datetime.strptime( date[:19],  date_format)
-            
-        query           = f"select dateId from dates where date = '{date}' ;"    
-        
-        self.Conn.Send( query )
-        if self.Conn.Results == [] :
-            query =f"INSERT INTO dates( date, yearmo, year, month,day {self.InsertMetaFields( 0) }  ) values  ("       
-            query += f"'{date}','{date.year}{date.month:02d}','{date.year}','{date.month:02d}','{date.day:02d}'"
-            #else:
-            #    query += f"'{date}','{datetime(date).year}{datetime(date).month}','{datetime(date).year}','{datetime(date).month}','{datetime(date).day}' "
-            query += f" {self.InsertMetaFields( 1) } ); "
-           
-            dateId  = self.Conn.Write( query)
-        else:
-            dateId = self.Conn.Results[0][0]
 
-        return dateId
+        try:
+            if isinstance( date, str ) :
+                date = datetime.strptime( date[:19],  date_format)
+            
+            query           = f"select dateId from dates where date = '{date}' ;"    
+        
+            self.Conn.Send( query )
+            if self.Conn.Results == [] :
+                query =f"INSERT INTO dates( date, yearmo, year, month,day {self.InsertMetaFields( 0) }  ) values  ("       
+                query += f"'{date}','{date.year}{date.month:02d}','{date.year}','{date.month:02d}','{date.day:02d}'"
+                #else:
+                #    query += f"'{date}','{datetime(date).year}{datetime(date).month}','{datetime(date).year}','{datetime(date).month}','{datetime(date).day}' "
+                query += f" {self.InsertMetaFields( 1) } ); "
+           
+                dateId  = self.Conn.Write( query)
+            else:
+                dateId = self.Conn.Results[0][0]
+        except:      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return dateId
 
 
     def InsertStock( self, stock : str = ""  , symbol : str = "", description : str = ''  , sector : str = '') -> int | None :
@@ -243,29 +256,36 @@ class TraderDB:
         """
         query       = f"select stockId from stocks where stock = '{self.Sanitize(stock)}'  or symbol ='{self.Sanitize(stock)}' or symbol ='{self.Sanitize(symbol)}';"
         stockId     = None
+
+        try:
+            self.Conn.Send( query )
         
-        self.Conn.Send( query )
-        
-        if self.Conn.Results == [] :
-            query =f"INSERT INTO stocks( stock, symbol, description,sector {self.InsertMetaFields( 0) }  ) values  ("                        
-            query += f"'{self.Sanitize(stock)}','{self.Sanitize(symbol)}','{self.Sanitize(description)}','{self.Sanitize(sector)}' {self.InsertMetaFields( 1) } ); "
+            if self.Conn.Results == [] :
+                query =f"INSERT INTO stocks( stock, symbol, description,sector {self.InsertMetaFields( 0) }  ) values  ("                        
+                query += f"'{self.Sanitize(stock)}','{self.Sanitize(symbol)}','{self.Sanitize(description)}','{self.Sanitize(sector)}' {self.InsertMetaFields( 1) } ); "
             
-            stockId  = self.Conn.Write( query)            
-        else:
-            stockId = self.Conn.Results[0][0]
-            
-        return stockId
+                stockId  = self.Conn.Write( query)            
+            else:
+                stockId = self.Conn.Results[0][0]
+                
+        except:      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return stockId
 
 
 
 
     
-    def InsertOrderbook( self, orderbook : list , email : str  ) -> None :
+    def InsertOrderbook( self, orderbook : list , email : str , username : str = '') -> bool:
         """
             Insert the transactions from the order book in to the database properly normalized
             ARGS   :
                         orderbook  ( list )  - entries to be added to orderbook table
-                        email      ( str )   - email of user to associate with orderbook entries 
+                        email      ( str )   - email of user to associate with orderbook entries
+                        username   ( str )   - user name to associate with session entries
             RETURNS:
                         nothing 
         """
@@ -274,33 +294,39 @@ class TraderDB:
         numRec          = 0
         dupeNum         = 0
         contents        = []
+        success         = False
         userId          = None 
         stockId         = None 
         initDateId      = None
         closeDateId     = None
 
+        try:
+            print("\t\t * Inserting Order book ")
+            print("\t\t   -> user : ", email , " : " ,username)
+            for order in orderbook :
+                userId      = self.InsertUser(  email  = email, userName =username )
+                stockId     = self.InsertStock( symbol = order[0] )
+                initDateId  = self.InsertDate(  date   = order[1] )
+                closeDateId = self.InsertDate(  date   = order[4] )
+                self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
+                if self.Conn.Results != [] :
+                    print("\t\t\t   | Found PreExisting OrderBook Entry : ", order )
+                    dupeNum += 1
+                else:
+                    contents.append( [userId, initDateId,stockId,order[2],order[3],closeDateId,order[5],order[6], *self.InsertMetaFields(2)  ] )
+                    numRec += 1
+
+            if contents != []:
+                self.Conn.WriteMany( header = header, contents = contents )
+                success = True 
         
-        print("\t\t * Inserting Order book ")
-        print("\t\t   -> user : ", email )
-        for order in orderbook :
-            userId      = self.InsertUser(  email  = email, userName ='' )
-            stockId     = self.InsertStock( symbol = order[0] )
-            initDateId  = self.InsertDate(  date   = order[1] )
-            closeDateId = self.InsertDate(  date   = order[4] )
-            self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
-            if self.Conn.Results != [] :
-                print("\t\t\t   | Found PreExisting OrderBook Entry : ", order )
-                dupeNum += 1
-            else:
-                contents.append( [userId, initDateId,stockId,order[2],order[3],closeDateId,order[5],order[6], *self.InsertMetaFields(2)  ] )
-                numRec += 1
+            print (f"\t\t\t -> Inserted {numRec} entries, while ignoring {dupeNum} duplicates in orderbook" )
+            
+        except:      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )     
 
-        if contents != []:
-            self.Conn.WriteMany( header = header, contents = contents )
-        
-        print (f"\t\t\t -> Inserted {numRec} entries, while ignoring {dupeNum} duplicates in orderbook" )
-
-
-
-
+        finally:
+                return success
   

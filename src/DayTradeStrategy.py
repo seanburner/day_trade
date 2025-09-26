@@ -38,7 +38,8 @@ class DayTradeStrategy:
                                 'basic'         :{ 'detail' : 'Basic Bitch of the group',                           'method': self.DayTradeBasic},
                                 'basic1'        :{ 'detail' : 'Basic Bitch of the group based on 1 min candles',    'method': self.DayTradeBasic_1Min},
                                 'basic5'        :{ 'detail' : 'Basic Bitch of the group based on 5 min candles',    'method': self.DayTradeBasic_5Min},
-                                'basic15'       :{ 'detail' : 'Basic Bitch of the group based on 15min candles',    'method': self.DayTradeBasic_15m},
+                                'basic10'       :{ 'detail' : 'Basic Bitch of the group based on 10min candles',    'method': self.DayTradeBasic_10Min},
+                                'basic15'       :{ 'detail' : 'Basic Bitch of the group based on 15min candles',    'method': self.DayTradeBasic_15Min},
                                 'basicXm'       :{ 'detail' : 'Basic Bitch of the group based on Varying candles',  'method': self.DayTradeBasic_Xm},
                                 'opening_range' :{ 'detail' : 'Use first candle to provide range of interest',      'method': self.OpeningRange} 
                           }
@@ -212,7 +213,7 @@ class DayTradeStrategy:
 
     def DayTradeBasic_5Min ( self, ticker_row : list, account : object, configs : dict) -> (bool, str) :
         """
-            Sets the limits for the account
+              Set the params for the DayTrade 5 min  version  , then call the function
             ARGS  :
                         ticker_row    ( list ) information about the stock and current price and volume
                         account       ( TradeAccount )  the trading account for BUYS and SELLS
@@ -230,7 +231,33 @@ class DayTradeStrategy:
         return self.DayTradeBasicModule ( ticker_row , account, params    )
 
 
-    def DayTradeBasic_15m ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
+
+
+
+    def DayTradeBasic_10Min ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
+        """
+              Set the params for the DayTrade 10 min  version  , then call the function
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        configs           (  dict)    configurations                   
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                         
+        """
+        params = self.BaseParams()
+        
+        params['time_interval']             = 600
+        params['time_interval_bought']      = 600
+        params['crash_out_percent']         = 0.85 
+        params['volume_threshold']          = configs['volume_threshold']
+        params['volume_change_avg_ratio']   = 0.10 
+
+        #print("\t *Strategy : basic bitch 10 min ")
+        return self.DayTradeBasicModule ( ticker_row , account, params    )
+
+
+
+    def DayTradeBasic_15Min ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
         """
             ARGS  :
                         ticker_row        ( list ) information about the stock and current price and volume
