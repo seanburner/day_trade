@@ -709,10 +709,10 @@ def  replay_test( configs: dict  ) -> None :
             else:
                 symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                 for symbol in symbols:
-                    print(f"-> Quote @ { current_time } {stock} " )
+                    print(f"-> Quote @ { current_time } {symbol} " )
                     ticker_row = account.Quote ( symbols= symbol,  frequency= time_interval , endDate = current_time)                
                     if ticker_row != None:                    
-                        data[stock].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                        data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
                         print(f"\t\t\t->DATA : {ticker_row} " ) 
                         success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs)
@@ -925,13 +925,13 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         report.AddText( "OrderBook ", "h1", 1)    
         contents        = ""
         total_profit    = 0
-        print("\t ORDERBOOK")
+        print(f"\t {symbol} ORDERBOOK")
         for entry in account.Trades:
             print("\t -  ", entry )            
             total_profit += entry[6]
 
         # LIST OF INPLAY
-        print("\t InPLAY")
+        print(f"\t {symbol}  InPLAY")
         for inplay in account.InPlay:
             print( "\t -  " , inplay ) 
 
