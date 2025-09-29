@@ -281,14 +281,15 @@ class PDFReport:
         pie.slices[0].popout = 10  # visually popout the slice 
         drawing.add( pie )
         
-        drawing2 = Drawing ( width, height )
-        drawing2.add( pie )
+        # Testing on making a second image / pie chart layout     
+        #drawing2 = Drawing ( width, height )
+        #drawing2.add( pie )
 
         # --- Create the Table to hold the charts ---
     
         chart_table_data = [
-            [Paragraph("<b>Revenue Distribution</b>", self.Styles['Normal']), Paragraph("<b>Expense Distribution</b>", self.Styles['Normal'])],
-            [drawing, drawing2]
+            [Paragraph("<b>Revenue Distribution</b>", self.Styles['Normal']) ], #, Paragraph("<b>Expense Distribution</b>", self.Styles['Normal'])],
+            [drawing]#, drawing2]
         ]
 
         chart_table_style = TableStyle([
@@ -298,7 +299,7 @@ class PDFReport:
             ('INNERGRID', (0,0), (-1,-1), 0.25, colors.grey),
         ])
 
-        chart_table = Table(chart_table_data, colWidths=[width/2, width/2])
+        chart_table = Table(chart_table_data, colWidths=[width ]) #,width/2])
         chart_table.setStyle(chart_table_style)
 
         

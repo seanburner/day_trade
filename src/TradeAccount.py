@@ -28,18 +28,18 @@ class TradeAccount:
         """
             Initialize the variables for the Trading Account class 
         """
-        self.AccountTypes   = { 'SCHWAB' :  SchwabAccount } 
-        self.APP_KEY        = ""
-        self.APP_SECRET     = ""
-        self.Trades         = []                       # COMPLETED TRADES FOR THE DAY
-        self.InPlay         = {}                       # CURRENT TRADES STILL OPEN  
+        self.Mode           = ""                       # Are we Testing or Trading or something else
         self.Funds          = funds                    # ACCOUNT DOLLAR AMOUNT 
         self.Limit          = 0.0                      # MAX TO SPEND ON ANY ONE TRADE 
-        self.TargetGoal     = 0                        # Dont get greedy, when reach this amount will quit trading for day
-        self.Mode           = ""                       # Are we Testing or Trading or something else
-        self.Performance    = {}                       # Keep track of wins and loses
-        self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage
+        self.Trades         = {}                       # COMPLETED TRADES FOR THE DAY
+        self.InPlay         = {}                       # CURRENT TRADES STILL OPEN  
+        self.APP_KEY        = ""
         self.LossLimit      = 0                        # HOW MUCH IS TOO MUH TO LOSE ON ONE TRADE   
+        self.APP_SECRET     = ""
+        self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage
+        self.TargetGoal     = 0                        # Dont get greedy, when reach this amount will quit trading for day
+        self.Performance    = {}                       # Keep track of wins and loses
+        self.AccountTypes   = { 'SCHWAB' :  SchwabAccount } 
 
         self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
 
@@ -86,26 +86,53 @@ class TradeAccount:
         
         for entry in candles['candles'] :
             pos += 1
-            #print("TradeAccount :: QuoteByInterval() - TimeStamps : ",
-            #      str(datetime.fromtimestamp(entry['datetime']/1000)) , " - > ",
-            #      str(datetime.fromtimestamp(timeStamp/1000)) , " : " , entry['datetime']/1000, " -> ", timeStamp/1000, " = " , entry )
             if ( entry['datetime']/1000 == timeStamp/1000 ):
-               print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
+               #print (f"\t\t\t ** FOUND : {pos} -> {len(candles['candles'])}    :: " , entry )
                quote_info = entry
-               print( f"\tFOUND | {quote_info} -> {datetime.fromtimestamp(entry['datetime']/1000)}\n\t LAST | {candles['candles'][-1]} -> {datetime.fromtimestamp(candles['candles'][-1]['datetime']/1000)}")
+               #print( f"\t\t\t\t FOUND | {quote_info} -> {datetime.fromtimestamp(entry['datetime']/1000)}\n\t\t\t\t  LAST | {candles['candles'][-1]} -> {datetime.fromtimestamp(candles['candles'][-1]['datetime']/1000)}")
                quote_info['symbol'] = candles['symbol']
                ticker_row = [candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
                          quote_info['open'],quote_info['volume'],quote_info['high']   ]
                         
         return ticker_row
+
+
+
     
-    def Quote ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" , endDate : datetime = datetime.now()) -> requests.Response :
+    def Quote ( self, symbols : list | str,  endDate : datetime = datetime.now()) -> requests.Response :
         """
             Abstraction to call the underlying client ( Schwab / ) to get a quote
             The last candle in candles:{} will be the most current one we want for frequency and timeframe
             ARGS    :
                         symbols : list 
-            RETURNS : 
+            RETURNS :
+                        request.response
+        """
+        ticker_row  = {}
+        
+        try:
+            quote_response = self.Conn.Quote( symbols)            
+            for sym in ( [symbols] if isinstance(symbols,str) else symbols):
+                details =  quote_response[sym]['quote']
+                ticker_row.update({ sym :  [ sym, str(datetime.now() ),details['lowPrice'], details['closePrice'], details["openPrice"],
+                                               details["totalVolume"],details['highPrice'],] })
+                
+        except:          
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )                
+        finally:            
+            return  ticker_row
+
+        
+    def QuoteByInterval ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" , endDate : datetime = datetime.now()) -> requests.Response :
+        """
+            Abstraction to call the underlying client ( Schwab / ) to get a quote by interval/time 
+            The last candle in candles:{} will be the most current one we want for frequency and timeframe
+            ARGS    :
+                        symbols : list 
+            RETURNS :
+                        request.response
         """
         candles         = ""
         timeStamp       = 0
@@ -132,6 +159,7 @@ class TradeAccount:
                 ticker_row = self.ExtractQuoteEntry( candles , timeStamp)
                 # A SECOND ATTEMPT INCASE THE FIRST WAS UNSUCCESSFUL
                 if ticker_row == None :
+                    print( f"{symbols}  RUNNING SECOND ")
                     candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
                     if 'candles' in candles :
@@ -140,7 +168,7 @@ class TradeAccount:
                 
                 #IF PROPER STILL IS NOT FOUND, THEN GET THE LAST ENTRY IN THE SERIES /RESPONSE DICT
                 if ticker_row == None :
-                    print(" **********  FAKING IT ************")
+                    print(f"{symbols}  **********  FAKING IT ************")
                     for entry in candles['candles'] :
                         print( f"\t>> {entry} -> {datetime.fromtimestamp(entry['datetime']/1000)}")
                     quote_info = candles['candles'][-1]
@@ -230,7 +258,7 @@ class TradeAccount:
                 print("\t\t |   " + str(entry) )
 
 
-    def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()))  -> bool :
+    def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()), volume : int = 0 , volume_threshold : int = 0)  -> bool :
         """
            Attempt to buy the stock under the confines of the limit , True = succeeded , False = failed
            Updates
@@ -267,11 +295,14 @@ class TradeAccount:
                 print(f"{message_prefix}   Already holding, cant take any more ")
                 return success
 
+            if not(stock  in self.Trades.keys() ) :
+                self.Trades.update( { stock : [] } )
+                
             #IF THE CURRENT PRICE IS BELOW THE PREVIOUS PRICE WE BOUGHT AT , SHOULD WE BE BUYING ????            
-            if len( self.Trades ) > 0 :
-                lenth = len( self.Trades ) - 1 
-                if self.Trades[ lenth][2] > price :
-                    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[lenth][2]} ")
+            if len( self.Trades[stock] ) > 0 :
+                lenth = len( self.Trades[stock] ) - 1 
+                if self.Trades[stock][ lenth][2] > price :
+                    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[stock][lenth][2]} ")
                     return success 
 
             working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
@@ -288,9 +319,9 @@ class TradeAccount:
                     'time'  : current_time,
                     'price' : price ,
                     'qty'   : qty ,
-                    'volume': 'not sure if needed ',
+                    'volume': volume,
                     'closed': '',
-                    'sold'  : 0,
+                    'sold'  : 0,                    
                     'pl'    : 0 
                 }
                 if not( stock  in self.Performance.keys() ) :
@@ -352,7 +383,7 @@ class TradeAccount:
                 print('FUNDS: ', self.Funds , ' : ' , ( self.InPlay[stock]['qty'] * new_price ), ' = ' , ( self.InPlay[stock]['qty'] * new_price )+self.Funds)    
                 self.Funds += ( self.InPlay[stock]['qty'] * new_price )
                 p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
-                self.Trades.append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
+                self.Trades[stock].append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
                             current_time, new_price, p_l ] )
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 

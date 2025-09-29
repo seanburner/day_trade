@@ -86,7 +86,7 @@ class TraderDB:
                         " CREATE PROCEDURE createTableOrderBook(  INOUT dbName  varchar(20)  )   " +
                         " BEGIN  "+
                              "create table orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null, stockId int not null, " +
-                                "bid decimal(10,4) not null , qty  int not null ,  closed  int not null,  ask  decimal(10,4), p_l decimal(10,4) , " +                    
+                                "bid decimal(10,4) not null , qty  int not null , volume_in int , closed  int not null,  ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +                    
                                 " active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date,  " +
                                 "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
                                 "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
@@ -99,8 +99,8 @@ class TraderDB:
                         " CREATE PROCEDURE createTable_vOrderBook(   )   " +
                         " BEGIN  "+
                         "     create view v_orderbook  as" +
-                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.qty,d2.date as closed ,o.ask , " +
-                        "          o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.volume_in,o.qty,d2.date as closed ,o.ask , " +
+                        "          o.volume_out, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
                         "     from orderbook o " +
                         "     inner join dates d on o.initiated =d.dateid "+
                         "     inner join dates d2 on o.closed = d2.dateid  "+

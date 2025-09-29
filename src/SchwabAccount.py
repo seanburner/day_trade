@@ -169,7 +169,7 @@ class SchwabAccount :
                         Nothing 
         """
         success  : bool  = False
-        print("\t\t \\-> Access Schwab Tokens ")
+        #print("\t\t \\-> Access Schwab Tokens ")
         # Needs to add expires at for refresh token
         if self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()):
             success = self.Authenticate() 
@@ -240,7 +240,7 @@ class SchwabAccount :
             RETURNS :
                         dictionary of stock quote information 
         """
-        quote_response = []
+        response = None 
 
         try:
             self.CheckAccessTokens()
@@ -250,16 +250,14 @@ class SchwabAccount :
                                  'fields': ['quote','regular'],
                                  'indicative': False},
                             timeout=self.Timeout)        
-            #print(f"Schwab:Quote - {response} - {response.text}")
-            details = response.json()[symbol]['quote']
-            quote_response = [details["totalVolume"],details["openPrice"],details['closePrice'],details['highPrice'],details['lowPrice']] 
+            #print(f"Schwab:Quote - {type(symbol)} -> {response} - {response.text}")
         
         except:
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
         finally:
-            return quote_response
+            return {} if response == None else response.json()
 
         
     def CashForTrading( self ) -> float :
@@ -282,20 +280,29 @@ class SchwabAccount :
             RETURNS:
                     Nothing 
         """
-        temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
+        temp  = None
+        success = False 
+        try:
+            temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             timeout=self.Timeout).json()
-        if 'errors' in temp :
-            print(f'\t\t\t SchwabAcccount::LinkedAccounts() - returned error from request : {temp} - Re-Authorizing')
-            success = self.Authenticate()
-            temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
+            if 'errors' in temp :
+                print(f'\t\t\t SchwabAcccount::LinkedAccounts() - returned error from request : {temp} - Re-Authorizing')
+                success = self.Authenticate()
+                temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             timeout=self.Timeout).json()
              
             
-        for entry in temp:
-            self.Accounts[ entry['accountNumber'] ] = {'hashValue' : entry['hashValue'], 'details' : None }
-            
+            for entry in temp:
+                self.Accounts[ entry['accountNumber'] ] = {'hashValue' : entry['hashValue'], 'details' : None }
+                
+        except :      
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+
+                
         
     def Preference( self ) -> dict :
         """
@@ -309,9 +316,7 @@ class SchwabAccount :
                                 ).json()
                             #params="", #self._params_parser({'fields': fields}),
                             #timeout=self.Timeout).json()
-
-
-            
+           
             
         except:
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -364,7 +369,7 @@ class SchwabAccount :
         """       
 
 
-    def AccountOrders ( self, accountHash : str , fromTime : str , toTime : str , status : str = "open"  ) -> {}:
+    def AccountOrders ( self, accountHash : str , fromTime : str , toTime : str , status : str = "open"  ) -> dict:
         """
             Get the orders for a specific account
             ARGS   :
@@ -372,17 +377,25 @@ class SchwabAccount :
             RETURNS:
                     dictionary of orders for account 
         """
-        
-        temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
+        temp  = None
+
+        try : 
+            temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params={'maxResults': 50,
                                  'fromEnteredTime': fromTime ,#str( datetime.now() - timedelta( days = 30) ),
                                  'toEnteredTime'  : toTime, # str( datetime.now() ),
                                  'status': status},
                             timeout=self.Timeout)
-        print("\t\t\t\t      * ", temp.json() )
-        
+            print("\t\t\t\t      * ", temp.json() )
+            
+        except:      
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
 
+        finally:
+            return temp.json()
 
         
 
@@ -411,7 +424,7 @@ class SchwabAccount :
 
 
 
-    def LoadTokensFile( self ) -> bool :
+    def LoadTokensFile( self ) -> dict :
         """
             Load Serialize file into Tokens structure 
             ARGS    :
