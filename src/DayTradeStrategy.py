@@ -19,9 +19,14 @@ import inspect
 import platform
 import argparse
 import functools
-import requests 
-from datetime import datetime
+import requests
 
+
+from datetime       import datetime
+from Indicators     import Indicators
+
+
+Date_Format     = "%Y-%m-%d %H:%M:%S"
 
 class DayTradeStrategy:
     OpenRange  = { 'high': 0, 'low': 0 , 'vwap' : 0}
@@ -46,8 +51,9 @@ class DayTradeStrategy:
 
         self.Stocks     = {
                             'Stock' : {
-                                    'Price' :  {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Occur' : 0},
-                                    'Volume' : {'Previous': 0, 'Slope' : 0, 'Bought' : 0 }
+                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Occur' : 0},
+                                    'Volume'        :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0 },
+                                    'Indicators'    :   {'MVA' : {}}   
                                 }
                          }
                     
@@ -85,7 +91,8 @@ class DayTradeStrategy:
         
         return True
 
-    
+
+            
     def Run( self,  ticker_row : list, account : object, configs : dict  ) -> bool :
         """
             Switching station to control which strategy gets used
@@ -136,7 +143,7 @@ class DayTradeStrategy:
             RETURNS    : 
         """
         bought_price        = float(self.Stocks[ stock ]['Price']['Bought'])        
-        trigger_price       = bought_price - ( risk_percent * bought_price )
+        trigger_price       = bought_price - (risk_percent * bought_price )
 
          
         #print(f"\t\t\t --  Trigger price : { trigger_price}     Bought : { bought_price} " )
@@ -288,7 +295,7 @@ class DayTradeStrategy:
 
     def DayTradeBasic_Xm ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
         """
-            Sets the limits for the account -> 5m to 1 min
+            Sets the limits for the account -> 5 m to 1 min
 
             PARAMETER  :
                         ticker_row        ( list ) information about the stock and current price and volume
@@ -345,9 +352,12 @@ class DayTradeStrategy:
 
             # ADD STOCK ENTRY IF NOT INPLAY
             if not ( symbol in self.Stocks.keys() ) :
+                data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFOR FOR SYMBOL 
+                indicators = Indicators ( symbol= symbol, data= data )                 # CALCULATE THE INDICATORS 
                 self.Stocks[ symbol ]  = {                        
-                                    'Price' :  {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
-                                    'Volume' : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0}
+                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
+                                    'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
+                                    'Indicators'    : indicators
                              }
             #BUY : if the price goes from neg to positive  by $0.10 and volume is higher
             #print(f" Volume percent : {(float(ticker_row[volumPos])  /  float(self.Stocks[ symbol]['Volume']['Previous'] ) )}")
@@ -408,7 +418,7 @@ class DayTradeStrategy:
                  crash_trail_stop       =  crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought'])
                  # dont sell unless crashing AND atleast 80% purchase, try to wait it out , BOXL fell fast and did not trigger this  so need to FIX
                  print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : CHECKING PROFIT_STOP :  STRIKE_PRICE_STOP : { strike_price_stop}   profit_trail_stop: { profit_trail_stop}   CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ symbol]['Price']['Bought']}   NEW PRICE : {ticker_row[ closePos ]} "   )
-                 if  (float(ticker_row[ closePos ]) <= crash_trail_stop  ) and  ( ( float(ticker_row[ closePos ]) <  strike_price_stop )   or   ( profit_trail_stop >  float(ticker_row[ closePos ]) )  ):
+                 if  (float(ticker_row[ closePos ]) <= crash_trail_stop  ) or ( float(ticker_row[ closePos ] ) <=  strike_price_stop    ):
                      print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP : SAFETY SELL  -> { profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ symbol]['Price']['Bought']}   NEW PRICE : {ticker_row[ closePos ]} "   )
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ]) , current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) )  :
                          success = True
@@ -418,7 +428,11 @@ class DayTradeStrategy:
                          action          = "closed"
                         
             
-                     
+            # Update the indicators for the next go round
+            entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
+                       'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
+            self.Stocks[ symbol ]['Indicators'].Update( entry = entry)
+            
             # holding and what happens when price moves but voume is level , increasing  or decreasing ?     
 
 

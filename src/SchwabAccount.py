@@ -70,12 +70,12 @@ class SchwabAccount :
 
         #self.UpdateTokensFile()
         self.Tokens = self.LoadTokensFile()
-       # print( self.Tokens ) 
+        print( "PAY ATTENTION WHEN TOKENS FAIL: " , self.Tokens ) 
        # self.Tokens['refresh_expires_at'] = datetime.now() + timedelta( seconds=900*96*5 ) 
         self.CheckAccessTokens()
        # self.UpdateTokensFile()
         
-        print ("\t\t Schwab Account Initiated ") 
+        print ("\t\t\t\t  ->  Schwab Account Initiated ") 
         
         self._base_api_url = "https://api.schwabapi.com"
         self.Timeout = 1800
@@ -169,18 +169,22 @@ class SchwabAccount :
                         Nothing 
         """
         success  : bool  = False
-        #print("\t\t \\-> Access Schwab Tokens ")
+        #print("\t\t\t\t  -> Access Schwab Tokens ")
         # Needs to add expires at for refresh token
-        if self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()):
+        if ( self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or
+             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys())  ):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
         else:
-            #print ( " Tokens still good :" , self.Tokens['expires_at'] )
+            #print ( "\t\t\t\t  ->  Tokens still good :" , self.Tokens['expires_at'] )
             success = True
             
         return success 
 
+
+
+   
 
     def QuoteByInterval(self, symbol: str, periodType: str | None = None, period: str | None = None, frequencyType: str | None = None, frequency: int = 15, startDate: datetime | str | None = None,
                       endDate: datetime | str  = None, needExtendedHoursData: bool | None = None, needPreviousClose: bool | None = None) -> requests.Response:
@@ -221,7 +225,6 @@ class SchwabAccount :
                             timeout=self.Timeout)
         
             #print(f"Schwab:QuoteByInterval - {response} - {response.text}")
-            return response
         
         except:   
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -229,7 +232,8 @@ class SchwabAccount :
                 print("\t\t |   " + str(entry) )
 
             print(f"\n-> ERROR: {response if isinstance(response, str) else response.text}")
-
+        finally:
+            return response 
 
   
     def Quote ( self, symbol :  str  ) -> requests.Response :
@@ -257,7 +261,7 @@ class SchwabAccount :
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
         finally:
-            return {} if response == None else response.json()
+            return {} if response == None  else response.json()
 
         
     def CashForTrading( self ) -> float :
@@ -287,7 +291,7 @@ class SchwabAccount :
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             timeout=self.Timeout).json()
             if 'errors' in temp :
-                print(f'\t\t\t SchwabAcccount::LinkedAccounts() - returned error from request : {temp} - Re-Authorizing')
+                print(f'\t\t\t\t  -> SchwabAcccount::LinkedAccounts() - returned error from request : {temp} - Re-Authorizing')
                 success = self.Authenticate()
                 temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
@@ -330,7 +334,9 @@ class SchwabAccount :
         """
             Details on each of the linked accounts
             ARGS    :
+                        nothing 
             RETURNS :
+                        nothing 
         """
         fields = None
         temp = ""
@@ -414,7 +420,7 @@ class SchwabAccount :
                 pickle.dump( self.Tokens, file )
 
             success = True 
-            #print ( "Updated the tokens file ", self.Tokens)
+            #print ( "\t\t\t\t  -> Updated the tokens file ", self.Tokens)
         except:
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
             for entry in sys.exc_info():
@@ -433,9 +439,9 @@ class SchwabAccount :
                         bool of success True/False 
         """
         try:
-            print("\t\t\\ -> Loading Schwab Tokens ")
+            print("\t\t\t\t  ->  Loading Schwab Tokens ")
             if os.path.exists( ACCNT_TOKENS_FILE ):
-                print( "Reading from Tokens file ")
+                print( "\t\t\t\t  -> Reading from Tokens file ")
                 with open( ACCNT_TOKENS_FILE, 'rb') as file :
                     self.Tokens = pickle.load(  file )
             else:
@@ -466,7 +472,7 @@ class SchwabAccount :
             RETURNS    :
                            bool -> True / False  
         """        
-        service = ChromeService(ChromeDriverManager().install())       
+        service = None     
         try:
             service = ChromeService(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
@@ -546,7 +552,7 @@ class SchwabAccount :
         success = False
         
         if self.Mode.lower()  == "test":
-            print( "\t\t\t   \\-> BUY Command : in test mode ")
+            print( "\t\t\t\t  -> BUY Command : in test mode ")
             return True
 
         
@@ -577,12 +583,12 @@ class SchwabAccount :
                             json=buy_order)
             
             if buy_response.status_code == 201  or buy_response.status_code == 200:
-                print("\t\t   -> SchwabAccount -  BUY ORDER submitted successsfully ")
+                print("\t\t\t\t  ->  SchwabAccount -  BUY ORDER submitted successsfully ")
                 success = True
             else:
-                print("\t\t   -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
+                print("\t\t\t\t  -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
                 
-            print(f"\t\t * BUY ORDER Response: {buy_response.status_code}  {buy_response.text} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            print(f"\t\t\t\t\t  |  BUY ORDER Response: {buy_response.status_code}  {buy_response.text} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
             
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -606,7 +612,7 @@ class SchwabAccount :
         """
         success = False 
         if self.Mode.lower()  == "test":
-            print( "\t\t\t   \\-> SELL Command : in test mode ")
+            print( "\t\t\t\t  -> SELL Command : in test mode ")
             return True
         
         accnt =  self.AccountID  #list(self.Accounts.keys())[0] 
@@ -634,12 +640,12 @@ class SchwabAccount :
                             json=sell_order)
             
             if sell_response.status_code == 201 or sell_response.status_code == 200 :
-                print("\t\t   -> SchwabAccount -  SELL ORDER submitted successsfully ")
+                print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted successsfully ")
                 success = True
             else:
-                print("\t\t   -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
+                print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
             
-            print(f"\t\t * SELL ORDER  Response: {sell_response.status_code} -> {sell_response.text} " )
+            print(f"\t\t\t\t\t  |  SELL ORDER  Response: {sell_response.status_code} -> {sell_response.text} " )
 
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )

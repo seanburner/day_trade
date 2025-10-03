@@ -98,7 +98,52 @@ class TradeAccount:
 
 
 
-    
+    def History( self, symbol : str , time_period : int ) -> dict :
+        """
+            Get historical entries for the symbol 
+        """
+        df              = None 
+        timeStamp       = 0
+        endDate         = datetime.now()
+        startDate       = None        
+        quote_info      = None
+        ticker_row      = None 
+        periodTypes     = ["day","month","year","ytd"]
+        frequencyTypes  = ["minute","daily","weekly","monthly"]
+        
+        
+        try:
+            periodType      = 'month' #'day'
+            period          = 1
+            frequencyType   = "daily"
+            frequency       = 1
+            startDate       = endDate - timedelta( days = frequency * time_period ) 
+
+            
+            response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
+                                              frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
+            
+            if response.status_code != 200 :
+                return ticker_row
+
+            
+            #print( "response : ", response.text)
+            df = pd.DataFrame( response.json()['candles'])
+            df.sort_values( by=['datetime'], ascending=False , inplace=True)
+            df['date'] = df['datetime'].apply( lambda x : str(datetime.fromtimestamp( x/1000))[:10] )
+            df = df.reindex()
+            #print("Data Frame : " , df )
+                
+        except:          
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )                
+        finally:            
+            return  df
+
+
+
+        
     def Quote ( self, symbols : list | str,  endDate : datetime = datetime.now()) -> requests.Response :
         """
             Abstraction to call the underlying client ( Schwab / ) to get a quote
@@ -111,16 +156,19 @@ class TradeAccount:
         ticker_row  = {}
         
         try:
-            quote_response = self.Conn.Quote( symbols)            
+            quote_response = self.Conn.Quote( symbols)
             for sym in ( [symbols] if isinstance(symbols,str) else symbols):
-                details =  quote_response[sym]['quote']
-                ticker_row.update({ sym :  [ sym, str(datetime.now() ),details['lowPrice'], details['closePrice'], details["openPrice"],
-                                               details["totalVolume"],details['highPrice'],] })
+                if not( sym in quote_response ):
+                    ticker_row.update({ sym :  [ ] })
+                else:
+                    details =  quote_response[sym]['quote']
+                    ticker_row.update({ sym :  [ sym, str(datetime.now() ),details['lowPrice'], details['closePrice'], details["openPrice"],
+                                               details["totalVolume"],details['highPrice']] })
                 
         except:          
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )                
+                print("\t\t |   " + str(entry) )            
         finally:            
             return  ticker_row
 
@@ -148,14 +196,18 @@ class TradeAccount:
             frequency       = int (15 if frequency/60 == 0 else frequency/60 )
             startDate       = endDate - timedelta( seconds = frequency * 60) 
             
-            candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
-                                              frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
-           
+            response = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
+                                              frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
+            
+            if response.status_code != 200 :
+                return ticker_row
+            
+            candles = response.json()          
             
             #print( f"\n->TradeAccount::" + str(inspect.currentframe().f_code.co_name) + f" -quote_info : { candles}")
             timeStamp = int(endDate.timestamp() * 1000)
             pos = 0
-            if 'candles' in candles :
+            if 'candles' in candles  and not ( candles['candles'] == [] ):
                 ticker_row = self.ExtractQuoteEntry( candles , timeStamp)
                 # A SECOND ATTEMPT INCASE THE FIRST WAS UNSUCCESSFUL
                 if ticker_row == None :
@@ -330,7 +382,7 @@ class TradeAccount:
                 print ( f"{message_prefix}   BOUGHT : " , self.InPlay )
                 success = True
             else:
-                print("\t\t --> Account level could not execute BUY properly ")
+                print("\t\t\t    --> Account level could not execute BUY properly ")
             return success 
         except: 
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -369,7 +421,7 @@ class TradeAccount:
             # WHEN PROFITABLE , ONLY SELL WHEN MORE THAN SPECIFIC PERCENT
             if ( new_price  > self.InPlay[ stock ]['price'] ) :
                 diff = (new_price  - self.InPlay[ stock ]['price'] )/self.InPlay[ stock ]['price']
-                print ( f"\t\t\t  \\----> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
+                print ( f"\t\t\t    \\----> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
                 if diff < 0.00016 :    # ignore profit if less than % of investment 
                     print(message_prefix + "  Not Selling - trying to be a little greedier ")
                     return False

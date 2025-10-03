@@ -194,7 +194,7 @@ class TraderDB:
                 query =f"INSERT INTO users( username, firstName, lastName, passwd,pwd_hash,email {self.InsertMetaFields( 0) } ) values  ("            
             
                 query += f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}','{self.Sanitize(passwd)}',sha2({passwd},256),'{self.Sanitize(email)}'"
-                query += f" {InsertMetaFields(1) } ); "
+                query += f" {self.InsertMetaFields(1) } ); "
             
                 userId  = self.Conn.Write( query)
             else:

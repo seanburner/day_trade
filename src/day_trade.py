@@ -37,6 +37,15 @@ from TradeAccount       import TradeAccount
 from DayTradeStrategy   import DayTradeStrategy
 
 
+from selenium                           import webdriver
+from selenium.webdriver.chrome.service  import Service as ChromeService
+from webdriver_manager.chrome           import ChromeDriverManager
+from selenium.webdriver.common.by       import By
+from selenium.webdriver.support.ui      import WebDriverWait
+from selenium.webdriver.support         import expected_conditions as EC
+from selenium.common.exceptions         import TimeoutException, WebDriverException
+
+
 Strategies = DayTradeStrategy()
 
 def download_stock_data( configs : dict  ) -> None :
@@ -134,8 +143,8 @@ def blank_config() -> dict:
                     'strategy'          : '',
                     'app_key'           : '',
                     'app_secret'        : '',
-                    'email'             : '',
-                    'username'          : '',
+                    'email'             : 'seanburner@gmail.com',
+                    'username'          : 'seanburner',
                     'replay_date'       : '',
                     'volume_threshold'  : 70000,
                     'csv_input_fields'  : False,                    
@@ -386,11 +395,66 @@ async def read_stream( stream_client):
 
 """
 
-def system_test( configs : dict  ) -> None :
-    account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
-    print('Preferences: ', account.Conn.Preference )
 
-    print(configs['stock'] , account.Quote( configs['stock'])  )
+def scrape_potential_stocks() -> None :
+    """
+        Scrape appropriate web sites to get the trending stocks and the analyze ( according to some criteria) to keep for trading
+        NOTE :  Use Investor Undergrounds Market Movers page 
+    """
+    service     = None
+    endpoints   = {
+                    'Premarket' : 'https://www.investorsunderground.com/market-movers',
+                    'Interday'  : 'https://www.investorsunderground.com/market-movers/?mm=2',
+                    'Afterhours': 'https://www.investorsunderground.com/market-movers/?mm=3'
+                }
+    data        = {}
+    try :
+        service = ChromeService(ChromeDriverManager().install())      
+        options = webdriver.ChromeOptions()
+        driver = webdriver.Chrome(service=service, options=options)
+        for endpoint in endpoints.keys():
+            driver.get(  endpoints[ endpoint ])
+            data.update( { endpoint : [] } ) 
+        
+    except: 
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
+            
+from Indicators  import Indicators
+
+def system_test( configs : dict  ) -> None :
+    account         = None
+    date_format     = "%Y-%m-%d %H:%M:%S"    
+
+    try: 
+        account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+        print('Preferences: ', account.Conn.Preference )
+
+        time_period = 200 + (.50 * 200 )
+        data = account.History( symbol=configs['stock'], time_period=time_period  ) 
+        #print( data.columns)
+        indicators = Indicators( symbol=configs['stock'], data=data )    
+        print(f"Indicators : {indicators }")
+        ticker = account.Quote ( symbols= configs['stock'][0])[configs['stock'][0]]
+        timePos = 1
+        lowPos = 2 
+        closePos = 3
+        openPos = 4 
+        highPos = 6
+        volumePos =  5
+        ticker[timePos] = datetime.strptime( ticker[timePos][:19], date_format)         
+        indicators.Update( entry ={0:{'close': ticker[closePos], 'open' : ticker[openPos] ,'low' : ticker[lowPos],
+                                      'high' : ticker[highPos], 'datetime' : ticker[timePos].timestamp()  * 1000 , 'volume' : ticker[volumePos]}})
+        print(f"Indicators UPDATED: {indicators }")
+         
+    except: 
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )   
 
 """
 /trader/v1/userPreference 
@@ -596,22 +660,25 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     msg             = ""
     cont            = True
     data            = {}
+    isFirst         = True #  First quote of the session should use Quote() not QuoteByInterval()
     account         = None
     success         = False
     date_format     = "%Y-%m-%d %H:%M:%S"  
     
-    
 
     
     try:  
+        configs['stock'] = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
+        
         account      = TradeAccount(funds=100, limit=0.10, app_type=configs['trading_platform'],
                                         app_key = configs['app_key'], app_secret = configs['app_secret'])
         account.SetFunds( params['account_funds'], params['funds_ratio'] )  #5000.00, 0.50 )     
         account.SetMode( params['mode'] )      
         
-        Strategies.Set( configs['strategy'] , account)   
+        Strategies.Set( configs['strategy'] , account)
         print( f'\t* About to live {params["mode"]}: ', account )
-        for stock in ( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
+        
+        for stock in  configs['stock'] :
             data.update({ stock :  [] } )
          
         time_interval   = params['time_interval']
@@ -622,12 +689,13 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                 cont = False
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
-            elif ( current_time.hour == 16 and (current_time.minute  +  (time_interval / 60 )) >=  30) and True :               
+            elif ( current_time.hour == 15 and (current_time.minute  +  (time_interval / 60 )) >=  55)  :               #MARKET CLOSES AT 4PM, SELL WHAT YOU ARE HOLDING (???)
                 # IF THE NEXT TIME INTERVAL CAUSES US TO BE OUTSIDE OF THE MARKET TIME THEN SELL NOW 
                 if  account.InPlay != {} :
                     stocks = set( account.InPlay.keys() )
-                    for stock in stocks:                        
-                        account.Sell( stock, float(ticker_row[3]) )
+                    for symbol in stocks:
+                        ticker_row = account.Quote ( symbols= symbol)[symbol]
+                        account.Sell( symbol, float(ticker_row[3]) )
                 cont = False
             else:
                 current_time    = datetime.strptime( str(current_time)[:17] +"00", date_format) 
@@ -635,9 +703,13 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                 bought_action   = False 
                 for symbol in symbols:
                     print(f"\t\t + {symbol}  @ { current_time } " ) 
-                    ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
+                    if isFirst :
+                        ticker_row = account.Quote ( symbols= symbol)[symbol]
+                        isFirst = False 
+                    else:
+                       ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
                     if ticker_row != None:                    
-                        print(f"\t\t\tDATE :{ticker_row}")
+                        print(f"\t\t\tTICKER_ROW :{ticker_row}")
                         data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
                 
@@ -691,6 +763,7 @@ def  replay_test( configs: dict  ) -> None :
     msg             = ""
     cont            = True
     data            = {}
+    isFirst         = True  # First quote requested should be on the 1 min chart 
     success         = False
     account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
     date_format     = "%Y-%m-%d %H:%M:%S"
@@ -717,23 +790,31 @@ def  replay_test( configs: dict  ) -> None :
             #    sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
             #    print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
             #    current_time +=  timedelta( seconds =sleep_time)            
-            elif ( current_time.hour == 16 and current_time.minute >= 00)   :               ## Sell whatever is InPlay
+            elif ( current_time.hour == 15 and (current_time.minute   +  (time_interval / 60 )) >= 55)   :               ## Sell whatever is InPlay
                 if  account.InPlay != {} :
                     symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                     for symbol in symbols:
                         print(f"\t\t + {symbol}  @ { current_time } " ) 
-                        ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)                
-                        account.Sell( symbol, float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] )
+                        ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
+                        if ticker_row != [] :
+                            account.Sell( symbol, float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] )
+                        else:
+                            print(f"\t\t\t Ticker Empty " ) 
                 cont = False
             else:
                 symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                 for symbol in symbols:
-                    print(f"\t\t + {symbol}  @ { current_time } " ) 
-                    ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)                
-                    if ticker_row != None:                    
+                    print(f"\t\t + {symbol}  @ { current_time } " )
+                    if isFirst :
+                        ticker_row = account.Quote ( symbols= symbol)[symbol]
+                        isFirst = False 
+                    else:
+                        ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
+                    print(f"\t\t\t->DATA : {ticker_row} " ) 
+                    if ( ticker_row != None and ticker_row != [] ):                    
                         data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
-                        print(f"\t\t\t->DATA : {ticker_row} " ) 
+                       # print(f"\t\t\t->DATA : {ticker_row} " ) 
                         success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs)
                         if msg.upper() == "BOUGHT" :
                             print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval/60} min  : " )                        
@@ -847,6 +928,7 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
                     nothing 
     """
     try:
+        print( '\t* Summary Report: ')
         #CONFIRM THE REPORT FOLDER EXISTS
         username = configs['username'] if configs['username'] != '' else configs['email']
         if not os.path.exists(f"../reports/{configs['action']}/"):
@@ -885,13 +967,15 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         dt2     = []
         off_on  = True
 
+        if not ( symbol in data )  or not (symbol in account.Trades) :
+            print(f"\t\t\t {symbol} No data for Symbol  ")
+            return
+
+        
+        
         for entry in data[symbol] :
             dt1.append( float( entry.get('close',0))  )
-           # if off_on :
-           #     dt1.append( entry.get('datetime',0)[11:16].replace(':','') )
-           # else:
-           #     dt1.append( "")
-           # off_on = not off_on
+            
         for entry in account.Trades[symbol]:            
             dt2.append( float(entry[6]) )
                 
@@ -923,7 +1007,6 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         report.AddText( "Wins vs Losses ", "h1", 1)    
         stats = ''
         opts = ['WIN','LOSS' ]
-        print( account.Performance)
         for opt in opts :
             stats = [account.Performance[symbol].count( opt ) for opt in opts ]            
             plt.pie( stats, labels=opts, autopct='%1.1f%%', startangle=90)
