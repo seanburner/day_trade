@@ -48,53 +48,76 @@ class TraderDB:
         """
             Staging Area to design schema 
         """
-        users   = ("DELIMITER // "+
-                    " CREATE PROCEDURE createTableUsers( INOUT dbName  varchar(20)  )  " +
-                    " BEGIN  " +
-                    " create table if not exists  users ( userId int auto_increment not null, " +
-                       " firstName varchar(20) , lastName  varchar(20),username varchar(20) PRIMARY KEY NOT NULL, passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
-                       "active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date ); "+                   
-                    " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
-                    "end // " +
-                    "DELIMITER; " )
         verifyUser = (" DELIMITER // " +
                    "CREATE PROCEDURE verifyUser( IN user_name varchar (20), IN pass_word varchar(30), OUT userId  int  ) " +  
                     " BEGIN  " +
                     "    select userId FROM  users  where username=user_name and pwd_hash = SHA2(pass_word, 256) ; " +                    
                     " end // " +
                     " DELIMITER;  ")
+        
+        indicators = ("DELIMITER // "+
+                    " CREATE PROCEDURE createTableIndicators( )  " +
+                    " BEGIN  " +
+                    " create table if not exists  indicators ( indId int auto_increment not null, " +
+                       " indicator varchar(20) , details  varchar(200), " +
+                       "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
+                    " INSERT INTO indicators ( indicator,details, active,createdBy,createdDate,modBy, modDate ) values  " +
+                      "('SMA9','Simple Moving Average: 9 day',1,'trader',now(),'trader',now() ), ('SMA14','Simple Moving Average:14 day',1,'trader',now(),'trader',now() ) , " +
+                      "('SMA21','Simple Moving Average: 21 day',1,'trader',now(),'trader',now() ), ('SMA50','Simple Moving Average:50 day',1,'trader',now(),'trader',now() ) , " +
+                      "('SMA200','Simple Moving Average:200 day',1,'trader',now(),'trader',now() ), ('VWAP','Volume Weighted Price',1,'trader',now(),'trader',now() ) , " +
+                      "('RSI','Relative Strength Index',1,'trader',now(),'trader',now() ), ('VolIndex','Volatility Index',1,'trader',now(),'trader',now() ) ; " +
+                    "end // " +
+                    "DELIMITER; " )
+        users   = ("DELIMITER // "+
+                    " CREATE PROCEDURE createTableUsers(   )  " +
+                    " BEGIN  " +
+                    " create table if not exists  users ( userId int auto_increment not null, " +
+                       " firstName varchar(20) , lastName  varchar(20),username varchar(20) PRIMARY KEY NOT NULL, passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
+                       "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
+                    " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
+                    "end // " +
+                    "DELIMITER; " )
         dates   = (" DELIMITER // " +
-                   "CREATE PROCEDURE createTableDates( INOUT dbName  varchar(20) ) " +  
+                   "CREATE PROCEDURE createTableDates(  ) " +  
                     " BEGIN  " +
                     "    create table if not exists  dates  ( dateId int auto_increment PRIMARY KEY not null, " +
-                    "       date date not null, yearmo varchar(6) not null, year int not null ,month int not null, " +
-                    "       day int not null ,active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date );  " +
+                    "       date datetime not null, yearmo varchar(6) not null, year int not null ,month int not null, " +
+                    "       day int not null ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime );  " +
                     " end // " +
                     " DELIMITER;  ")
                     
         stocks  = ("DELIMITER //  " +
-                   " CREATE PROCEDURE createTableStocks( INOUT dbName  varchar(20)  )  " +
+                   " CREATE PROCEDURE createTableStocks( )  " +
                     " BEGIN  " +
                     " create table if not exists  stocks ( stockId int auto_increment PRIMARY KEY not null, " +
                     "       stock varchar(10) , symbol varchar(10) not null, description varchar(50),  " +
-                    "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date ); " +
+                    "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
                     " end // "+ 
                     "DELIMITER; ")
 
 
         orderbook = ("DELIMITER // "+
-                        " CREATE PROCEDURE createTableOrderBook(  INOUT dbName  varchar(20)  )   " +
+                        " CREATE PROCEDURE createTableOrderBook(    )   " +
                         " BEGIN  "+
                              "create table orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null, stockId int not null, " +
                                 "bid decimal(10,4) not null , qty  int not null , volume_in int , closed  int not null,  ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +                    
-                                " active  tinyint , createdBy varchar(20), createdDate date, modBy varchar(20), modDate date,  " +
+                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
                                 "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
                                 "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
                                 "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
-
+        orderIndicates = ("DELIMITER // "+
+                        " CREATE PROCEDURE createTableOrderIndicates(    )   " +
+                        " BEGIN  "+
+                             "create table orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, indicateId  int  not null, bidValue decimal(10,4), , " +
+                                "askValue decimal(10,4) not null ,  " +                    
+                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
+                                "FOREIGN KEY ( orderId  )     REFERENCES orderBook(id) , " +
+                                "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
+                        "     END //  "+
+                        "     DELIMITER ;  ")
         v_orderbook = ("DELIMITER // "+
                         " CREATE PROCEDURE createTable_vOrderBook(   )   " +
                         " BEGIN  "+
@@ -107,14 +130,15 @@ class TraderDB:
                         "     inner join stocks s on o.stockid =s.stockid  "+
                         "     inner join users u on o.userid=u.userid; "+
                         "     END //  "+
-                        "     DELIMITER ;  ")
+                        "     DELIMITER ;  ")        
         p_createTables = ("DELIMITER // "+
                             " CREATE PROCEDURE createAllTables( )  " +
                             " BEGIN " +
-                            " call createTableDates(@something); " +
-                            " call createTableUsers(@something); " +
-                            " call createTableStocks(@something); " +
-                            " call createTableOrderbook(@something); " +
+                            " call createTableIndicators(); " +
+                            " call createTableDates(); " +
+                            " call createTableUsers(); " +
+                            " call createTableStocks(); " +
+                            " call createTableOrderbook(); " +
                             " END // " +
                             " DELIMITER ;")
 
@@ -191,9 +215,10 @@ class TraderDB:
         try:
             self.Conn.Send( query )
             if self.Conn.Results == [] :
-                query =f"INSERT INTO users( username, firstName, lastName, passwd,pwd_hash,email {self.InsertMetaFields( 0) } ) values  ("            
+                query =f"INSERT INTO users( username, firstName, lastName," + ( "passwd,pwd_hash," if passwd != '' else '') + "email {self.InsertMetaFields( 0) } ) values  ("            
             
-                query += f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}','{self.Sanitize(passwd)}',sha2({passwd},256),'{self.Sanitize(email)}'"
+                query += (f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}'," +
+                                  + ( "'{self.Sanitize(passwd)}',sha2({passwd},256),'" if passwd != '' else '') + ",'{self.Sanitize(email)}'")
                 query += f" {self.InsertMetaFields(1) } ); "
             
                 userId  = self.Conn.Write( query)
@@ -220,13 +245,13 @@ class TraderDB:
         dateId          = None
         date_format     = "%Y-%m-%d %H:%M:%S"
 
-        try:
-            if isinstance( date, str ) :
+        try:            
+            if isinstance( date, str ) :            
                 date = datetime.strptime( date[:19],  date_format)
             
-            query           = f"select dateId from dates where date = '{date}' ;"    
-        
+            query           = f"select dateId from dates where date = '{date}' ;"
             self.Conn.Send( query )
+            
             if self.Conn.Results == [] :
                 query =f"INSERT INTO dates( date, yearmo, year, month,day {self.InsertMetaFields( 0) }  ) values  ("       
                 query += f"'{date}','{date.year}{date.month:02d}','{date.year}','{date.month:02d}','{date.day:02d}'"
@@ -241,6 +266,8 @@ class TraderDB:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
+
+            print( query)
         finally:
             return dateId
 
@@ -254,15 +281,17 @@ class TraderDB:
             RETURNS:
                         stockId ( int ) - stockId from table 
         """
-        query       = f"select stockId from stocks where stock = '{self.Sanitize(stock)}'  or symbol ='{self.Sanitize(stock)}' or symbol ='{self.Sanitize(symbol)}';"
+        query       = (f"select stockId from stocks where " +
+                         ( "stock = '{self.Sanitize(stock)}'  or symbol ='{self.Sanitize(stock)}' or  " if stock != '' and stock != None else '' ) +
+                        "  symbol ='{self.Sanitize(symbol).upper()}';" )
         stockId     = None
 
-        try:
+        try:            
             self.Conn.Send( query )
         
             if self.Conn.Results == [] :
                 query =f"INSERT INTO stocks( stock, symbol, description,sector {self.InsertMetaFields( 0) }  ) values  ("                        
-                query += f"'{self.Sanitize(stock)}','{self.Sanitize(symbol)}','{self.Sanitize(description)}','{self.Sanitize(sector)}' {self.InsertMetaFields( 1) } ); "
+                query += f"'{self.Sanitize(stock)}','{self.Sanitize(symbol).upper()}','{self.Sanitize(description)}','{self.Sanitize(sector)}' {self.InsertMetaFields( 1) } ); "
             
                 stockId  = self.Conn.Write( query)            
             else:
@@ -303,18 +332,20 @@ class TraderDB:
         try:
             print("\t\t * Inserting Order book ")
             print("\t\t   -> user : ", email , " : " ,username)
-            for order in orderbook :
-                userId      = self.InsertUser(  email  = email, userName =username )
-                stockId     = self.InsertStock( symbol = order[0] )
-                initDateId  = self.InsertDate(  date   = order[1] )
-                closeDateId = self.InsertDate(  date   = order[4] )
-                self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
-                if self.Conn.Results != [] :
-                    print("\t\t\t   | Found PreExisting OrderBook Entry : ", order )
-                    dupeNum += 1
-                else:
-                    contents.append( [userId, initDateId,stockId,order[2],order[3],closeDateId,order[5],order[6], *self.InsertMetaFields(2)  ] )
-                    numRec += 1
+            for symbol in orderbook.keys():
+                dupeNum = 0 
+                for order in orderbook[symbol]  :                    
+                    userId      = self.InsertUser(  email  = email, userName =username )
+                    stockId     = self.InsertStock( symbol = symbol )
+                    initDateId  = self.InsertDate(  date   = order['bidTime'] )
+                    closeDateId = self.InsertDate(  date   = order['askTime'] )
+                    self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
+                    if self.Conn.Results != [] :
+                        print("\t\t\t   | Found PreExisting OrderBook Entry : ", order )
+                        dupeNum += 1
+                    else:
+                        contents.append( [userId, initDateId,stockId,order['bid'],order['qty'],closeDateId,order['ask'],order['p_l'], *self.InsertMetaFields(2)  ] )
+                        numRec += 1
 
             if contents != []:
                 self.Conn.WriteMany( header = header, contents = contents )

@@ -113,7 +113,7 @@ class MySQLConn:
                 except:
                         e = sys.exc_info()[0]
                         f = sys.exc_info()[1]
-                        print("\t\t|EXCEPTION: MySQLConn -WRITE() Ran into an exception" + str(e) + " : "  + str(f) ) #+ "\n\t\t|> " + query) 
+                        print("\t\t|EXCEPTION: MySQLConn -WRITE() Ran into an exception" + str(e) + " : "  + str(f) + "\n\t\t|> " + query) 
 			# pymssql.Error as err: 
 			#print('\t| DVR ERR: ',err, "\n\t| SQL ERR : " , self.Cursor.description ,'\n\t| QUERY >> ', query)
 

@@ -37,7 +37,7 @@ class Indicators :
                         nothing 
         """
         self.Symbol     = symbol
-        self.MVA        = {}
+        self.SMA        = {}
         self.Set( data )
         
         
@@ -46,8 +46,8 @@ class Indicators :
         """
             Formats the class to print out in string format 
         """
-        contents  = (f"Symbol : {self.Symbol}  " + str( self.MVA) + "\n VWAP : " + str(self.VWAP)+
-                         "\n RSI : " + str(self.RSI) + "\n Volatility : " +str( self.Volatility) )
+        contents  = (f"Symbol : {self.Symbol}  " + str( self.SMA) + "\n VWAP : " + str(self.VWAP)+
+                         "\n RSI : " + str(self.RSI) + "\n Volatility : " +str( self.VolIndex) )
         
         return contents 
 
@@ -62,7 +62,10 @@ class Indicators :
             RETURNS:
                         nothing 
         """
+        print( data )
         self.Data = data
+        # Simple Moving Averages
+        self.SimpleMovingAverages()
         self.Calculate()
 
             
@@ -98,9 +101,7 @@ class Indicators :
         """
         try:
             #print( f"\t\t\t** {self.Symbol}  INDICATORS SETTING ")
-            #print( data['close'][:9].mean())
-            self.MVA.update ( { 9: self.Data['close'][:9].mean(), 14: self.Data[:14]['close'].mean() ,
-                                21: self.Data['close'][:21].mean(), 50: self.Data['close'][:50].mean(), 200: self.Data['close'][:200].mean()} )
+            
             # VWAP
             self.Data['Typical_Price']       = (self.Data['high'] + self.Data['low'] + self.Data['close']) / 3
             self.Data['Price_Volume']        = self.Data['Typical_Price'] * self.Data['volume']
@@ -111,16 +112,35 @@ class Indicators :
             
             #RSI            Using the last 14 days            
             thisData = pd.Series(self.Data[:14].sort_values(by=['datetime'],ascending=True)['close'])            
-            self.RSI                    = self.CalculateRSI( data = thisData )
+            self.RSI                 = self.CalculateRSI( data = thisData )
 
             #Volatility 
-            self.Volatility             = self.CalculateVolatility(df = pd.DataFrame( {'close':list(self.Data["close"])}, index=self.Data["date"]) )
+            self.VolIndex            = self.CalculateVolatility(df = pd.DataFrame( {'close':list(self.Data["close"])}, index=self.Data["date"]) )
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
+
     
-    
+    def SimpleMovingAverages( self ) -> None:
+        """
+            Calculate the simaple moving averages based on daily summary info / not intraday
+            ARGS   :
+                        nothing 
+            RETURNS:
+                        nothing 
+        """
+        try:
+            #print( data['close'][:9].mean())
+            self.SMA.update ( { 9: self.Data['close'][:9].mean(), 14: self.Data[:14]['close'].mean() ,
+                                21: self.Data['close'][:21].mean(), 50: self.Data['close'][:50].mean(), 200: self.Data['close'][:200].mean()} )
+        except:
+            print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+
+                
     def CalculateRSI(self, data, window=14) -> pd.Series :
         """
             Calculates the Relative Strength Index (RSI).
@@ -131,6 +151,11 @@ class Indicators :
 
             Returns:
                 pd.Series: A pandas Series containing the RSI values.
+
+            RSI – Relative Strength Indicator 
+                >= 70 -  possible trend reversal downward 
+                <= 30 – possible trend reversal upward 
+            Divergence  - when the RSI value shows something different than the price ( Price is always a distraction)
         """
         rsi = None
         try:

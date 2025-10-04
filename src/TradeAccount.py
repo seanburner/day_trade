@@ -23,6 +23,10 @@ import requests
 from datetime           import datetime, timedelta
 from SchwabAccount      import SchwabAccount 
 
+CONTRACT_NONE = 0
+CONTRACT_CALL = 0
+CONTRACT_PUT  = 0
+
 class TradeAccount:
     def __init__(self, funds : float =5000, limit : float = 0.10 , app_type = 'Schwab',app_key ="xxxxx", app_secret = "zzzzzz" ) :
         """
@@ -104,7 +108,7 @@ class TradeAccount:
         """
         df              = None 
         timeStamp       = 0
-        endDate         = datetime.now()
+        endDate         = datetime.now()- timedelta( days = 1 )  # time delta for when working on weekend 
         startDate       = None        
         quote_info      = None
         ticker_row      = None 
@@ -122,7 +126,7 @@ class TradeAccount:
             
             response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
-            
+            print( response.text )
             if response.status_code != 200 :
                 return ticker_row
 
@@ -353,8 +357,8 @@ class TradeAccount:
             #IF THE CURRENT PRICE IS BELOW THE PREVIOUS PRICE WE BOUGHT AT , SHOULD WE BE BUYING ????            
             if len( self.Trades[stock] ) > 0 :
                 lenth = len( self.Trades[stock] ) - 1 
-                if self.Trades[stock][ lenth][2] > price :
-                    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[stock][lenth][2]} ")
+                if self.Trades[stock][ lenth]['bid'] > price :
+                    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[stock][lenth]['bid']} ")
                     return success 
 
             working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
@@ -391,7 +395,7 @@ class TradeAccount:
 
 
 
-    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()))  -> bool :
+    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()), ask_volume : int = 0)  -> bool :
         """
            Sell the stock currently holding , True = succeeded , False = failed
            Updates
@@ -435,8 +439,8 @@ class TradeAccount:
                 print('FUNDS: ', self.Funds , ' : ' , ( self.InPlay[stock]['qty'] * new_price ), ' = ' , ( self.InPlay[stock]['qty'] * new_price )+self.Funds)    
                 self.Funds += ( self.InPlay[stock]['qty'] * new_price )
                 p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
-                self.Trades[stock].append(  [ stock, self.InPlay[ stock ]['time'],  self.InPlay[ stock ]['price'],  self.InPlay[ stock ]['qty'],
-                            current_time, new_price, p_l ] )
+                self.Trades[stock].append(  {'symbol':stock, 'type': CONTRACT_NONE , 'bidTime':self.InPlay[ stock ]['time'],  'bid':self.InPlay[ stock ]['price'],'bidVolume':self.InPlay[ stock ]['volume'],
+                                             'qty' :self.InPlay[ stock ]['qty'],'askTime':current_time, 'ask':new_price, 'p_l': p_l } )
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                

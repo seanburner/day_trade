@@ -577,7 +577,8 @@ class SchwabAccount :
                     ]
             }
         
-        try:            
+        try:
+            startTime = str( datetime.now() ) 
             buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]["hashValue"]}/orders',  
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             json=buy_order)
@@ -585,10 +586,13 @@ class SchwabAccount :
             if buy_response.status_code == 201  or buy_response.status_code == 200:
                 print("\t\t\t\t  ->  SchwabAccount -  BUY ORDER submitted successsfully ")
                 success = True
+                response = self.AccountOrders ( self, self.Accounts[accnt]["hashValue"] , fromTime=startTime, toTime =str( datetime.now()) ,  status  = "open"  )
+                print( f"Schwab ORDERS BOUGHT OPEN ************\n {response}")
             else:
                 print("\t\t\t\t  -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
                 
             print(f"\t\t\t\t\t  |  BUY ORDER Response: {buy_response.status_code}  {buy_response.text} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            
             
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -635,12 +639,16 @@ class SchwabAccount :
                     ]
             }
         try:            
+            startTime = str( datetime.now() ) 
             sell_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ self.Accounts[accnt]["hashValue"]}/orders', 
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
                             json=sell_order)
             
             if sell_response.status_code == 201 or sell_response.status_code == 200 :
                 print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted successsfully ")
+                success = True
+                response = self.AccountOrders ( self, self.Accounts[accnt]["hashValue"] , fromTime=startTime, toTime =str( datetime.now()) ,  status  = "open"  )
+                print( f"Schwab ORDERS BOUGHT OPEN ************\n {response}")
                 success = True
             else:
                 print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")

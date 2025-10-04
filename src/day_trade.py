@@ -581,7 +581,6 @@ def send_transactions_to_sql( configs : dict , trades: list  ) -> None :
     """
     try:
         traderDB = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
-
         traderDB.InsertOrderbook(orderbook=trades , email=configs['email'] , username=configs['username'] )
 
     except:
@@ -732,7 +731,8 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                     
         if params['mode']  == 'TRADE':
             # SEND TRANSACTIONS TO SQL
-            send_transactions_to_sql( configs, account.Trades  )
+            if len( account.Trades) > 0 :
+                send_transactions_to_sql( configs, account.Trades  )
 
             # SEND DATA TO FILE
             send_data_to_file( configs, data )
@@ -830,7 +830,7 @@ def  replay_test( configs: dict  ) -> None :
                 #    print( 'Just received  empty ticker info ')
         
         # SEND TRANSACTIONS TO SQL
-        #send_transactions_to_sql( configs, account.Trades  )
+        send_transactions_to_sql( configs, account.Trades  )
 
         # SEND DATA TO FILE
         send_data_to_file( configs, data )
@@ -935,12 +935,14 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
             os.mkdir(f"../reports/{configs['action']}/")
 
         if isinstance( configs['stock'] ,str ) :
-            report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{ configs['stock']  }.pdf")
-            summary_report_engine(  configs['stock']  , data  , account  , report  ) 
+            if configs['stock'] in data:
+                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{ configs['stock']  }.pdf")
+                summary_report_engine(  configs['stock']  , data  , account  , report  ) 
         elif isinstance( configs['stock'] , list ) :
             for symbol in configs['stock'] :
-                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{symbol}.pdf")
-                summary_report_engine( symbol  , data  , account  , report  ) 
+                if symbol in data:
+                    report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{symbol}.pdf")
+                    summary_report_engine( symbol  , data  , account  , report  ) 
 
     except: 
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
