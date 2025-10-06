@@ -53,7 +53,7 @@ class DayTradeStrategy:
                             'Stock' : {
                                     'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Occur' : 0},
                                     'Volume'        :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0 },
-                                    'Indicators'    :   {'MVA' : {}}   
+                                    'Indicators'    :   None
                                 }
                          }
                     
@@ -381,7 +381,7 @@ class DayTradeStrategy:
                 print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ volumePos ]} from previous  {float(ticker_row[ closePos ]) -  float(self.Stocks[ symbol]['Price']['Previous'])}   Volume :  from {self.Stocks[ symbol]['Volume']['Previous'] } ==> {volume_increase} " ) 
                 if  account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
-                                                         volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'])  :
+                                    volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators'])  :
                     success = True
                     self.Stocks[ symbol ]['Price' ]['Bought'] =  ticker_row[ closePos ]
                     self.Stocks[ symbol ]['Volume']['Bought'] =  ticker_row[volumePos]
@@ -402,7 +402,8 @@ class DayTradeStrategy:
                  if ( ( float(ticker_row[ closePos ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ closePos ]) )  ):
                      print( f"\t\t\t   \\-> SELL SIGNAL : {self.Stocks[ symbol]['Price']['Bought']}  > {ticker_row[ closePos]}  : Profit_Trail_Stop : {profit_trail_stop} " )
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ])  ,
-                                       current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) , ask_volume=float(ticker_row[ volumePos ] ))  :
+                                       current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
+                                           ask_volume=float(ticker_row[ volumePos ] ),  indicators=self.Stocks[symbol]['Indicators'])  :
                          success = True
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
                          self.Stocks[ symbol ]['Price' ]['High']   = 0
@@ -424,7 +425,8 @@ class DayTradeStrategy:
                  if  (float(ticker_row[ closePos ]) <= crash_trail_stop  ) or ( float(ticker_row[ closePos ] ) <=  strike_price_stop    ):
                      print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP : SAFETY SELL  -> { profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ symbol]['Price']['Bought']}   NEW PRICE : {ticker_row[ closePos ]} "   )
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ]) ,
-                                           current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ), ask_volume=float(ticker_row[ volumePos ] ) )  :
+                                           current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ),
+                                       ask_volume=float(ticker_row[ volumePos ] ), indicators=self.Stocks[symbol]['Indicators'] )  :
                          success = True
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
                          self.Stocks[ symbol ]['Price' ]['High']   = 0

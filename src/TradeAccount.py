@@ -21,11 +21,12 @@ import functools
 import requests
 
 from datetime           import datetime, timedelta
-from SchwabAccount      import SchwabAccount 
+from SchwabAccount      import SchwabAccount
+from Indicators         import Indicators 
 
-CONTRACT_NONE = 0
-CONTRACT_CALL = 0
-CONTRACT_PUT  = 0
+OPTION_NONE = 0
+OPTION_CALL = 0
+OPTION_PUT  = 0
 
 class TradeAccount:
     def __init__(self, funds : float =5000, limit : float = 0.10 , app_type = 'Schwab',app_key ="xxxxx", app_secret = "zzzzzz" ) :
@@ -314,7 +315,8 @@ class TradeAccount:
                 print("\t\t |   " + str(entry) )
 
 
-    def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()), volume : int = 0 , volume_threshold : int = 0)  -> bool :
+    def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()), volume : int = 0 ,
+             volume_threshold : int = 0, indicators : Indicators = None )  -> bool :
         """
            Attempt to buy the stock under the confines of the limit , True = succeeded , False = failed
            Updates
@@ -378,7 +380,8 @@ class TradeAccount:
                     'volume': volume,
                     'closed': '',
                     'sold'  : 0,                    
-                    'pl'    : 0 
+                    'pl'    : 0,
+                    'indicators_in' : indicators.Summary()
                 }
                 if not( stock  in self.Performance.keys() ) :
                     self.Performance[stock] = []
@@ -395,7 +398,7 @@ class TradeAccount:
 
 
 
-    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()), ask_volume : int = 0)  -> bool :
+    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()), ask_volume : int = 0, indicators : Indicators = None )  -> bool :
         """
            Sell the stock currently holding , True = succeeded , False = failed
            Updates
@@ -439,8 +442,10 @@ class TradeAccount:
                 print('FUNDS: ', self.Funds , ' : ' , ( self.InPlay[stock]['qty'] * new_price ), ' = ' , ( self.InPlay[stock]['qty'] * new_price )+self.Funds)    
                 self.Funds += ( self.InPlay[stock]['qty'] * new_price )
                 p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
-                self.Trades[stock].append(  {'symbol':stock, 'type': CONTRACT_NONE , 'bidTime':self.InPlay[ stock ]['time'],  'bid':self.InPlay[ stock ]['price'],'bidVolume':self.InPlay[ stock ]['volume'],
-                                             'qty' :self.InPlay[ stock ]['qty'],'askTime':current_time, 'ask':new_price, 'p_l': p_l } )
+                self.Trades[stock].append(  {'symbol':stock, 'type': OPTION_NONE , 'bidTime':self.InPlay[ stock ]['time'],
+                                             'bid':self.InPlay[ stock ]['price'],'bidVolume':self.InPlay[ stock ]['volume'], 'askVolume':ask_volume,
+                                             'qty' :self.InPlay[ stock ]['qty'],'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
+                                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()} )
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
@@ -450,12 +455,13 @@ class TradeAccount:
                 success = True
             else:
                 print ("\t\t --> Account  level did not Execute SELL properly ") 
-            return success
+            
         except: 
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-
+        finally :
+            return success 
 
 
 

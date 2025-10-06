@@ -14,19 +14,15 @@ import os
 import re
 import sys
 import time
-#import getpass
 import inspect
 import platform
 import argparse
 import functools
 import requests
 
-#import http.client
-#import urllib.request
-#from urllib.parse import urlparse
+
 
 import pandas               as pd
-#import numpy  as np 
 import  matplotlib.pyplot   as plt
 
 
@@ -446,10 +442,22 @@ def system_test( configs : dict  ) -> None :
         openPos = 4 
         highPos = 6
         volumePos =  5
-        ticker[timePos] = datetime.strptime( ticker[timePos][:19], date_format)         
+        print(f"*************************** Indicators  *********************************")
+        ticker[timePos] = datetime.strptime( "2025-10-04 14:20:25", date_format)        
         indicators.Update( entry ={0:{'close': ticker[closePos], 'open' : ticker[openPos] ,'low' : ticker[lowPos],
                                       'high' : ticker[highPos], 'datetime' : ticker[timePos].timestamp()  * 1000 , 'volume' : ticker[volumePos]}})
         print(f"Indicators UPDATED: {indicators }")
+
+        print(f"\n\n*************************** Indicators  *********************************")
+        
+        ticker[timePos] = datetime.strptime( "2025-10-05 14:20:25", date_format)        
+        indicators.Update( entry ={0:{'close': ticker[closePos]+0.05, 'open' : ticker[openPos] ,'low' : ticker[lowPos],
+                                      'high' : ticker[highPos], 'datetime' : ticker[timePos].timestamp()  * 1000 , 'volume' : ticker[volumePos]}})
+        print(f"Indicators UPDATED: {indicators }")
+
+
+        traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+        traderDB.CheckDB()
          
     except: 
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -973,13 +981,15 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
             print(f"\t\t\t {symbol} No data for Symbol  ")
             return
 
-        
+        if len(account.Trades[symbol]) == 0 :
+            print(f"\t\t\t {symbol} No TRADING data for Symbol  ")
+            return 
         
         for entry in data[symbol] :
             dt1.append( float( entry.get('close',0))  )
             
         for entry in account.Trades[symbol]:            
-            dt2.append( float(entry[6]) )
+            dt2.append( float(entry.get("p_l")) )
                 
         pixplt =plt
         fig, (ax1, ax2) = pixplt.subplots(2, 1)
@@ -1033,7 +1043,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         
         for entry in account.Trades[symbol]:
             print("\t -  ", entry )            
-            total_profit += entry[6]
+            total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
         print(f"\t {symbol}  InPLAY")

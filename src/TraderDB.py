@@ -44,104 +44,6 @@ class TraderDB:
         self.Conn       = MySQLConn( )
         self.Conn.Connect(server =self.Server, database='trading', username =self.UserName, passwd =self.Password )
 
-    def Tables( self ) -> None :
-        """
-            Staging Area to design schema 
-        """
-        verifyUser = (" DELIMITER // " +
-                   "CREATE PROCEDURE verifyUser( IN user_name varchar (20), IN pass_word varchar(30), OUT userId  int  ) " +  
-                    " BEGIN  " +
-                    "    select userId FROM  users  where username=user_name and pwd_hash = SHA2(pass_word, 256) ; " +                    
-                    " end // " +
-                    " DELIMITER;  ")
-        
-        indicators = ("DELIMITER // "+
-                    " CREATE PROCEDURE createTableIndicators( )  " +
-                    " BEGIN  " +
-                    " create table if not exists  indicators ( indId int auto_increment not null, " +
-                       " indicator varchar(20) , details  varchar(200), " +
-                       "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
-                    " INSERT INTO indicators ( indicator,details, active,createdBy,createdDate,modBy, modDate ) values  " +
-                      "('SMA9','Simple Moving Average: 9 day',1,'trader',now(),'trader',now() ), ('SMA14','Simple Moving Average:14 day',1,'trader',now(),'trader',now() ) , " +
-                      "('SMA21','Simple Moving Average: 21 day',1,'trader',now(),'trader',now() ), ('SMA50','Simple Moving Average:50 day',1,'trader',now(),'trader',now() ) , " +
-                      "('SMA200','Simple Moving Average:200 day',1,'trader',now(),'trader',now() ), ('VWAP','Volume Weighted Price',1,'trader',now(),'trader',now() ) , " +
-                      "('RSI','Relative Strength Index',1,'trader',now(),'trader',now() ), ('VolIndex','Volatility Index',1,'trader',now(),'trader',now() ) ; " +
-                    "end // " +
-                    "DELIMITER; " )
-        users   = ("DELIMITER // "+
-                    " CREATE PROCEDURE createTableUsers(   )  " +
-                    " BEGIN  " +
-                    " create table if not exists  users ( userId int auto_increment not null, " +
-                       " firstName varchar(20) , lastName  varchar(20),username varchar(20) PRIMARY KEY NOT NULL, passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
-                       "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
-                    " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
-                    "end // " +
-                    "DELIMITER; " )
-        dates   = (" DELIMITER // " +
-                   "CREATE PROCEDURE createTableDates(  ) " +  
-                    " BEGIN  " +
-                    "    create table if not exists  dates  ( dateId int auto_increment PRIMARY KEY not null, " +
-                    "       date datetime not null, yearmo varchar(6) not null, year int not null ,month int not null, " +
-                    "       day int not null ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime );  " +
-                    " end // " +
-                    " DELIMITER;  ")
-                    
-        stocks  = ("DELIMITER //  " +
-                   " CREATE PROCEDURE createTableStocks( )  " +
-                    " BEGIN  " +
-                    " create table if not exists  stocks ( stockId int auto_increment PRIMARY KEY not null, " +
-                    "       stock varchar(10) , symbol varchar(10) not null, description varchar(50),  " +
-                    "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
-                    " end // "+ 
-                    "DELIMITER; ")
-
-
-        orderbook = ("DELIMITER // "+
-                        " CREATE PROCEDURE createTableOrderBook(    )   " +
-                        " BEGIN  "+
-                             "create table orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null, stockId int not null, " +
-                                "bid decimal(10,4) not null , qty  int not null , volume_in int , closed  int not null,  ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +                    
-                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
-                                "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
-                                "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
-                                "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
-                                "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); " +
-                        "     END //  "+
-                        "     DELIMITER ;  ")
-        orderIndicates = ("DELIMITER // "+
-                        " CREATE PROCEDURE createTableOrderIndicates(    )   " +
-                        " BEGIN  "+
-                             "create table orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, indicateId  int  not null, bidValue decimal(10,4), , " +
-                                "askValue decimal(10,4) not null ,  " +                    
-                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
-                                "FOREIGN KEY ( orderId  )     REFERENCES orderBook(id) , " +
-                                "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
-                        "     END //  "+
-                        "     DELIMITER ;  ")
-        v_orderbook = ("DELIMITER // "+
-                        " CREATE PROCEDURE createTable_vOrderBook(   )   " +
-                        " BEGIN  "+
-                        "     create view v_orderbook  as" +
-                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.volume_in,o.qty,d2.date as closed ,o.ask , " +
-                        "          o.volume_out, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
-                        "     from orderbook o " +
-                        "     inner join dates d on o.initiated =d.dateid "+
-                        "     inner join dates d2 on o.closed = d2.dateid  "+
-                        "     inner join stocks s on o.stockid =s.stockid  "+
-                        "     inner join users u on o.userid=u.userid; "+
-                        "     END //  "+
-                        "     DELIMITER ;  ")        
-        p_createTables = ("DELIMITER // "+
-                            " CREATE PROCEDURE createAllTables( )  " +
-                            " BEGIN " +
-                            " call createTableIndicators(); " +
-                            " call createTableDates(); " +
-                            " call createTableUsers(); " +
-                            " call createTableStocks(); " +
-                            " call createTableOrderbook(); " +
-                            " END // " +
-                            " DELIMITER ;")
-
     def Sanitize ( self, field : object  ) -> object :
         """
             Takes any input and if its an instance of a str then sanitizes it
@@ -215,11 +117,17 @@ class TraderDB:
         try:
             self.Conn.Send( query )
             if self.Conn.Results == [] :
-                query =f"INSERT INTO users( username, firstName, lastName," + ( "passwd,pwd_hash," if passwd != '' else '') + "email {self.InsertMetaFields( 0) } ) values  ("            
-            
-                query += (f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}'," +
-                                  + ( "'{self.Sanitize(passwd)}',sha2({passwd},256),'" if passwd != '' else '') + ",'{self.Sanitize(email)}'")
-                query += f" {self.InsertMetaFields(1) } ); "
+                query =f"INSERT INTO users( username, firstName, lastName,"
+                if passwd != '' :
+                    query +=  "passwd,pwd_hash,"
+                    
+                query += f"email {self.InsertMetaFields( 0) } ) values  ("            
+
+                
+                query += f"'{self.Sanitize(userName)}','{self.Sanitize(firstName)}','{self.Sanitize(lastName)}'," 
+                if passwd != '':
+                    query +=  f"'{self.Sanitize(passwd)}',sha2({passwd},256),'"
+                query += f"'{self.Sanitize(email)}'  {self.InsertMetaFields(1) } ); "
             
                 userId  = self.Conn.Write( query)
             else:
@@ -227,7 +135,8 @@ class TraderDB:
         except :      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )     
+                print("\t\t |   " + str(entry) )
+            print(f"\t\tQUERY: {query}")
         finally:
             return userId
 
@@ -267,7 +176,7 @@ class TraderDB:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
 
-            print( query)
+            print( f"\t\tQUERY:{query}")
         finally:
             return dateId
 
@@ -301,6 +210,7 @@ class TraderDB:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
+            print( f"\t\tQUERY:{query}")
         finally:
             return stockId
 
@@ -318,8 +228,8 @@ class TraderDB:
             RETURNS:
                         nothing 
         """
-        header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l {self.InsertMetaFields(0) } ) values " +
-                            "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
+        header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,volume_in,volume_out {self.InsertMetaFields(0) } ) values " +
+                            "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
         numRec          = 0
         dupeNum         = 0
         contents        = []
@@ -332,6 +242,7 @@ class TraderDB:
         try:
             print("\t\t * Inserting Order book ")
             print("\t\t   -> user : ", email , " : " ,username)
+            self.CheckDB()
             for symbol in orderbook.keys():
                 dupeNum = 0 
                 for order in orderbook[symbol]  :                    
@@ -341,10 +252,10 @@ class TraderDB:
                     closeDateId = self.InsertDate(  date   = order['askTime'] )
                     self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
                     if self.Conn.Results != [] :
-                        print("\t\t\t   | Found PreExisting OrderBook Entry : ", order )
+                        print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
                         dupeNum += 1
                     else:
-                        contents.append( [userId, initDateId,stockId,order['bid'],order['qty'],closeDateId,order['ask'],order['p_l'], *self.InsertMetaFields(2)  ] )
+                        contents.append( [userId, initDateId,stockId,order['bid'],order['qty'],closeDateId,order['ask'],order['p_l'],order['type'],order['bidVolume'],order['askVolume'], *self.InsertMetaFields(2)  ] )
                         numRec += 1
 
             if contents != []:
@@ -356,8 +267,188 @@ class TraderDB:
         except:      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )     
-
+                print("\t\t |   " + str(entry) )
+            print( f"\t\tQUERY:{query}")
         finally:
                 return success
+
+
   
+    def CheckDB( self ) -> None :
+        """
+            Confirm the database can be connected to 
+        """
+        query = "show databases;"
+        try :
+            self.Conn.Send( query )
+            if not ( 'trading' in str(self.Conn.Results) ) :
+                print("\t\t Database ( trading ) has not be initiated")
+                return 
+            query  = "show tables in trading;"
+            self.Conn.Send( query )
+            if len(self.Conn.Results) < 6   :
+                print("\t\t Building Tables and procedures")
+                self.CreateTables()
+            
+        except:      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )     
+
+
+
+
+    def CreateTables( self ) -> None :
+        """
+            Staging Area to design schema 
+        """
+        
+        verifyUser = (" DELIMITER // " +
+                   "CREATE PROCEDURE verifyUser( IN user_name varchar (20), IN pass_word varchar(30), OUT userId  int  ) " +  
+                    " BEGIN  " +
+                    "    select userId FROM  users  where username=user_name and pwd_hash = SHA2(pass_word, 256) ; " +                    
+                    " end // " +
+                    " DELIMITER;  ")
+        
+        indicators = ("DELIMITER // "+
+                    " CREATE PROCEDURE createTableIndicators( )  " +
+                    " BEGIN  " +
+                    " create table if not exists  indicators ( indId int auto_increment PRIMARY KEY not null, " +
+                       " indicator varchar(20) , details  varchar(200), " +
+                       "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
+                    " INSERT INTO indicators ( indicator,details, active,createdBy,createdDate,modBy, modDate ) values  " +
+                      "('SMA9','Simple Moving Average: 9 day',1,'trader',now(),'trader',now() ), ('SMA14','Simple Moving Average:14 day',1,'trader',now(),'trader',now() ) , " +
+                      "('SMA21','Simple Moving Average: 21 day',1,'trader',now(),'trader',now() ), ('SMA50','Simple Moving Average:50 day',1,'trader',now(),'trader',now() ) , " +
+                      "('SMA200','Simple Moving Average:200 day',1,'trader',now(),'trader',now() ), ('VWAP','Volume Weighted Price',1,'trader',now(),'trader',now() ) , " +
+                      "('SMA','Simple Moving Average:for the day',1,'trader',now(),'trader',now() ), ('FIB','Fibonacci Retracement: All Time',1,'trader',now(),'trader',now() ) , " +
+                      "('ATH','All Time High: 200 days',1,'trader',now(),'trader',now() ), ('ATL','All Time Low: 200 days',1,'trader',now(),'trader',now() ) , " +
+                      "('HIGH','Daily High',1,'trader',now(),'trader',now() ), ('LOW','Daily Low',1,'trader',now(),'trader',now() ) , ('dFib','Fibonacci Retracement: daily data',1,'trader',now(),'trader',now() ) , " +
+                      "('RSI','Relative Strength Index',1,'trader',now(),'trader',now() ), ('VolIndex','Volatility Index',1,'trader',now(),'trader',now() ) ; " +
+                    "end // " +
+                    "DELIMITER; " )
+        users   = ("DELIMITER // "+
+                    " CREATE PROCEDURE createTableUsers(   )  " +
+                    " BEGIN  " +
+                    " create table if not exists  users ( userId int auto_increment PRIMARY KEY not null, " +
+                       " firstName varchar(20) , lastName  varchar(20),username varchar(20)  NOT NULL, passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
+                       "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
+                    " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
+                    "end // " +
+                    "DELIMITER; " )
+        dates   = (" DELIMITER // " +
+                   "CREATE PROCEDURE createTableDates(  ) " +  
+                    " BEGIN  " +
+                    "    create table if not exists  dates  ( dateId int auto_increment PRIMARY KEY not null, " +
+                    "       date datetime not null, yearmo varchar(6) not null, year int not null ,month int not null, " +
+                    "       day int not null ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime );  " +
+                    " end // " +
+                    " DELIMITER;  ")
+                    
+        stocks  = ("DELIMITER //  " +
+                   " CREATE PROCEDURE createTableStocks( )  " +
+                    " BEGIN  " +
+                    " create table if not exists  stocks ( stockId int auto_increment PRIMARY KEY not null, " +
+                    "       stock varchar(10) , symbol varchar(10) not null, description varchar(50),  " +
+                    "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
+                    " end // "+ 
+                    "DELIMITER; ")
+
+
+        orderbook = ("DELIMITER // "+
+                        " CREATE PROCEDURE createTableOrderBook(    )   " +
+                        " BEGIN  "+
+                             "create table if not exists orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null,  stockId int not null, " +
+                                "type int not null,bid decimal(10,4) not null , qty  int not null , volume_in int , closed  int not null,  ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +                    
+                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
+                                "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
+                                "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
+                                "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
+                                "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); " +
+                        "     END //  "+
+                        "     DELIMITER ;  ")
+        orderIndicates = ("DELIMITER // "+
+                        " CREATE PROCEDURE createTableOrderIndicates(    )   " +
+                        " BEGIN  "+
+                             "create table if not exists orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, indicateId  int  not null, bidValue decimal(10,4), " +
+                                "askValue decimal(10,4) not null ,  " +                    
+                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
+                                "FOREIGN KEY ( orderId  )     REFERENCES orderbook(id) , " +
+                                "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
+                        "     END //  "+
+                        "     DELIMITER ;  ")
+        # NOT SURE A SEPARATE TABLE IS NEEDED FOR THIS 
+        orderOptions = ("DELIMITER // "+
+                        " CREATE PROCEDURE createTableOrderOptions(    )   " +
+                        " BEGIN  "+
+                             "create table if not exists orderOptions( orderOptionid int auto_increment PRIMARY KEY not null, orderId int not null, strike  decimal(10,4),  " +
+                                "askValue decimal(10,4) not null ,  " +                    
+                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
+                                "FOREIGN KEY ( orderId  )     REFERENCES orderBook(id) , " +
+                                "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
+                        "     END //  "+
+                        "     DELIMITER ;  ")
+        v_orderbook = ("DELIMITER // "+
+                        " CREATE PROCEDURE if not exists createTable_vOrderBook(   )   " +
+                        " BEGIN  "+
+                        "     create view v_orderbook  as" +
+                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.volume_in,o.qty,d2.date as closed ,o.ask , " +
+                        "          o.volume_out, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "     from orderbook o " +
+                        "     inner join dates d on o.initiated =d.dateid "+
+                        "     inner join dates d2 on o.closed = d2.dateid  "+
+                        "     inner join stocks s on o.stockid =s.stockid  "+
+                        "     inner join users u on o.userid=u.userid; "+
+                        "     END //  "+
+                        "     DELIMITER ;  ")        
+        p_createTables = ("DELIMITER // "+
+                            " CREATE PROCEDURE createAllTables( )  " +
+                            " BEGIN " +
+                            " call createTableIndicators(); " +
+                            " call createTableDates(); " +
+                            " call createTableUsers(); " +
+                            " call createTableStocks(); " +
+                            " call createTableOrderbook(); " +
+                            " call createTableOrderIndicates(); " +
+                            " call createTable_vOrderbook(); " +
+                            " END // " +
+                            " DELIMITER ;")
+        try:
+            tables = [verifyUser,indicators,users, dates,stocks,orderbook, orderIndicates ,v_orderbook, p_createTables ] #     
+            for table in tables :
+                print( f"Table : {table}")
+                self.Conn.Write( table)
+                             
+            self.Conn.Write( "call createAllTables(); " )
+            
+        except:      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )  
+        """
+            SELECT 
+    ROUTINE_NAME, 
+    ROUTINE_SCHEMA, 
+    ROUTINE_TYPE, 
+    CREATED, 
+    DEFINER 
+FROM 
+    INFORMATION_SCHEMA.ROUTINES 
+WHERE 
+    ROUTINE_TYPE = 'PROCEDURE' 
+    AND ROUTINE_SCHEMA = 'your_database_name';
+            SHOW CREATE PROCEDURE your_procedure_name;
+            SELECT * FROM mysql.proc WHERE name = 'your_procedure_name' \G
+
+
+                        CREATE PROCEDURE createTableOrderIndicates(    )   
+                         BEGIN  
+                             create table orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, indicateId  int  not null, bidValue decimal(10,4), 
+                                askValue decimal(10,4) not null , 
+                                 active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  
+                                FOREIGN KEY ( orderId  )     REFERENCES orderbook(id) , 
+                                FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); 
+                             END // 
+
+
+            
+        """

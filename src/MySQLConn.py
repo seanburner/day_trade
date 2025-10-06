@@ -3,6 +3,7 @@
 ##	AUTHOR 		:	Sean A. Burner 
 ##	PURPOSE		:
 ##      INSTALLATION    :       pip3 install python3-devel mysql-devel mysqlclient mysql-connector-python
+##  				pip3 install mysqlclient mysql-connector-python
 
 
 import sys 
@@ -139,8 +140,9 @@ class MySQLConn:
                 except:
                         e = sys.exc_info()[0]
                         f = sys.exc_info()[1]
-                        print("\t\t|EXCEPTION: MySQLConn -WRITEMANY() Ran into an exception" + str(e) + " : "  + str(f) ) 
+                        print("\t\t|EXCEPTION: MySQLConn -WRITEMANY() Ran into an exception" + str(e) + " : "  + str(f) )
+                        print(f"\tHEADER :{header}")
+                        print(f"\tCONTENTS: {contents}")
 			# pymssql.Error as err: #pyodbc.Error as err:			
 			#print('\t| DVR ERR: ',err, "\n\t| SQL ERR : " , self.Cursor.description ,'\n\t| QUERY >> ', query)
-
 

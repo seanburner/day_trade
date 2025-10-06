@@ -37,20 +37,45 @@ class Indicators :
                         nothing 
         """
         self.Symbol     = symbol
-        self.SMA        = {}
+        self.SMA        = 0
+        self.dSMA       = {}
+        self.ATH        = 0
+        self.ATL        = 0
+        self.Fib        = {}
+        self.dFib       = {}
+        self.RSI        = 0
+        self.VolIndex   = 0
+        self.VWAP       = 0
+        
         self.Set( data )
         
-        
+
                                
     def __str__(self) -> str :
         """
             Formats the class to print out in string format 
         """
-        contents  = (f"Symbol : {self.Symbol}  " + str( self.SMA) + "\n VWAP : " + str(self.VWAP)+
-                         "\n RSI : " + str(self.RSI) + "\n Volatility : " +str( self.VolIndex) )
+        contents  = (f"Symbol : {self.Symbol}  "+ "\n Daily SMA : " + str( self.dSMA) + "\n VWAP : " + str(self.VWAP)+
+                         "\n RSI : " + str(self.RSI) + "\n Volatility : " +str( self.VolIndex)  + "\n SMA : " +str( self.SMA)  +
+                        f"\nAT [H/L] : {self.ATH} /{self.ATL}" + f"\n d_FIb: {self.dFib} " + f"\n FIb: {self.Fib} ")
         
         return contents 
 
+
+    def Summary ( self ) -> dict :
+        """
+            Format all the indicators into a dicctionary for easier external handling
+            ARGS    :
+                    nothing
+            RETURNS :
+                    dictionary of the formatted indicators 
+        """
+        summary = self.SMA
+        summary |= {'HIGH': self.High, 'LOW':self.Low, 'VWAP':self.VWAP, 'RSI':self.RSI, 'VolIndex' : self.VolIndex}
+        summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
+        print( "SUMMARY:", summary )
+
+        return summary
 
 
 
@@ -62,11 +87,28 @@ class Indicators :
             RETURNS:
                         nothing 
         """
-        print( data )
+        data = data.reset_index( drop=True)
         self.Data = data
-        # Simple Moving Averages
-        self.SimpleMovingAverages()
+        
+        # DAILY SMA  Averages; only needs to be done once 
+        self.CalculateDailySMA()
+
+        # ALL TIME HIGH / LOW
+        self.ATH = self.Data['close'].max()
+        self.ATL = self.Data['close'].min()
+        
+        #FIB LEVELS - All TIME
+        self.Fib = self.CalculateFibonacci( self.ATH  , self.ATL  )
+        
+        # Calculate the rest that are based on daily entries 
         self.Calculate()
+        self.Data = self.Data.sort_values( by=["date"], ascending=True)
+        self.Data = pd.DataFrame(self.Data.iloc[-1]).T              # FUTURE CALCULATIONS BASED ON ONE PREVIOUS DATA PLUS TODAY'S ENTRIES
+        
+        self.Data = self.Data.dropna().reset_index(drop=True)
+        
+
+
 
             
     def Update ( self , entry : dict   ) -> None :
@@ -79,9 +121,14 @@ class Indicators :
             
         """        
         try:
-            df = pd.DataFrame(entry).T 
+            df = pd.DataFrame(entry).T
             df['date'] = df['datetime'].apply( lambda x: str(datetime.fromtimestamp(x/1000))[:10])
-            self.Data = pd.concat( [df, self.Data ],  ignore_index=True)            
+            
+            self.Data = pd.concat( [df, self.Data ],  ignore_index=True).reset_index( drop=True)
+            if 0 in self.Data.columns :
+                self.Data = self.Data.drop(0, axis=1)
+            
+            
             self.Calculate()
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -101,6 +148,10 @@ class Indicators :
         """
         try:
             #print( f"\t\t\t** {self.Symbol}  INDICATORS SETTING ")
+            # SMA for just the day
+            self.dSMA  =  self.Data['close'].mean()
+            self.High  =  self.Data['close'].max()
+            self.Low   =  self.Data['close'].min()
             
             # VWAP
             self.Data['Typical_Price']       = (self.Data['high'] + self.Data['low'] + self.Data['close']) / 3
@@ -116,13 +167,19 @@ class Indicators :
 
             #Volatility 
             self.VolIndex            = self.CalculateVolatility(df = pd.DataFrame( {'close':list(self.Data["close"])}, index=self.Data["date"]) )
+
+            # Fibonacci
+            self.dFib               = self.CalculateFibonacci( self.Data['close'].max() , self.Data['close'].min() )
+
+
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
 
+
     
-    def SimpleMovingAverages( self ) -> None:
+    def CalculateDailySMA( self ) -> None:
         """
             Calculate the simaple moving averages based on daily summary info / not intraday
             ARGS   :
@@ -132,16 +189,37 @@ class Indicators :
         """
         try:
             #print( data['close'][:9].mean())
-            self.SMA.update ( { 9: self.Data['close'][:9].mean(), 14: self.Data[:14]['close'].mean() ,
-                                21: self.Data['close'][:21].mean(), 50: self.Data['close'][:50].mean(), 200: self.Data['close'][:200].mean()} )
+            self.SMA =  { 'SMA9': self.Data['close'][:9].mean(), 'SMA14': self.Data[:14]['close'].mean() ,
+                                'SMA21': self.Data['close'][:21].mean(), 'SMA50': self.Data['close'][:50].mean(),
+                                'SMA200': self.Data['close'][:200].mean()} 
+
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
 
-
+    def CalculateFibonacci( self, high : float , low : float  ) -> dict :
+        """
+            Calculate the Fibonacci levels based on the high and low given
+            ARGS   :
+                        high ( float ) - highest value of data series
+                        low  ( float ) - lowest values of data series  
+            RETURNS:
+                        dictionary of fib levels 
+        """
+        diff = high - low
+        fib_levels = {
+        '0%': low,
+        '23.6%': high - (diff * 0.236),
+        '38.2%': high - (diff * 0.382),
+        '50%': high - (diff * 0.5), # 50% is commonly used but not a true Fibonacci ratio
+        '61.8%': high - (diff * 0.618),
+        '78.6%': high - (diff * 0.786),
+        '100%': high
+        }
+        return fib_levels 
                 
-    def CalculateRSI(self, data, window=14) -> pd.Series :
+    def CalculateRSI(self, data : object , window : int =14) -> pd.Series :
         """
             Calculates the Relative Strength Index (RSI).
 
@@ -180,13 +258,16 @@ class Indicators :
 
             # Calculate RSI
             rsi = 100 - (100 / (1 + rs))
+               
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t >>   " + str(entry) )
-                
+                print("\t\t >>   " + str(entry) )                
         finally:
-            return rsi
+            self.RSI =  rsi.iloc[-1]            
+            return rsi.iloc[-1]
+
+
 
     def CalculateVolatility( self, df : object  ) -> []:
         """
@@ -197,37 +278,43 @@ class Indicators :
                         dataframe  modified with a new volatility column 
         """
         try:
+            df = df.sort_index()
             # --- 1. Sample Data (Replace with your actual stock data) ---        
             #dates = pd.to_datetime(pd.date_range(start='2024-01-01', periods=len(data['Close']), freq='D'))
             #df = pd.DataFrame(data, index=dates)
-
+            
             # Define the annualization factor (approx. 252 trading days)
-            TRADING_DAYS_PER_YEAR = 252
+            TRADING_MINUTES_PER_DAY = 5.5 * 60  # days per year = 252
 
             # --- 2. Calculate Logarithmic Daily Returns ---
             # The .shift(1) moves the price back one day, allowing for P_t / P_{t-1}
             df['Log_Return'] = np.log(df['close'] / df['close'].shift(1))
 
-            # --- 3. Calculate Daily Volatility (Standard Deviation of Returns) ---
+            # --- 3. Calculate Minute/Daily Volatility (Standard Deviation of Returns) ---
             # .std() calculates the standard deviation (σ)
-            daily_volatility = df['Log_Return'].std()
+            
+            minute_volatility = df['Log_Return'].std()
+            if pd.isna( minute_volatility ) :
+                minute_volatility =  df.iloc[-1]['Log_Return'] 
 
-            # --- 4. Annualize the Volatility ---
-            # Volatility is annualized by multiplying the daily volatility by the square root of 252.
-            annualized_volatility = daily_volatility * np.sqrt(TRADING_DAYS_PER_YEAR)
+            # --- 4. Daily/Annualize the Volatility ---
+            # Volatility is annualized by multiplying the daily volatility by the square root of (5.5 * 60)     252.
+            daily_volatility = minute_volatility * np.sqrt(TRADING_MINUTES_PER_DAY)
 
             # --- 5. Output Results ---
             """
-            print("--- Historical Volatility Calculation ---")
+            print("--- Daily Volatility Calculation ---")
             print(df)
-            print("\nDaily Volatility (Standard Deviation of Daily Log Returns):")
-            print(f"{daily_volatility:.4f}")
-            print("\nAnnualized Historical Volatility:")
-            print(f"{annualized_volatility:.4f} (or {annualized_volatility * 100:.2f}%)")
+            print("\nMinute Volatility (Standard Deviation of Minute Log Returns):")
+            print(f"{minute_volatility:.4f}")
+            print("\nDaily Historical Volatility:")
+            print(f"{daily_volatility:.4f} (or {daily_volatility * 100:.2f}%)")
             """
+           
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )                
         finally:
-            return df
+            self.VolIndex = minute_volatility  #df["Log_Return"][-1]
+            return minute_volatility #df["Log_Return"][-1]
