@@ -70,10 +70,15 @@ class Indicators :
             RETURNS :
                     dictionary of the formatted indicators 
         """
+        fibs = ['dFib','Fib']
         summary = self.SMA
-        summary |= {'HIGH': self.High, 'LOW':self.Low, 'VWAP':self.VWAP, 'RSI':self.RSI, 'VolIndex' : self.VolIndex}
-        summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
-        print( "SUMMARY:", summary )
+        summary |= {'HIGH': self.High, 'LOW':self.Low, 'VWAP':self.VWAP, 'RSI':self.RSI, 'VolIndex' : self.VolIndex, 'dSMA' : self.dSMA}
+        for pos,fib in enumerate( [self.dFib, self.Fib]):
+            for key in fib.keys():
+                summary.update( {  fibs[pos]+"_"+key : fib[key] } ) 
+        #summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
+        #summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
+        #print( "SUMMARY:", summary )
 
         return summary
 

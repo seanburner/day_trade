@@ -82,6 +82,9 @@ class TraderDB:
         finally:
             return userId 
 
+
+
+
     def InsertMetaFields ( self, aspect : int = 0  ) -> str | tuple:
         """
             Inserts the Active, Created and Mod fields for each  table in the insert clause
@@ -216,7 +219,75 @@ class TraderDB:
 
 
 
+    def GetIndicators( self, indicators : dict  ) -> dict :
+        """
+            Get the current entries in Indicators tables then update as  necessary
+            ARGS   :
+                    indicators  ( dict ) - indicators present in one of the records in the order book
+            RETURNS:
+                    dictionary of  indicator names and id
+        """
+        query           = "select indicator, indId from indicators;"
+        header          = f"INSERT INTO indicators ( indicator {self.InsertMetaFields(0) } ) values ( %s,%s,%s,%s,%s,%s );"
+        contents        = [] 
+        indicatorTbl    = {}
+        
+        try:
+            self.Conn.Send( query )            
+            if self.Conn.Results != []:
+                for indName in indicators.keys():
+                    if not( indName.upper()  in str(self.Conn.Results).upper() ) :  
+                        contents.append ( [indName ,*self.InsertMetaFields(2) ] ) 
+                        
+            
+                    
+            # Add The missing entries 
+            if contents != []:
+                self.Conn.WriteMany( header = header, contents = contents )
 
+            # PULL ALL THE ENTRIES AGAIN
+            query       = "select indicator, indId from indicators;"
+            self.Conn.Send( query )
+            if self.Conn.Results != [] :
+                for entry in self.Conn.Results:
+                    indicatorTbl.update( { entry[0] : entry[1] } )
+            else:
+                print("\t\t\t WARNING - Although tried to update - did not get the indicators ")
+        except: 
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+            print( f"\t\tQUERY:{query}")
+        finally:
+            return indicatorTbl 
+
+
+    def InsertOrderIndicators( self, indicatorsId : dict , orderId : int , indicators_in : dict ,indicators_out : dict  ) -> None :
+        """
+            Add the associated indicators for the order to the orderIndicates table
+            ARGS   :
+                        orderId       ( int )  ID for the overall order
+                        indicatorsId  ( dict ) ID for the inidcators in the sql table 
+                        inidcators_in ( dict ) indicators for the bid
+                        inidcators_out( dict ) indicators for the ask
+            RETURNS:
+                        nothing
+        """
+        header      = f"INSERT INTO orderIndicates( orderId,indicateId,bidValue,askValue {self.InsertMetaFields(0) } ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s);"
+        contents    = []
+        
+        try:
+            for ind in indicatorsId.keys() :
+                contents.append( [orderId, indicatorsId[ind],indicators_in[ind],indicators_out[ind] ,*self.InsertMetaFields(2) ] )
+            if contents != [] :
+                self.Conn.WriteMany( header=header, contents =contents)
+            
+        except:
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+            print( f"\t\tQUERY:{query}")
+            
     
     def InsertOrderbook( self, orderbook : list , email : str , username : str = '') -> bool:
         """
@@ -228,21 +299,25 @@ class TraderDB:
             RETURNS:
                         nothing 
         """
-        header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,volume_in,volume_out {self.InsertMetaFields(0) } ) values " +
-                            "(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
+        header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,bidVolume,askVolume," +
+                            f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL {self.InsertMetaFields(0) } ) values " )
+                            #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
         numRec          = 0
         dupeNum         = 0
         contents        = []
         success         = False
-        userId          = None 
+        userId          = None
+        orderId         = None 
         stockId         = None 
         initDateId      = None
         closeDateId     = None
-
+        indicatorsId    = {}
         try:
             print("\t\t * Inserting Order book ")
             print("\t\t   -> user : ", email , " : " ,username)
-            self.CheckDB()
+            self.CheckDB()            
+            indicatorsId = self.GetIndicators( indicators = orderbook[ list(orderbook.keys())[0]][0]['indicators_in'] )
+            
             for symbol in orderbook.keys():
                 dupeNum = 0 
                 for order in orderbook[symbol]  :                    
@@ -255,12 +330,18 @@ class TraderDB:
                         print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
                         dupeNum += 1
                     else:
-                        contents.append( [userId, initDateId,stockId,order['bid'],order['qty'],closeDateId,order['ask'],order['p_l'],order['type'],order['bidVolume'],order['askVolume'], *self.InsertMetaFields(2)  ] )
-                        numRec += 1
-
-            if contents != []:
-                self.Conn.WriteMany( header = header, contents = contents )
-                success = True 
+                        query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
+                                    f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
+                                     f"'{order['askFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
+                                     f"'{((order['askFilled'] - order['bidFilled'] ) * order['qty'])}' {self.InsertMetaFields(1)} );"  )                        
+                        
+                        orderId  =  self.Conn.Write( query )
+                        if orderId != None :
+                            self.InsertOrderIndicators( indicatorsId=indicatorsId, orderId=orderId, 
+                                                        indicators_in=order['indicators_in'],indicators_out=order['indicators_out'] )
+                            numRec += 1
+                            success = True 
+  
         
             print (f"\t\t\t -> Inserted {numRec} entries, while ignoring {dupeNum} duplicates in orderbook" )
             
@@ -358,7 +439,8 @@ class TraderDB:
                         " CREATE PROCEDURE createTableOrderBook(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null,  stockId int not null, " +
-                                "type int not null,bid decimal(10,4) not null , qty  int not null , volume_in int , closed  int not null,  ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +                    
+                                "type int not null,bid decimal(10,4) not null , qty  int not null , volume_in int ,  closed  int not null,ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +
+                                 "bidReceipt int , bidFilled decimal(10,4),  askReceipt int , askFilled decimal(10,4), actualPL decimal(10,4), " +                    
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
                                 "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
@@ -369,8 +451,8 @@ class TraderDB:
         orderIndicates = ("DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderIndicates(    )   " +
                         " BEGIN  "+
-                             "create table if not exists orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, indicateId  int  not null, bidValue decimal(10,4), " +
-                                "askValue decimal(10,4) not null ,  " +                    
+                             "create table if not exists orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, " +
+                                "indicateId  int  not null, bidValue decimal(10,4), askValue decimal(10,4) not null ,  " +                    
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( orderId  )     REFERENCES orderbook(id) , " +
                                 "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
@@ -391,8 +473,8 @@ class TraderDB:
                         " CREATE PROCEDURE if not exists createTable_vOrderBook(   )   " +
                         " BEGIN  "+
                         "     create view v_orderbook  as" +
-                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.volume_in,o.qty,d2.date as closed ,o.ask , " +
-                        "          o.volume_out, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , " +
+                        "          o.askVolume, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
                         "     from orderbook o " +
                         "     inner join dates d on o.initiated =d.dateid "+
                         "     inner join dates d2 on o.closed = d2.dateid  "+
@@ -450,5 +532,20 @@ WHERE
                              END // 
 
 
-            
+             CREATE PROCEDURE if not exists createTable_vOrderBook(   )   
+                         BEGIN  
+                             create view v_orderbook  as
+                                 select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , 
+                                  o.askVolume, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate 
+                             from orderbook o 
+                             inner join dates d on o.initiated =d.dateid 
+                             inner join dates d2 on o.closed = d2.dateid  
+                             inner join stocks s on o.stockid =s.stockid  
+                             inner join users u on o.userid=u.userid; 
+                             END //  
+                             DELIMITER
+            Indicators
+            * Smart Money Concepts
+            * C& B Scout  ( RedK Chop and Breakout Scout )
+            * Average True Range ( ATR ) 
         """

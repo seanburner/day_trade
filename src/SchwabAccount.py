@@ -24,7 +24,7 @@ import webbrowser
 
 
 from loguru     import logger
-from datetime   import datetime, timedelta
+from datetime   import datetime, timedelta, timezone 
 
 
 
@@ -375,7 +375,7 @@ class SchwabAccount :
         """       
 
 
-    def AccountOrders ( self, accountHash : str , fromTime : str , toTime : str , status : str = "open"  ) -> dict:
+    def AccountOrders ( self, accountHash : str , fromTime : datetime , toTime : datetime , status : str = "open"  ) -> dict:
         """
             Get the orders for a specific account
             ARGS   :
@@ -385,7 +385,8 @@ class SchwabAccount :
         """
         temp  = None
 
-        try : 
+        try :
+            print(f'ENDPOINT: {self._base_api_url}/trader/v1/accounts/{accountHash}/orders')
             temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params={'maxResults': 50,
@@ -393,7 +394,7 @@ class SchwabAccount :
                                  'toEnteredTime'  : toTime, # str( datetime.now() ),
                                  'status': status},
                             timeout=self.Timeout)
-            print("\t\t\t\t      * ", temp.json() )
+            #print("\t\t\t\t      * ", temp.text )
             
         except:      
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -403,8 +404,49 @@ class SchwabAccount :
         finally:
             return temp.json()
 
-        
+    def Reconcile ( self, symbol : str , enteredTime : datetime, qty : int, action : str ) -> dict :
+        """
+            Reconcile what we submitted ( BUY/SELL ) with how Schwab filled it
+            DOES:
+            0. Should run as async
+            1. Change time from local to UTC
+            2. Gets filled orders
+            3. Builds dictionary for marching order at time and symbol and qty
+            ARGS   :
+                    symbol       ( str )  stock symbol to search for
+                    enteredTime  ( datetime ) time the BUY/SELL was submitted
+                    qty          ( int ) qty of stock BOUGHT/SOLD
+            RETURNS:
+                    dictionary of values 
+        """
+        results     = {}
+        fromTime    = (datetime.fromtimestamp(enteredTime.timestamp() ,tz=timezone.utc)- timedelta( days = 10) ).strftime('%Y-%m-%dT%H:%M:%SZ')        
+        toTime      = (datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+        try:           
+            accountHash = self.Accounts[self.AccountID]['hashValue']
+            print( f"OpenOrders: {accountHash}   {fromTime} -> {toTime} ")
+            filledOrders= self.AccountOrders ( accountHash ,
+                                fromTime =fromTime,toTime=toTime , status = "FILLED"  )
+            for order in filledOrders:
+                for orderLeg in order['orderLegCollection']:
+                    if (orderLeg['instrument']['symbol'].upper() == symbol.upper()  and
+                            action.upper() == orderLeg['instruction'].upper()   and
+                                qty == orderLeg['quantity']  ):
+                        print(f"\t{orderLeg} -> {order} ")
+                        # MIGHT NEED TO ALLOW FOR MULTI LEG INFO IN THE PRICE AND EXECUTION TIME 
+                        results =  { 'symbol' : symbol,
+                                    'bidReceipt'    if action.upper() =='BUY' else 'askReceipt' : order['orderId'],
+                                    'bidFilled'     if action.upper() =='BUY' else 'askFilled'  : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                    'bidFilledAt'   if action.upper() =='BUY' else 'askFilledAt': order['orderActivityCollection'][0]['executionLegs'][0]['time']
+                                } 
+        except:   
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return results
+        
     def UpdateTokensFile( self ) -> bool :
         """
             Serialize the Tokens structure and send to file for future use

@@ -127,7 +127,7 @@ class TradeAccount:
             
             response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
-            print( response.text )
+            #print( response.text )
             if response.status_code != 200 :
                 return ticker_row
 
@@ -315,6 +315,9 @@ class TradeAccount:
                 print("\t\t |   " + str(entry) )
 
 
+
+
+
     def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()), volume : int = 0 ,
              volume_threshold : int = 0, indicators : Indicators = None )  -> bool :
         """
@@ -441,7 +444,8 @@ class TradeAccount:
             if self.Mode.lower() == "test" or success:    
                 print('FUNDS: ', self.Funds , ' : ' , ( self.InPlay[stock]['qty'] * new_price ), ' = ' , ( self.InPlay[stock]['qty'] * new_price )+self.Funds)    
                 self.Funds += ( self.InPlay[stock]['qty'] * new_price )
-                p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )  
+                p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )
+                
                 self.Trades[stock].append(  {'symbol':stock, 'type': OPTION_NONE , 'bidTime':self.InPlay[ stock ]['time'],
                                              'bid':self.InPlay[ stock ]['price'],'bidVolume':self.InPlay[ stock ]['volume'], 'askVolume':ask_volume,
                                              'qty' :self.InPlay[ stock ]['qty'],'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
@@ -466,8 +470,45 @@ class TradeAccount:
 
 
 
-
-
+    def Reconcile ( self) -> None :
+        """
+            Reconcile the BUY /SELL with  how they were filled by the trading platform
+            ARGS   :
+                    none
+            RETURNS:
+                    none 
+            
+        """
+        reconcile   = {}
+        temp        = self.Trades
+        
+        try:
+            print(f"RECONCILING : {len(self.Trades)} " )
+            self.Trades = {}
+            for symbol in temp.keys():
+                self.Trades.update( { symbol : [] } )
+                for trade in temp[symbol] :
+                    if self.Mode.upper() == "TEST":
+                        reconcile   = {
+                                        'bidReceipt': 11111111,     'bidFilled' : trade['bid'] ,
+                                           'askReceipt' : 2222222,  'askFilled' : trade['ask'] ,
+                                           
+                                       }
+                    else:
+                        if not('bidReceipt' in trade ):
+                            reconcile.update(self.Conn.Reconcile( symbol, enteredTime=trade['bidTime'], qty=trade['qty'],action='BUY') )
+                            
+                        if not('askReceipt' in trade ):
+                            reconcile.update( self.Conn.Reconcile( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
+                    
+                    trade.update( reconcile )
+                    self.Trades[symbol].append(  trade  ) 
+            
+            print(f"AFTER RECONCILING : {len(self.Trades)} " ) 
+        except:
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
 
 
 

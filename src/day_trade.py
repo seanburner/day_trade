@@ -26,7 +26,7 @@ import pandas               as pd
 import  matplotlib.pyplot   as plt
 
 
-from datetime           import datetime, timedelta
+from datetime           import datetime, timedelta, timezone 
 from PDFReport          import PDFReport
 from TraderDB           import TraderDB
 from TradeAccount       import TradeAccount
@@ -428,6 +428,17 @@ def system_test( configs : dict  ) -> None :
 
     try: 
         account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+        print('> Account Orders ' )
+
+        accountHash = account.Conn.Accounts[account.Conn.AccountID]['hashValue']
+        print(f"  Account : {account.Conn.Accounts[account.Conn.AccountID]}")
+        fromTime    = (datetime.now(timezone.utc) - timedelta( days = 10) ).strftime('%Y-%m-%dT%H:%M:%SZ')        
+        toTime      = (datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')        
+        openOrders= account.Conn.Reconcile ( symbol="ARBK",enteredTime= datetime.now() -timedelta( days =10), qty=397 , action="BUY")
+        print( f"OpenOrders: {accountHash}   {fromTime} -> {toTime}  => {openOrders}")
+        return 
+
+        
         print('Preferences: ', account.Conn.Preference )
 
         time_period = 200 + (.50 * 200 )
@@ -736,8 +747,15 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     #                print( 'Just received  empty ticker info ')
                     
             current_time    = datetime.now()
-                    
+
+
+
+
+        
         if params['mode']  == 'TRADE':
+            #RECONCILE WHAT WE LOGGED WITH HOW THE BROKERAGE EXECUTED OUR TRADES
+            account.Reconcile()
+            
             # SEND TRANSACTIONS TO SQL
             if len( account.Trades) > 0 :
                 send_transactions_to_sql( configs, account.Trades  )
@@ -836,12 +854,15 @@ def  replay_test( configs: dict  ) -> None :
                 #else:
                 #    cont = False
                 #    print( 'Just received  empty ticker info ')
+
+        #RECONCILE WHAT WE LOGGED WITH HOW THE BROKERAGE EXECUTED OUR TRADES
+        #account.Reconcile()
         
         # SEND TRANSACTIONS TO SQL
-        send_transactions_to_sql( configs, account.Trades  )
+        #send_transactions_to_sql( configs, account.Trades  )
 
         # SEND DATA TO FILE
-        send_data_to_file( configs, data )
+        #send_data_to_file( configs, data )
 
         
         # SEND EMAIL OF PERFORMANCE

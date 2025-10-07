@@ -123,7 +123,7 @@ class DayTradeStrategy:
         previous_price      = float(self.Stocks[ stock ]['Price']['Previous'])
         strike_price        = float(self.Stocks[ stock ]['Price']['Bought']) 
         profit              = previous_price - strike_price
-        trigger_price       = previous_price - ( profit * risk_percent )
+        trigger_price       = strike_price + ( profit * risk_percent )
 
          
         #print(f"\t\t\t --  Trigger price : { trigger_price}     Previous Price : { previous_price}     Strike : { strike_price} " )
