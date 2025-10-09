@@ -172,7 +172,8 @@ class SchwabAccount :
         #print("\t\t\t\t  -> Access Schwab Tokens ")
         # Needs to add expires at for refresh token
         if ( self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or
-             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys())  ):
+             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys())  or
+             (self.Tokens['expires_at'] + timedelta(minutes=self.Tokens['expires_in'] ) )< datetime.now() ):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
@@ -404,7 +405,7 @@ class SchwabAccount :
         finally:
             return temp.json()
 
-    def Reconcile ( self, symbol : str , enteredTime : datetime, qty : int, action : str ) -> dict :
+    def Reconcile ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str ) -> dict :
         """
             Reconcile what we submitted ( BUY/SELL ) with how Schwab filled it
             DOES:
@@ -420,10 +421,16 @@ class SchwabAccount :
                     dictionary of values 
         """
         results     = {}
-        fromTime    = (datetime.fromtimestamp(enteredTime.timestamp() ,tz=timezone.utc)- timedelta( days = 10) ).strftime('%Y-%m-%dT%H:%M:%SZ')        
-        toTime      = (datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        toTime      = None
+        fromTime    = None
+        date_format     = "%Y-%m-%d %H:%M:%S"  
 
-        try:           
+        try:
+            if isinstance( enteredTime, str ) :
+                enteredTime = datetime.strptime( enteredTime[:19] , date_format)
+            fromTime    = (datetime.fromtimestamp(enteredTime.timestamp() ,tz=timezone.utc)- timedelta( days = 10) ).strftime('%Y-%m-%dT%H:%M:%SZ')
+            toTime      = (datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
             accountHash = self.Accounts[self.AccountID]['hashValue']
             print( f"OpenOrders: {accountHash}   {fromTime} -> {toTime} ")
             filledOrders= self.AccountOrders ( accountHash ,
@@ -627,9 +634,7 @@ class SchwabAccount :
             
             if buy_response.status_code == 201  or buy_response.status_code == 200:
                 print("\t\t\t\t  ->  SchwabAccount -  BUY ORDER submitted successsfully ")
-                success = True
-                response = self.AccountOrders ( self, self.Accounts[accnt]["hashValue"] , fromTime=startTime, toTime =str( datetime.now()) ,  status  = "open"  )
-                print( f"Schwab ORDERS BOUGHT OPEN ************\n {response}")
+                success = True               
             else:
                 print("\t\t\t\t  -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
                 
@@ -640,8 +645,8 @@ class SchwabAccount :
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )   
-
-        return success
+        finally:
+            return success
 
 
 
@@ -688,10 +693,7 @@ class SchwabAccount :
             
             if sell_response.status_code == 201 or sell_response.status_code == 200 :
                 print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted successsfully ")
-                success = True
-                response = self.AccountOrders ( self, self.Accounts[accnt]["hashValue"] , fromTime=startTime, toTime =str( datetime.now()) ,  status  = "open"  )
-                print( f"Schwab ORDERS BOUGHT OPEN ************\n {response}")
-                success = True
+                success = True                
             else:
                 print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
             
@@ -701,8 +703,8 @@ class SchwabAccount :
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )   
-
-        return success
+        finally:
+            return success
 
 
 

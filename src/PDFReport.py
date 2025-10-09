@@ -82,12 +82,12 @@ class PDFReport:
 
 
 
-    def AddTable( self, data : object,  style : str,  alignment : int  ) -> None:
+    def AddTable( self, data : list,  style : str,  alignment : int  ) -> None:
         """
             Add table to report 
 
             PARAMETER  :
-                            data      :  list of list of data 
+                            data      :   list of dictionary of data 
                             style     :  html style tags ( h1 / h2 )
                             alignment :  number represents alignment [ 1 = center ] 
             RETURNS    :
@@ -101,7 +101,8 @@ class PDFReport:
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ])
-        table = Table( data)
+        
+        table = Table( data )
         table.setStyle(table_style)
         self.Story.append( table )
 

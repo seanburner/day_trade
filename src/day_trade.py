@@ -713,7 +713,8 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                     stocks = set( account.InPlay.keys() )
                     for symbol in stocks:
                         ticker_row = account.Quote ( symbols= symbol)[symbol]
-                        account.Sell( symbol, float(ticker_row[3]) )
+                        account.Sell(stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] ,
+                                     ask_volume=ticker_row[5], indicators=Strategies.Stocks[symbol]['Indicators'] )
                 cont = False
             else:
                 current_time    = datetime.strptime( str(current_time)[:17] +"00", date_format) 
@@ -737,7 +738,16 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                             print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
                         elif msg.upper() == "CLOSED" :
                             bought_action |= False          #KEEP TRACK IF NEED TO CHANGE THE INTERVAL BECAUSE BOUGHT ONE OF THE SYMBOLS 
-                            print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )   
+                            print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )
+                # If TargetGoal == 0 then sleep for 30 minutes and readjust DailyFunds, TargetGoal  and Limit
+                """
+                if account.TargetGoal == 0 :
+                    account.SetFunds( params['account_funds'] - (params['account_funds'] * 0.10), params['funds_ratio'] - 0.10 )  #5000.00, 0.50 )
+                    account.SetTargetGoal( target = 0.5  ) # Target making 50% of our funds ( SetFunds) before auto quitting 
+                    current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , 1800)  # 30 min cool down period 
+                else:
+                    current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                 
+                """
                 current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                 
                 print(f"\t\t | Sleeping from : {sleep_interval} - { datetime.now() }",  )
                 time.sleep( sleep_interval )
@@ -823,7 +833,8 @@ def  replay_test( configs: dict  ) -> None :
                         print(f"\t\t + {symbol}  @ { current_time } " ) 
                         ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
                         if ticker_row != [] :
-                            account.Sell( symbol, float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] )
+                            account.Sell( stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] ,
+                                              ask_volume=ticker_row[5], indicators=Strategies.Stocks[symbol]['Indicators'] )
                         else:
                             print(f"\t\t\t Ticker Empty " ) 
                 cont = False
@@ -849,14 +860,19 @@ def  replay_test( configs: dict  ) -> None :
                         
                         
                     
-                current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
+                if account.TargetGoal == 0 :
+                    account.SetFunds(4500 , .40)  #5000.00, 0.50 )
+                    account.SetTargetGoal( target = 0.5  ) # Target making 50% of our funds ( SetFunds) before auto quitting 
+                    current_time   , sleep_interval   = calculate_new_poll_time( current_time , 1800) #30 min break
+                else:
+                    current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
                         
                 #else:
                 #    cont = False
                 #    print( 'Just received  empty ticker info ')
 
         #RECONCILE WHAT WE LOGGED WITH HOW THE BROKERAGE EXECUTED OUR TRADES
-        #account.Reconcile()
+        account.Reconcile()
         
         # SEND TRANSACTIONS TO SQL
         #send_transactions_to_sql( configs, account.Trades  )
@@ -996,6 +1012,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         dt1     = []
         dt1_2   = []
         dt2     = []
+        dt3     = []
         off_on  = True
 
         if not ( symbol in data )  or not (symbol in account.Trades) :
@@ -1011,9 +1028,14 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
             
         for entry in account.Trades[symbol]:            
             dt2.append( float(entry.get("p_l")) )
+
+            
+        for entry in account.Trades[symbol]:            
+            dt3.append( float(entry.get("actualPL")) )
+
                 
         pixplt =plt
-        fig, (ax1, ax2) = pixplt.subplots(2, 1)
+        fig, (ax1, ax2,ax3) = pixplt.subplots(3, 1)
         # GRAPH 1
         ax1.plot(dt1, color='blue')
         #ax1.xticks([930,1100,1230,200,330,500,630])
@@ -1021,10 +1043,15 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         ax1.set_ylabel('dollars')
         ax1.set_title(f"{symbol} Activity ")
         # GRAPH 2
-        ax2.plot(dt2, color='blue')
+        ax2.plot(dt2, color='orange')
         ax2.set_xlabel('index')
         ax2.set_ylabel('dollars')
         ax2.set_title(f"{symbol} P & L")
+        # GRAPH 2
+        ax3.plot(dt3, color='green')
+        ax3.set_xlabel('index')
+        ax3.set_ylabel('dollars')
+        ax3.set_title(f"{symbol} Actual P & L")
         
         chart_graph = "../pix/graph1.png"
         pixplt.tight_layout()
@@ -1061,20 +1088,30 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         contents        = ""
         total_profit    = 0
         print(f"\t {symbol} ORDERBOOK")
-        
+        print(f"\t   === BID=== \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
-            print("\t -  ", entry )            
+            print(f"\t   ${entry['bid'] }\t${entry['ask']}\t\t\t{entry['qty']}\t${entry['p_l']}\t\t${entry['actualPL']}" )            
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
-        print(f"\t {symbol}  InPLAY")
+        print(f"\n\t {symbol}  InPLAY")
         for inplay in account.InPlay:
             print( "\t -  " , inplay ) 
 
         print( "* Account : " , account  , " : " , account.Funds , " : " , total_profit)
 
+        header = ['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']
+        row     = [] 
+        table  = []
+
+        table.append( header ) 
+        for rec in account.Trades[symbol] :
+            row = [] 
+            for key in ['symbol', 'bidTime','bid', 'qty','askTime','ask','p_l'] :
+                row.append ( rec[key] )
+            table.append( row ) 
         
-        report.AddTable( [['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']] +  account.Trades[symbol], "h3", 1 )        
+        report.AddTable( table , "h3", 1 )        
         contents = f"* FUNDS : ${account.Funds}           TOTAL PROFIT: ${total_profit}"
         report.AddText( contents , "h3", 2)
         report.Save()

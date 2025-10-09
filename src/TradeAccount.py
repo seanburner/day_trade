@@ -49,6 +49,7 @@ class TradeAccount:
         self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
 
         self.Funds          = self.Conn.CashForTrading()
+        print(f"\t\t\t Available Cash for Trading : ${ self.Funds} " )
 
         self.SetLimit(limit )                           # INCASE VALUE SENT IN THROUGH CONSTRUCTOR
         
@@ -214,7 +215,9 @@ class TradeAccount:
             pos = 0
             if 'candles' in candles  and not ( candles['candles'] == [] ):
                 ticker_row = self.ExtractQuoteEntry( candles , timeStamp)
-                # A SECOND ATTEMPT INCASE THE FIRST WAS UNSUCCESSFUL
+                # A SECOND ATTEMPT INCASE THE FIRST WAS UNSUCCESSFUL;  using QUOTE
+                #ticker_row = self.Quote ( symbols =symbols, endDate = endDate)[symbols]
+                
                 if ticker_row == None :
                     print( f"{symbols}  RUNNING SECOND ")
                     candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
@@ -226,8 +229,8 @@ class TradeAccount:
                 #IF PROPER STILL IS NOT FOUND, THEN GET THE LAST ENTRY IN THE SERIES /RESPONSE DICT
                 if ticker_row == None :
                     print(f"{symbols}  **********  FAKING IT ************")
-                    for entry in candles['candles'] :
-                        print( f"\t>> {entry} -> {datetime.fromtimestamp(entry['datetime']/1000)}")
+                    #for entry in candles['candles'] :
+                    #    print( f"\t>> {entry} -> {datetime.fromtimestamp(entry['datetime']/1000)}")
                     quote_info = candles['candles'][-1]
                     quote_info['symbol'] = candles['symbol']
                     new_quote_info = {}
@@ -235,7 +238,7 @@ class TradeAccount:
                         new_quote_info[key] =  float( quote_info[key]) if key in ['volume','open','close','high','low'] else quote_info[key]
                     ticker_row = [ candles['symbol'],str(datetime.fromtimestamp( timeStamp/1000)),quote_info['low'],quote_info['close'],
                                         quote_info['open'],quote_info['volume'],quote_info['high']   ]
-         
+                 
         except:            
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -389,7 +392,7 @@ class TradeAccount:
                 if not( stock  in self.Performance.keys() ) :
                     self.Performance[stock] = []
                 
-                print ( f"{message_prefix}   BOUGHT : " , self.InPlay )
+               # print ( f"{message_prefix}   BOUGHT : " , self.InPlay )
                 success = True
             else:
                 print("\t\t\t    --> Account level could not execute BUY properly ")
@@ -463,7 +466,7 @@ class TradeAccount:
         except: 
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )
+                print("\t\t |   " + str(entry) )                
         finally :
             return success 
 
@@ -482,8 +485,7 @@ class TradeAccount:
         reconcile   = {}
         temp        = self.Trades
         
-        try:
-            print(f"RECONCILING : {len(self.Trades)} " )
+        try:           
             self.Trades = {}
             for symbol in temp.keys():
                 self.Trades.update( { symbol : [] } )
@@ -492,7 +494,7 @@ class TradeAccount:
                         reconcile   = {
                                         'bidReceipt': 11111111,     'bidFilled' : trade['bid'] ,
                                            'askReceipt' : 2222222,  'askFilled' : trade['ask'] ,
-                                           
+                                           'actualPL' : (trade['ask'] - trade['bid'] ) * trade['qty'] 
                                        }
                     else:
                         if not('bidReceipt' in trade ):
@@ -504,7 +506,7 @@ class TradeAccount:
                     trade.update( reconcile )
                     self.Trades[symbol].append(  trade  ) 
             
-            print(f"AFTER RECONCILING : {len(self.Trades)} " ) 
+            
         except:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
