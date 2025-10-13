@@ -332,7 +332,7 @@ class TraderDB:
                     else:
                         query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
                                     f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
-                                     f"'{order['askFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
+                                     f"'{order['bidFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
                                      f"'{((order['askFilled'] - order['bidFilled'] ) * order['qty'])}' {self.InsertMetaFields(1)} );"  )                        
                         
                         orderId  =  self.Conn.Write( query )
@@ -440,7 +440,7 @@ class TraderDB:
                         " BEGIN  "+
                              "create table if not exists orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null,  stockId int not null, " +
                                 "type int not null,bid decimal(10,4) not null , qty  int not null , volume_in int ,  closed  int not null,ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +
-                                 "bidReceipt int , bidFilled decimal(10,4),  askReceipt int , askFilled decimal(10,4), actualPL decimal(10,4), " +                    
+                                 "bidReceipt bigint(25) , bidFilled decimal(10,4),  askReceipt bigint(20) , askFilled decimal(10,4), actualPL decimal(10,4), " +                    
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
                                 "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
@@ -474,7 +474,7 @@ class TraderDB:
                         " BEGIN  "+
                         "     create view v_orderbook  as" +
                         "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , " +
-                        "          o.askVolume, o.p_l, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "          o.askVolume, o.p_l " + #, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
                         "     from orderbook o " +
                         "     inner join dates d on o.initiated =d.dateid "+
                         "     inner join dates d2 on o.closed = d2.dateid  "+

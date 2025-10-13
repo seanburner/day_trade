@@ -56,8 +56,9 @@ class DayTradeStrategy:
                                     'Indicators'    :   None
                                 }
                          }
-                    
+       
         self.StrategyName = ""
+        
 
          
     def List( self) -> str  :
@@ -362,15 +363,12 @@ class DayTradeStrategy:
         crash_out_percent   = params['crash_out_percent']      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
         
         try :
-            #account.SetLimit( limit )
-            upward_pressure        =  round( float(ticker_row[highPos]) - float(ticker_row[closePos]), 3)
-            downward_pressure      =  round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 3)
-
-            # if volume is less than 1M there is no point in playing with it --  SHOULD THIS ONLY BE FOR THE BUYS / STOP FROM BUYING WHEN VOLUME IS TOO LOW ???
-            if ticker_row[volumePos] < int(params['volume_threshold'])   and float(self.Stocks[ symbol]['Price']['Bought']) == 0  : 
-                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[volumePos] } " )
-                return False, action, time_interval
-
+            # NO BUYING AFTER 3:45
+            current_time = datetime.now()
+            if not ( symbol in self.Stocks.keys() )  and ( current_time.hour == 15 and current_time.minute >= 45) :
+                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
+                return 
+            
             # ADD STOCK ENTRY IF NOT INPLAY
             if not ( symbol in self.Stocks.keys() ) :
                 data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFOR FOR SYMBOL 
@@ -378,28 +376,69 @@ class DayTradeStrategy:
                 self.Stocks[ symbol ]  = {                        
                                     'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
                                     'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
-                                    'Indicators'    : indicators
+                                    'Indicators'    : indicators,
+                                    'Losses'        : 0
                              }
+                
+            #IF MORE THAN 2 LOSSES THEN DONT DO ANY MORE BUYING
+            if ( not (symbol in account.InPlay) and   self.Stocks[symbol]['Losses'] > 1 ):
+                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO MANY LOSSES TO TRADE :   {self.Stocks[symbol]['Losses'] } " )
+                return False, action, time_interval
+            
+            # if volume is less than pre-determined threshold  there is no point in playing with it --  SHOULD THIS ONLY BE FOR THE BUYS / STOP FROM BUYING WHEN VOLUME IS TOO LOW ???
+            if ticker_row[volumePos] < int(params['volume_threshold'])   and float(self.Stocks[ symbol]['Price']['Bought']) == 0  : 
+                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[volumePos] } " )
+                return False, action, time_interval
+            
+
             #BUY : if the price goes from neg to positive  by $0.02               and volume is higher
             #print(f" Volume percent : {(float(ticker_row[volumPos])  /  float(self.Stocks[ symbol]['Volume']['Previous'] ) )}")
             #print(f"Price to Previous: {float(ticker_row[ closePos])} -  {float(self.Stocks[ symbol]['Price']['Previous'])} :: { float(ticker_row[ closePos]) -  float(self.Stocks[ symbol]['Price']['Previous'])} --> {params['price_move_change']} " +
-            #       f"VOLUME : {float(ticker_row[volumePos])  -  float(self.Stocks[ symbol]['Volume']['Previous'] ) } --> {params['volume_change_ratio']} ")  
-            if (not (symbol in account.InPlay)  and  #float(self.Stocks[ symbol]['Price']['Bought']) == 0 and (#float(ticker_row[ closePos ]) > 568  and 
-                    ( round(float(ticker_row[ closePos]),2) -  round(float(self.Stocks[ symbol]['Price']['Previous']),2) >= params["price_move_change"] )  and  # Atleast a $0.02 move before entering into a new position
-                        (float(ticker_row[volumePos])  /  float(self.Stocks[ symbol]['Volume']['Previous'] ) ) > params["volume_change_ratio"]  ):                        
+            #       f"VOLUME : {float(ticker_row[volumePos])  -  float(self.Stocks[ symbol]['Volume']['Previous'] ) } --> {params['volume_change_ratio']} ")
+
+            #account.SetLimit( limit )
+            upward_pressure        =  round( float(ticker_row[highPos])  - float(ticker_row[closePos]), 5)
+            downward_pressure      =  round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 5)
+            profit_trail_stop      =  round( self.ProfitTrailStop( symbol, risk_percent  ) , 5)
+            strike_price_stop      =  round( self.StrikePriceStop( symbol, risk_percent  ) , 5)                
+            current_to_previous    =  round(float(ticker_row[closePos]) / float(self.Stocks[ symbol ]['Price' ]['Previous'] ), 5)            
+            crash_trail_stop       =  round(crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought']) ,5)
+            
+            #CRITERIA SWITCH 
+            potential_switch = False
+            criteria = False 
+            # TESTING BUYING INTO THE DIP IF HAVE UPWARD PRESSURE
+            if potential_switch :
+                criteria = (   ( upward_pressure > downward_pressure ) and
+                                        ( ticker_row[ volumePos]  > self.Stocks[ symbol]['Volume']['Previous'] ) and
+                                            (round(float(ticker_row[ closePos]),2) < round(float(self.Stocks[ symbol]['Price']['Previous']),2)) )
+            else:
+                criteria = (( round(float(ticker_row[ closePos]),2) -  round(float(self.Stocks[ symbol]['Price']['Previous']),2) >= params["price_move_change"] )  and 
+                        (float(ticker_row[volumePos])  /  float(self.Stocks[ symbol]['Volume']['Previous'] ) ) > params["volume_change_ratio"]) 
+                
+            
+            if (not (symbol in account.InPlay)  and   criteria ) :
+                if potential_switch :
+                    print(f"\t[POTENTIAL] BUY - Price : {round(float(ticker_row[ closePos]),2)}  " +
+                          f" Previous: {round(float(self.Stocks[ symbol]['Price']['Previous']),2)}  " +
+                              f" Upward: {round(upward_pressure, 5) }  Down : {  round(downward_pressure, 5 ) }" )
+                else:
+                    print(f"\t[REGULAR] BUY - Price : {round(float(ticker_row[ closePos]),2)}  " +
+                          f" Previous: {round(float(self.Stocks[ symbol]['Price']['Previous']),2)}  " +
+                              f" Upward: {round(upward_pressure, 5) }  Down : {  round(downward_pressure, 5 ) }" )
                 volume_increase = (float( ticker_row[ volumePos]) - float(self.Stocks[ symbol]['Volume']['Previous'] ) ) / float(self.Stocks[ symbol]['Volume']['Previous'] )                
                 if volume_increase  < params["volume_change_avg_ratio"] : # 85% starts to see good results, but dont want to be too strict or too loose 
                     print( f"\t\t\t  *  BUY:: Volume increase isnt enough : {ticker_row[ volumePos ]}  from {self.Stocks[ symbol]['Volume']['Previous'] } ==> {volume_increase} " )
                     # THIS SHOULD BE A SUB FUNCTION
                     self.ResetStock( symbol =symbol ,stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )
                     return False, action, time_interval
-                
+            
                 if ( round(ticker_row[closePos], 2 ) <  round(ticker_row[openPos],2 )  and round(ticker_row[closePos],2) == round(ticker_row[highPos],2)) :  #  PRICE CLOSED LOWER THAN IT OPENED with upward pressure
-                    print( f"\t\t\t  *  BUY:: PRICE CLOSED LOWER THAN IT OPENED WITH NO UPWARD PRESSURE  : CLOSED={ticker_row[ closePos ]}  " +
-                               f"OPENED={ticker_row[openPos] }   LOW={ticker_row[lowPos] }  HIGH={ticker_row[highPos] }  " )                    
+                    print( f"\t\t\t  *  BUY:: PRICE CLOSED LOWER THAN IT OPENED WITH NO UPWARD PRESSURE  : CLOSED={ round(ticker_row[ closePos ],5)}  " +
+                               f"OPENED={ round(ticker_row[openPos], 5) }   LOW={ round(ticker_row[lowPos],5) }  HIGH={ round(ticker_row[highPos],5) }  " )                    
                     self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
                     return False, action, time_interval
-                
+            
                 self.Stocks[ symbol]['Price']['Occur']  += 1
                 if self.Stocks[symbol]['Price']['Occur']  < params["bounce_up_min"] :  # TWO consecutive upward moves with appropriate volume 
                     print( f"\t\t\t  *  BUY [TERST SIGNAL ]:: Consecutive upward moves with volumes : {self.Stocks[ symbol]['Price']['Occur']} " )
@@ -408,43 +447,53 @@ class DayTradeStrategy:
                 
                 
                 print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ volumePos ]} from" +
-                       f" newPrice - previous = ${float(ticker_row[ closePos ]) -  float(self.Stocks[ symbol]['Price']['Previous'])} " +
-                       f" Volume :  from {self.Stocks[ symbol]['Volume']['Previous'] } ==> {volume_increase} " +
-                       f" PRESSURE :  upward : {upward_pressure} ==>  downward :{downward_pressure} " ) 
-                if  ( (upward_pressure > downward_pressure) and account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
+                       f" newPrice - previous = ${round( round(float(ticker_row[ closePos ]),5) -  round(float(self.Stocks[ symbol]['Price']['Previous']), 5) , 5) } " +
+                       f" Volume :  from { round( self.Stocks[ symbol]['Volume']['Previous'] , 5)  } ==> {volume_increase} " +
+                       f" PRESSURE :  upward : { round(upward_pressure,5)} ==>  downward :{ round(downward_pressure,5)} " ) 
+                if   upward_pressure > downward_pressure :
+                    print( f"\t\t\t\t  *  BUY:: Submitting a BUY" )
+                    if ( account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                     volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators'])   ) :
-                    success = True
-                    self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
-                    self.Stocks[ symbol ]['Price' ]['Bought'] =  ticker_row[ closePos ]
-                    self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
-                    self.Stocks[ symbol ]['Volume']['Bought'] =  ticker_row[volumePos]                    
-                    action          = "bought"
+                    
+                        success = True
+                        self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
+                        self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
+                        self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
+                        self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]                    
+                        action          = "bought"
                     
             
             if action != 'bought' and self.Stocks[ symbol]['Price']['Bought'] > 0 :
-                print( f"CURRENT : { ticker_row [closePos]}   BOUGHT AT : {self.Stocks[ symbol]['Price']['Bought']}   PREVIOUS AT: {self.Stocks[ symbol]['Price']['Previous'] } OPEN: {ticker_row[openPos]}   CLOSE :{ticker_row[closePos]} ")
+                print( f"CURRENT : { round(ticker_row [closePos], 5)}   " +
+                       f"BOUGHT AT : { round(self.Stocks[ symbol]['Price']['Bought'],5)}  " +
+                       f"PREVIOUS AT: {round(self.Stocks[ symbol]['Price']['Previous'] ,5)}  " +
+                       f"OPEN: {round(ticker_row[openPos],5)}   CLOSE :{ round(ticker_row[closePos],5)} ")
 
 
             #SELL : In profit territory 
-            if action != 'bought' and float(self.Stocks[ symbol]['Price']['Bought']) > 0 and (float(ticker_row[ closePos ]) >  float(self.Stocks[ symbol]['Price']['Bought']) ) : 
-                 profit_trail_stop      =  self.ProfitTrailStop( symbol, risk_percent  )
-                 strike_price_stop      =  self.StrikePriceStop( symbol, risk_percent  )                 
-                 current_to_previous    =  float(ticker_row[closePos]) / float(self.Stocks[ symbol ]['Price' ]['Previous'] )
+            if ( action != 'bought' and
+                     round(float(self.Stocks[ symbol]['Price']['Bought']) ,3) > 0 and
+                     ( round(float(ticker_row[ closePos ]),3) >  round(float(self.Stocks[ symbol]['Price']['Bought']),3) )  ): 
                  print( f"\t\t\t  * SELL SIGNAL EVALUATION :CurrentToPrevious: {current_to_previous}  PROFIT_STOP :{ profit_trail_stop } " +
-                                f"STRIKE_PRICE_STOP : { strike_price_stop}   BOUGHT : {self.Stocks[ symbol]['Price']['Bought']}    " +
-                                f" NEW PRICE : {ticker_row[ closePos ]}  PRESSURE: {upward_pressure} -> {downward_pressure}   *{current_to_previous }"   )                 
+                                f"STRIKE_PRICE_STOP : { strike_price_stop}   BOUGHT : {round(self.Stocks[ symbol]['Price']['Bought'] , 3 )}    " +
+                                f" NEW PRICE : { round(ticker_row[ closePos ],3) }  " +
+                                f" PRESSURE: {upward_pressure} -> {downward_pressure} %{upward_pressure /downward_pressure}  "   )                 
                  #  THERE IS SOMETHING ABOUT THE UPWARD PRESSURE == 0 THAT SIGNALS A TURNAROUND TO MAXIMIZE PROFITS , FIGURE IT OUT
                  # MAYBE NEEDS ALL 3   CURRENT TO PREVIOUS > 95  AND CLOSE > OPEN AND UPPER PRESSURE MORE THAN DOWNWARD FOR IT TO TRIGGER 
-                 if (   ( current_to_previous > 0.95) and ( ticker_row[closePos] > ticker_row[openPos])  and (upward_pressure > downward_pressure ) ):                       
-                     print( f"\t\t\t  \\-> SELL SIGNAL [ RESCIND ] IN PROFIT  :  More upward than downward pressure : {float(ticker_row[highPos]) - float(ticker_row[closePos])} -> {float( ticker_row[openPos]) - float(ticker_row[lowPos])} "  )
+                 if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
+                     print( f"\t\t\t  \\-> SELL SIGNAL [ RESCIND ] IN PROFIT  : " +
+                            f" More upward than downward pressure : { round( float(ticker_row[highPos]) - float(ticker_row[closePos]), 5) } -> " +
+                            f"{ round(float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 5 )} "  )
                  #ticker_row[volumePos] < self.Stocks[ symbol ]['Volume' ]['Bought'] :  # VOLUME IS STILL MOVING UP SO DONT SELL RIGHT NOW
                      self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )
                      return False, action, params["time_interval"]
                     
                     
                 # The price is now lower than the previous price and in the Profit_Trail_Stop  range    
-                 if ( True or  ( float(ticker_row[ closePos ])  <  float(self.Stocks[ symbol]['Price']['Previous'])     ) and ( float(ticker_row[ closePos ])  >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ closePos ]) )  ):
+                 if ( True or
+                      ( round(float(ticker_row[ closePos ]), 5)  <  round( float(self.Stocks[ symbol]['Price']['Previous']) , 5)     ) and
+                      ( round( float(ticker_row[ closePos ]) , 5 )   >=  profit_trail_stop     )   ) : # or   ( profit_trail_stop >  float(ticker_row[ closePos ]) )  ):
                      print( f"\t\t\t   \\-> SELL SIGNAL : {self.Stocks[ symbol]['Price']['Bought']}  > {ticker_row[ closePos]}  : Profit_Trail_Stop : {profit_trail_stop} " )
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ])  ,
                                        current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
@@ -458,19 +507,16 @@ class DayTradeStrategy:
         
 
             #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
-            if ( action != 'bought' and float(self.Stocks[ symbol]['Price']['Bought']) > 0 and
-                    (   ( (float(ticker_row[ closePos ]) <  float(self.Stocks[ symbol]['Price']['Bought']) )  or
-                             (float(ticker_row[ closePos ]) <  float(self.Stocks[symbol]['Price']['Previous'])   or
-                                  (float(ticker_row[ closePos ]) <  float(ticker_row[ openPos ])  )  ))  ) ) :
+            if ( action != 'bought' and round(float(self.Stocks[ symbol]['Price']['Bought']) , 5) > 0 and
+                    (   ( (  round(float(ticker_row[ closePos ]) , 5 ) <  round(float(self.Stocks[ symbol]['Price']['Bought']) , 5) )  or
+                             ( round(float(ticker_row[ closePos ]) ,5) <  round(float(self.Stocks[symbol]['Price']['Previous']) ,5)  ) or
+                                  ( round(float(ticker_row[ closePos ]) ,5) <  round(float(ticker_row[ openPos ]) ,5) )  ))) :
                         #and
                         # (float(ticker_row[ volumePos ]) <  float(self.Stocks[ symbol]['Volume']['Previous']) ) )  ):
                  print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : Current price is below what we bought for  or  ( lower than previous and the volume is lower than previous) "   )
-                 profit_trail_stop      =  self.ProfitTrailStop( symbol, risk_percent  )
-                 strike_price_stop      =  self.StrikePriceStop( symbol, risk_percent  )
-                 crash_trail_stop       =  crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought'])
                  # dont sell unless crashing AND atleast 80% purchase, try to wait it out , BOXL fell fast and did not trigger this  so need to FIX
                  print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : CHECKING PROFIT_STOP :  STRIKE_PRICE_STOP : { strike_price_stop}   profit_trail_stop: { profit_trail_stop}   CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ symbol]['Price']['Bought']}   NEW PRICE : {ticker_row[ closePos ]} "   )
-                 if  (float(ticker_row[ closePos ]) <= crash_trail_stop  ) or ( float(ticker_row[ closePos ] ) <=  strike_price_stop    ):
+                 if  (round(float(ticker_row[ closePos ]),5) <= crash_trail_stop  ) or (  round(float(ticker_row[ closePos ] ),5) <=  strike_price_stop    ):
                      print( f"\t\t\t  \\-> SELL SIGNAL (SAFETY) : PROFIT_STOP : SAFETY SELL  -> { profit_trail_stop }   STRIKE_PRICE_STOP : { strike_price_stop}    CRASH_TRAIL_STOP: { crash_trail_stop}   BOUGHT : {self.Stocks[ symbol]['Price']['Bought']}   NEW PRICE : {ticker_row[ closePos ]} "   )
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ]) ,
                                            current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ),
@@ -480,7 +526,7 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Price' ]['High']   = 0
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
                          action          = "closed"
-                        
+                         self.Stocks[symbol]['Losses']    += 1
             
             # Update the indicators for the next go round
             entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
@@ -501,7 +547,7 @@ class DayTradeStrategy:
             else:
                 if action =='closed' :
                     print("Taking a breathe")
-                    time.sleep(params['time_interval'] ) # After closing a position , take a pause 
+               #     time.sleep(params['time_interval'] ) # After closing a position , take a pause 
                     
                 time_interval   = params['time_interval']
                 

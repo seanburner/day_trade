@@ -708,7 +708,8 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
             elif ( current_time.hour == 15 and (current_time.minute  +  (time_interval / 60 )) >=  55)  :               #MARKET CLOSES AT 4PM, SELL WHAT YOU ARE HOLDING (???)
-                # IF THE NEXT TIME INTERVAL CAUSES US TO BE OUTSIDE OF THE MARKET TIME THEN SELL NOW 
+                # IF THE NEXT TIME INTERVAL CAUSES US TO BE OUTSIDE OF THE MARKET TIME THEN SELL NOW
+                print("\t\t\t > Market closing ; shifting InPlay -> Trades" )
                 if  account.InPlay != {} :
                     stocks = set( account.InPlay.keys() )
                     for symbol in stocks:
@@ -728,11 +729,12 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                     else:
                        ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
                     if ticker_row != None:                    
-                        print(f"\t\t\tTICKER_ROW :{ticker_row}")
-                        data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
-                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
-                
+                        print(f"\t\t\tTICKER_ROW :{ticker_row}")                
                         success , msg , time_interval = Strategies.Run(  ticker_row,  account, configs )
+                        
+                        data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),
+                                              'volume':float(ticker_row[5]), 'interval': time_interval/60 , 'msg':msg } )
                         if msg.upper() == "BOUGHT" :
                             bought_action = True 
                             print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
@@ -821,17 +823,14 @@ def  replay_test( configs: dict  ) -> None :
             #print("\t\t\t\t + Current Time : " , current_time ) 
             if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
                 cont = False
-                print("\t\t\t\t -> Outside of market hours ")                  
-            #elif ( current_time.hour >= 12 and current_time.hour < 14)  and False   :               ## between 12  -> 2 seems to be loss filled
-            #    sleep_time = ((14 - current_time.hour) * 60* 60 ) + (( 59 - current_time.minute))
-            #    print( f'\t\t --> sleeping for {sleep_time} -> { current_time  } ->{ current_time + timedelta( seconds =sleep_time) } ')
-            #    current_time +=  timedelta( seconds =sleep_time)            
+                print("\t\t\t\t -> Outside of market hours ")  
             elif ( current_time.hour == 15 and (current_time.minute   +  (time_interval / 60 )) >= 55)   :               ## Sell whatever is InPlay
+                print("\t\t\t > Market closing ; shifting InPlay -> Trades" )
                 if  account.InPlay != {} :
                     symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                     for symbol in symbols:
                         print(f"\t\t + {symbol}  @ { current_time } " ) 
-                        ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
+                        ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time) 
                         if ticker_row != [] :
                             account.Sell( stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] ,
                                               ask_volume=ticker_row[5], indicators=Strategies.Stocks[symbol]['Indicators'] )
@@ -848,24 +847,26 @@ def  replay_test( configs: dict  ) -> None :
                     else:
                         ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
                     print(f"\t\t\t->DATA : {ticker_row} " ) 
-                    if ( ticker_row != None and ticker_row != [] ):                    
-                        data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
-                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),'volume':float(ticker_row[5]), 'interval': time_interval/60 })
+                    if ( ticker_row != None and ticker_row != [] ): 
                        # print(f"\t\t\t->DATA : {ticker_row} " ) 
-                        success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs)
+                        success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs)                   
+                        data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),
+                                              'volume':float(ticker_row[5]), 'interval': time_interval/60 , 'msg':msg } )
                         if msg.upper() == "BOUGHT" :
                             print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval/60} min  : " )                        
                         elif msg.upper() == "CLOSED" :
                             print(f"\t\t\t   -> OUT Play - should shift from {time_interval/60} -> 15 min  : " )
                         
                         
-                    
+                """    
                 if account.TargetGoal == 0 :
                     account.SetFunds(4500 , .40)  #5000.00, 0.50 )
                     account.SetTargetGoal( target = 0.5  ) # Target making 50% of our funds ( SetFunds) before auto quitting 
                     current_time   , sleep_interval   = calculate_new_poll_time( current_time , 1800) #30 min break
                 else:
-                    current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
+                """
+                current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
                         
                 #else:
                 #    cont = False
@@ -923,35 +924,41 @@ def  back_test( configs: dict  ) -> None :
             return
         
         data = read_csv( configs['input_data'] )        
-        data = data.sort_values( by=['timestamp'], ascending=True)
+        data = data.sort_values( by=['DATETIME'], ascending=True)
         print( '\t* About to back_test: ', account )
         Strategies.Set( configs['strategy'] , account)
         account.SetMode( "TEST")
         for index, row in data.iterrows() :
-            if not ( configs['stock'] in new_data ):
-                new_data[  configs['stock'] ]       = []
-                thorHammer [  configs['stock'] ]    = { 'high' : -1,'low':-1, 'close': -1,'volume': -1 }
+            for symbol in configs['stock']:
+                if not ( symbol in new_data ):
+                    new_data[  symbol ]       = []
+                    thorHammer [  symbol ]    = { 'high' : -1,'low':-1, 'close': -1,'volume': -1 }
             
-            ticker_row = [f"{configs['stock']}",f"{row['timestamp']}",float(row['high']),float(row['low']),float(row['close']),float(row['volume']),float(row['high'])]
-            """  figure if this is useful at all
-            if ( row['open'] == row['low']) :
-                print(f"\t\t\t******* Thor's Hammer : {  configs['stock'] } -> { row }")
-                thorHammer [  configs['stock'] ]    = {'high' : float(row['high']),'low':float(row['low']), 'close': float(row['close']),'volume': float(row['volume']) }
-            if ( row['low']  <   thorHammer [  configs['stock'] ].get( 'low', -1)):
-                 print(f"\t\t\t****** TRIGGERED -Less THan  {row['low']}  -> { thorHammer [  configs['stock'] ].get( 'low', -1)}" )
-            """          
-            new_data[ticker_row[0]].append( {'stock':ticker_row[0],'datetime':ticker_row[1],'low': ticker_row[3],'quote': ticker_row[3],
-                                                             'high':ticker_row[4],'close':ticker_row[4],'volume':ticker_row[5], 'interval': 15 })
+                ticker_row = [f"{symbol}",f"{row['DATETIME']}",float(row['LOW']),float(row['QUOTE']),
+                                  float(row['CLOSE']),float(row['VOLUME']),float(row['HIGH']), row['MSG'] if 'MSG' in row else '']
+                print(f"\t\t\t->DATA : {ticker_row} " ) 
+                """  figure if this is useful at all
+                if ( row['open'] == row['low']) :
+                    print(f"\t\t\t******* Thor's Hammer : {  configs['stock'] } -> { row }")
+                    thorHammer [  configs['stock'] ]    = {'high' : float(row['high']),'low':float(row['low']), 'close': float(row['close']),'volume': float(row['volume']) }
+                if ( row['low']  <   thorHammer [  configs['stock'] ].get( 'low', -1)):
+                     print(f"\t\t\t****** TRIGGERED -Less THan  {row['low']}  -> { thorHammer [  configs['stock'] ].get( 'low', -1)}" )
+                """          
             
-            
-            #print( f"\t\t Data :  {ticker_row} ")
-            success , msg , interval = Strategies.Run(  ticker_row,  account )
-            if msg.upper() == "BOUGHT" :
-                print("\t\t\t In Play - should shift from 15 -> 5 min  : " )
-            elif msg.upper() == "CLOSED" :
-                print("\t\t\t OUT Play - should shift from 5 -> 15 min  : " )
+                #print( f"\t\t Data :  {ticker_row} ")
+                success , msg , interval = Strategies.Run(  ticker_row,  account, configs )
+                
+                new_data[symbol].append( {'stock':symbol,'datetime':f"{ticker_row[1]}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),
+                                          'volume':float(ticker_row[5]), 'interval': interval/60 , 'msg': msg } )
+                if msg.upper() == "BOUGHT" :
+                    print("\t\t\t In Play - should shift from 15 -> 5 min  : " )
+                elif msg.upper() == "CLOSED" :
+                    print("\t\t\t OUT Play - should shift from 5 -> 15 min  : " )
 
-
+        #RECONCILE WHAT WE LOGGED WITH HOW THE BROKERAGE EXECUTED OUR TRADES
+        account.Reconcile()
+        
         # SEND EMAIL OF PERFORMANCE
         summary_report( configs, new_data, account )
     except:
@@ -1024,14 +1031,17 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
             return 
         
         for entry in data[symbol] :
-            dt1.append( float( entry.get('close',0))  )
+            print("\t\t ADDING DT1 : " , entry )
+            dt1.append(  entry.get('close',0)  )
             
-        for entry in account.Trades[symbol]:            
-            dt2.append( float(entry.get("p_l")) )
+        for entry in account.Trades[symbol]:    
+            print("\t\t ADDING DT2 : " , entry )        
+            dt2.append( entry.get("p_l", 0) )
 
             
         for entry in account.Trades[symbol]:            
-            dt3.append( float(entry.get("actualPL")) )
+            print("\t\t ADDING DT3 : " , entry )
+            dt3.append( entry.get("actualPL", 0) )
 
                 
         pixplt =plt
@@ -1088,9 +1098,9 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         contents        = ""
         total_profit    = 0
         print(f"\t {symbol} ORDERBOOK")
-        print(f"\t   === BID=== \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t\t= ACTUAL P&L =" )            
+        print(f"\t   === BID=== \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
-            print(f"\t   ${entry['bid'] }\t${entry['ask']}\t\t\t{entry['qty']}\t${entry['p_l']}\t\t${entry['actualPL']}" )            
+            print(f"\t   ${entry['bid'] :.4f}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry['actualPL']:.4f}" )            
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
@@ -1098,7 +1108,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         for inplay in account.InPlay:
             print( "\t -  " , inplay ) 
 
-        print( "* Account : " , account  , " : " , account.Funds , " : " , total_profit)
+        print( "* Account : " , account  , " : " , account.Funds , " : " , total_profit  , " : " , (total_profit/(account.Funds - total_profit))* 100 ,"%")
 
         header = ['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']
         row     = [] 

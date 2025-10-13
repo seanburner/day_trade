@@ -432,7 +432,7 @@ class SchwabAccount :
             toTime      = (datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
             
             accountHash = self.Accounts[self.AccountID]['hashValue']
-            print( f"OpenOrders: {accountHash}   {fromTime} -> {toTime} ")
+            #print( f"OpenOrders: {accountHash}   {fromTime} -> {toTime} ")
             filledOrders= self.AccountOrders ( accountHash ,
                                 fromTime =fromTime,toTime=toTime , status = "FILLED"  )
             for order in filledOrders:
@@ -440,7 +440,7 @@ class SchwabAccount :
                     if (orderLeg['instrument']['symbol'].upper() == symbol.upper()  and
                             action.upper() == orderLeg['instruction'].upper()   and
                                 qty == orderLeg['quantity']  ):
-                        print(f"\t{orderLeg} -> {order} ")
+                        #print(f"\t{orderLeg} -> {order} ")
                         # MIGHT NEED TO ALLOW FOR MULTI LEG INFO IN THE PRICE AND EXECUTION TIME 
                         results =  { 'symbol' : symbol,
                                     'bidReceipt'    if action.upper() =='BUY' else 'askReceipt' : order['orderId'],

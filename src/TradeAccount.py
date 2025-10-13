@@ -59,7 +59,8 @@ class TradeAccount:
         """
         return (f'\n\t\t |Mode : {self.Mode}' +
                 f'\n\t\t |Funds : {self.Funds}\n\t\t |Limit : {self.Limit} ->{self.Limit * self.Funds} ' +
-                f'\n\t\t |DailyFunds : {self.DailyFunds}\n\t\t |TargetGoal : {self.TargetGoal}' ) #+ f"{self.Conn}")
+                f'\n\t\t |DailyFunds : {self.DailyFunds}' +
+                f'\n\t\t |TargetGoal : {self.TargetGoal}' ) #+ f"{self.Conn}")
     
     def __iter__(self) -> object:
         """
@@ -220,6 +221,9 @@ class TradeAccount:
                 
                 if ticker_row == None :
                     print( f"{symbols}  RUNNING SECOND ")
+                    ticker_row = self.Quote( symbols )[symbols]
+                    return ticker_row
+                    
                     candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
                     if 'candles' in candles :
