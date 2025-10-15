@@ -25,8 +25,8 @@ from SchwabAccount      import SchwabAccount
 from Indicators         import Indicators 
 
 OPTION_NONE = 0
-OPTION_CALL = 0
-OPTION_PUT  = 0
+OPTION_CALL = 1
+OPTION_PUT  = 2
 
 class TradeAccount:
     def __init__(self, funds : float =5000, limit : float = 0.10 , app_type = 'Schwab',app_key ="xxxxx", app_secret = "zzzzzz" ) :
@@ -221,8 +221,8 @@ class TradeAccount:
                 
                 if ticker_row == None :
                     print( f"{symbols}  RUNNING SECOND ")
-                    ticker_row = self.Quote( symbols )[symbols]
-                    return ticker_row
+                #    ticker_row = self.Quote( symbols )[symbols]
+                #    return ticker_row
                     
                     candles = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate).json()
@@ -506,7 +506,10 @@ class TradeAccount:
                             
                         if not('askReceipt' in trade ):
                             reconcile.update( self.Conn.Reconcile( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
-                    
+
+                        if 'askFilled' in reconcile and 'bidFilled' in reconcile:
+                            reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )
+                            
                     trade.update( reconcile )
                     self.Trades[symbol].append(  trade  ) 
             

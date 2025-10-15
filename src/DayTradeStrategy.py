@@ -379,7 +379,12 @@ class DayTradeStrategy:
                                     'Indicators'    : indicators,
                                     'Losses'        : 0
                              }
-                
+
+            # Update the indicators 
+            entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
+                       'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
+            self.Stocks[ symbol ]['Indicators'].Update( entry = entry)
+            
             #IF MORE THAN 2 LOSSES THEN DONT DO ANY MORE BUYING
             if ( not (symbol in account.InPlay) and   self.Stocks[symbol]['Losses'] > 1 ):
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO MANY LOSSES TO TRADE :   {self.Stocks[symbol]['Losses'] } " )
@@ -387,7 +392,7 @@ class DayTradeStrategy:
             
             # if volume is less than pre-determined threshold  there is no point in playing with it --  SHOULD THIS ONLY BE FOR THE BUYS / STOP FROM BUYING WHEN VOLUME IS TOO LOW ???
             if ticker_row[volumePos] < int(params['volume_threshold'])   and float(self.Stocks[ symbol]['Price']['Bought']) == 0  : 
-                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low  {ticker_row[volumePos] } " )
+                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> volume too low   {ticker_row[volumePos] } " )
                 return False, action, time_interval
             
 
@@ -397,16 +402,23 @@ class DayTradeStrategy:
             #       f"VOLUME : {float(ticker_row[volumePos])  -  float(self.Stocks[ symbol]['Volume']['Previous'] ) } --> {params['volume_change_ratio']} ")
 
             #account.SetLimit( limit )
-            upward_pressure        =  round( float(ticker_row[highPos])  - float(ticker_row[closePos]), 5)
-            downward_pressure      =  round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 5)
+            upward_pressure        =  round( float(ticker_row[highPos])  - float(ticker_row[closePos]), 3)
+            downward_pressure      =  round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 3)
             profit_trail_stop      =  round( self.ProfitTrailStop( symbol, risk_percent  ) , 5)
             strike_price_stop      =  round( self.StrikePriceStop( symbol, risk_percent  ) , 5)                
             current_to_previous    =  round(float(ticker_row[closePos]) / float(self.Stocks[ symbol ]['Price' ]['Previous'] ), 5)            
             crash_trail_stop       =  round(crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought']) ,5)
+
+
+            #HOW MANY CONSECUTIVE TIMES THE PRICE HAS RISENS
+            if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous']  and  ticker_row[closePos] > ticker_row[openPos]:
+                    self.Stocks[ symbol]['Price']['Occur']  += 1
+            else:
+                self.Stocks[ symbol]['Price']['Occur']  = 0
             
             #CRITERIA SWITCH 
-            potential_switch = False
-            criteria = False 
+            criteria            = False
+            potential_switch    = False 
             # TESTING BUYING INTO THE DIP IF HAVE UPWARD PRESSURE
             if potential_switch :
                 criteria = (   ( upward_pressure > downward_pressure ) and
@@ -439,9 +451,9 @@ class DayTradeStrategy:
                     self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
                     return False, action, time_interval
             
-                self.Stocks[ symbol]['Price']['Occur']  += 1
+                
                 if self.Stocks[symbol]['Price']['Occur']  < params["bounce_up_min"] :  # TWO consecutive upward moves with appropriate volume 
-                    print( f"\t\t\t  *  BUY [TERST SIGNAL ]:: Consecutive upward moves with volumes : {self.Stocks[ symbol]['Price']['Occur']} " )
+                    print( f"\t\t\t  *  BUY [TEST SIGNAL ]:: Consecutive upward moves with volumes : {self.Stocks[ symbol]['Price']['Occur']} " )
                     self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )
                     return False, action, time_interval
                 
@@ -449,9 +461,11 @@ class DayTradeStrategy:
                 print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ volumePos ]} from" +
                        f" newPrice - previous = ${round( round(float(ticker_row[ closePos ]),5) -  round(float(self.Stocks[ symbol]['Price']['Previous']), 5) , 5) } " +
                        f" Volume :  from { round( self.Stocks[ symbol]['Volume']['Previous'] , 5)  } ==> {volume_increase} " +
-                       f" PRESSURE :  upward : { round(upward_pressure,5)} ==>  downward :{ round(downward_pressure,5)} " ) 
-                if   upward_pressure > downward_pressure :
-                    print( f"\t\t\t\t  *  BUY:: Submitting a BUY" )
+                       f" PRESSURE :  upward : { round(upward_pressure,5)} ==>  downward :{ round(downward_pressure,5)} " +
+                       f" OCCUR : {self.Stocks[symbol]['Price']['Occur'] }  -> {params['bounce_up_min'] } " +
+                       f" BODY vs WICK : {(ticker_row[closePos] - ticker_row[openPos])} --> {(ticker_row[highPos] - ticker_row[closePos])} "    )  
+                if   (ticker_row[closePos] - ticker_row[openPos]) > (ticker_row[highPos] - ticker_row[closePos]) and upward_pressure > downward_pressure :
+                    print( f"\t\t\t\t  -  BUY:: ATTEMPTING to Submit a BUY" )
                     if ( account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                     volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators'])   ) :
@@ -528,12 +542,9 @@ class DayTradeStrategy:
                          action          = "closed"
                          self.Stocks[symbol]['Losses']    += 1
             
-            # Update the indicators for the next go round
-            entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
-                       'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
-            self.Stocks[ symbol ]['Indicators'].Update( entry = entry)
             
-            # holding and what happens when price moves but voume is level , increasing  or decreasing ?     
+            
+            # holding and what happens when price moves but volume is level , increasing  or decreasing ?     
 
 
             # UPDATE THE STOCK INFO WITH THE CURRENT PRICE / VOLUME

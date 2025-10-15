@@ -2,7 +2,7 @@
 ## ###################################################################################################################
 ##  Program :   Day Trade 
 ##  Author  :
-##  Install :   pip3 install requests  inspect platform argparse selenium webdriver-manager reportlab 
+##  Install :   pip3 install requests  inspect platform argparse selenium webdriver-manager reportlab pandas schwab-py matplotlib pymssql mysql-connector loguru
 ##  Example :
 ##              python3 day_trade.py --csv_config=files/config.csv --display_config 
 ##              python3 day_trade.py --api_key=XXXXXXXXXXXXXXX --action=download  --stock=QQQ --csv_output=../data --interval=15min --display_config
@@ -20,10 +20,11 @@ import argparse
 import functools
 import requests
 
-
+import socket
+import threading
 
 import pandas               as pd
-import  matplotlib.pyplot   as plt
+import matplotlib.pyplot    as plt
 
 
 from datetime           import datetime, timedelta, timezone 
@@ -41,8 +42,9 @@ from selenium.webdriver.support.ui      import WebDriverWait
 from selenium.webdriver.support         import expected_conditions as EC
 from selenium.common.exceptions         import TimeoutException, WebDriverException
 
-
-Strategies = DayTradeStrategy()
+Configs     = {'username':'Sean Burner'}
+DataLock    = threading.Lock()
+Strategies  = DayTradeStrategy()
 
 def download_stock_data( configs : dict  ) -> None :
     """
@@ -101,7 +103,7 @@ def read_csv( fileName : str) -> object :
     try:       
         if os.path.exists( fileName):
             try:
-                df = pd.read_csv( fileName, encoding = "ISO-8859-1" )
+                df = pd.read_csv( fileName,header=0,encoding = "ISO-8859-1",index_col=None )  #         
             except :
                 print('\t\t\t -> Problems reading into dataframe : ', fileName )
                 for entry in sys.exc_info():
@@ -153,7 +155,7 @@ def blank_config() -> dict:
                     } 
 
 
-def apply_csv_config ( configs : dict) -> dict:
+def apply_csv_config ( configs : dict ) -> dict:
     """
         IF THE USER PROVIDED A VALID CSV CONFIG FILE , APPLY THOSE SETTINGS AND THEN LATER APPLY OTHER COMMAND LINE ARGS
 
@@ -181,12 +183,15 @@ def apply_csv_config ( configs : dict) -> dict:
               
             
                 
-        return config_new
+        
     except:
         print("\t\t|EXCEPTION: MAIN::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )        
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) ) 
+    finally:
+        return config_new
 
+    
 def update_args_field ( argValue , defaultValue  ) -> {} :
     """
         Updates the fields from the argument list. This way  preserves any default values
@@ -422,12 +427,51 @@ def scrape_potential_stocks() -> None :
             
 from Indicators  import Indicators
 
+from MySQLConn          import MySQLConn
+
 def system_test( configs : dict  ) -> None :
     account         = None
     date_format     = "%Y-%m-%d %H:%M:%S"    
 
-    try: 
-        account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    try:
+        HEADER = "INSERT INTO orderIndicates( orderId,indicateId,bidValue,askValue ,active,createdBy,createdDate,modBy,modDate  ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s);"
+        CONTENTS= [[16, 1, 6.74611, 6.74611,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 2, 6.59036, 6.59036,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 3, 5.72571, 5.72571,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 4, 4.6244, 4.6244,      1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 5, 7.93102, 7.93102,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 6, 34.51633, 34.51633,  1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 9, 21.0, 21.0,          1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 10, 3.46, 3.46,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 11, 35.02, 35.02,       1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 12, 9.91, 9.91,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 14, 100.0, 100.0,       1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 15, 0.76352, 0.76352,   1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 31, 26.12571, 26.12571, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 32, 9.91, 9.91,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 33, 29.09404, 29.09404, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 34, 25.42798, 25.42798, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 35, 22.465, 22.465,     1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 36, 19.50202, 19.50202, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 37, 15.28354, 15.28354, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 38,35.02, 35.02,        1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 39, 3.46, 3.46,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 40, 16.86056, 16.86056, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 41, 14.29972, 14.29972, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 42, 12.23, 12.23,       1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 43, 10.16028, 10.16028, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 44, 7.21356, 7.21356,   1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
+                   [16, 45, 21.0, 21.0,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01']
+                   ]
+        Conn       = MySQLConn( )
+        Conn.Connect(server ='127.0.0.1', database='trading', username ='trader', passwd ='verified' )
+        Conn.WriteMany ( header=HEADER, contents =CONTENTS)
+        return 
+        while True :
+            print ( "-> going round in circles ")
+            time.sleep( 60 )
+                    
+        account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = Configs['app_key'], app_secret = Configs['app_secret'])
         print('> Account Orders ' )
 
         accountHash = account.Conn.Accounts[account.Conn.AccountID]['hashValue']
@@ -442,11 +486,11 @@ def system_test( configs : dict  ) -> None :
         print('Preferences: ', account.Conn.Preference )
 
         time_period = 200 + (.50 * 200 )
-        data = account.History( symbol=configs['stock'], time_period=time_period  ) 
+        data = account.History( symbol=Configs['stock'], time_period=time_period  ) 
         #print( data.columns)
-        indicators = Indicators( symbol=configs['stock'], data=data )    
+        indicators = Indicators( symbol=Configs['stock'], data=data )    
         print(f"Indicators : {indicators }")
-        ticker = account.Quote ( symbols= configs['stock'][0])[configs['stock'][0]]
+        ticker = account.Quote ( symbols=Configs['stock'][0])[Configs['stock'][0]]
         timePos = 1
         lowPos = 2 
         closePos = 3
@@ -475,59 +519,6 @@ def system_test( configs : dict  ) -> None :
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )   
 
-"""
-/trader/v1/userPreference 
-{
-    "requests":[
-        {
-            "requestid" :'1",
-            "service" : "ADMIN",
-            "command" :"LOGIN",
-            "SchwabClientCustomerId":"XXX",
-            "SchwabClientCorrelId" : "XXX",
-            "parameters":{
-                "Authorization" :"access-token ",
-                "SchwabClientChannel":"N9",
-                'SchwabClientFundtionId" :"APIAPP"
-                },
-            }
-        ]
-    }
-{
-    "requests":[
-        {            
-            "service" : "LEVELONE_EQUITIES",
-            "requestid" : 1, << incremented for each request
-            "command" :"ADD",  << unsub / view
-            "SchwabClientCustomerId":"XXX",
-            "SchwabClientCorrelId" : "XXX",
-            "parameters":{
-                "keys" :"AMD,INTC",
-                "fields" : '0,1,2,3,4,5,8"
-                },
-            }
-        ]
-    }
-"""
-
-"""
-def system_test1( configs : dict  ) -> None :
-
-    #account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
-   
-    client = easy_client(
-        api_key      = configs['app_key'],
-        app_secret   = configs['app_secret'],
-        callback_url ='https://127.0.0.1:8114',
-        token_path   ='/files/account_tokens.json',
-        interactive=False)
-    
-    stream_client = StreamClient(client, account_id=88867477, show_linked=False)
-
-    print ( stream_client.quote("AMD").json() )
-    
-    asyncio.run(read_stream( stream_client))
-"""
 
 
 def system_test_old( configs : dict ) -> None :
@@ -578,7 +569,7 @@ def send_data_to_file( configs : dict , data: dict   )   -> None :
     
     try:        
         for key in data.keys():
-            contents    = "SYMBOL, DATETIME, LOW ,QUOTE, HIGH ,CLOSE , VOLUME , INTERVAL"
+            contents    = "SYMBOL,DATETIME,LOW,QUOTE,HIGH,CLOSE,VOLUME,INTERVAL,MSG"
             for row in data[key]:
                 line = ""
                 for key2 in row.keys():
@@ -924,7 +915,7 @@ def  back_test( configs: dict  ) -> None :
             return
         
         data = read_csv( configs['input_data'] )        
-        data = data.sort_values( by=['DATETIME'], ascending=True)
+        data = data.sort_values( by=['DATETIME'], ascending=True)        
         print( '\t* About to back_test: ', account )
         Strategies.Set( configs['strategy'] , account)
         account.SetMode( "TEST")
@@ -933,9 +924,10 @@ def  back_test( configs: dict  ) -> None :
                 if not ( symbol in new_data ):
                     new_data[  symbol ]       = []
                     thorHammer [  symbol ]    = { 'high' : -1,'low':-1, 'close': -1,'volume': -1 }
-            
-                ticker_row = [f"{symbol}",f"{row['DATETIME']}",float(row['LOW']),float(row['QUOTE']),
-                                  float(row['CLOSE']),float(row['VOLUME']),float(row['HIGH']), row['MSG'] if 'MSG' in row else '']
+
+                
+                ticker_row = [f"{row['SYMBOL']}",f"{row['DATETIME']}",float(row['LOW']),float(row['CLOSE']),
+                                  float(row['QUOTE']),float(row['VOLUME']),float(row['HIGH']), row['MSG'] if 'MSG' in row else '']
                 print(f"\t\t\t->DATA : {ticker_row} " ) 
                 """  figure if this is useful at all
                 if ( row['open'] == row['low']) :
@@ -958,6 +950,9 @@ def  back_test( configs: dict  ) -> None :
 
         #RECONCILE WHAT WE LOGGED WITH HOW THE BROKERAGE EXECUTED OUR TRADES
         account.Reconcile()
+                
+        # SEND TRANSACTIONS TO SQL
+        #send_transactions_to_sql( configs, account.Trades  )
         
         # SEND EMAIL OF PERFORMANCE
         summary_report( configs, new_data, account )
@@ -1108,7 +1103,8 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         for inplay in account.InPlay:
             print( "\t -  " , inplay ) 
 
-        print( "* Account : " , account  , " : " , account.Funds , " : " , total_profit  , " : " , (total_profit/(account.Funds - total_profit))* 100 ,"%")
+        print( "* Account : " , account  , " : " , account.Funds , " : " ,
+                   total_profit  , " : " , round((total_profit/(account.Funds - total_profit))* 100,5) ,"%")
 
         header = ['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']
         row     = [] 
@@ -1153,42 +1149,93 @@ def business_logic_test(current_time :str = "2025-08-16 15:27:35",  time_interva
 
 
 
+def server_interface(   ) -> None :
+    """
+        Function that allows client to connect with this server 
+    """    
+    HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+    PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
+    global  Configs
+    try:
+        print( "Inside the interface ", type(Configs) , " : " , Configs)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((HOST, PORT))
+            s.listen()
+            while True:
+                conn, addr = s.accept()
+                with conn:
+                    print(f"[INTERFACE] Connected by {addr}")
+                    with DataLock :
+                        while True:
+                            data = conn.recv(1024)
+                            print(f"[INTERFACE] Received : {data}")
+                            if not data:
+                                print("[INTERFACE] Empty Data ")
+                                #break
+                            else: #if  data == b'username':
+                                data = f"{Configs[data.decode() ]}".encode("utf-8")                                
+                                print( f"[INTERFACE] Trying to send : { data } " )
+                            
+                            conn.sendall(data)
+    except:
+        print("\t\t|EXCEPTION: MAIN::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+    finally:
+        print('[INTERFACE] finished')
+
+
+
+    
+
+
+
+
+        
+
             
 def main() -> None :
     """
         main logic of application 
-    """   
-    configs         = None
+    """       
     #required_fields = ['url','doi','project-title_01','award-number']
     
     try:
         # GET THE CONFIGURATION - EITHER DEFAULTS OR COMMAND LINE GIVEN        
-        configs = parse_arguments()       
+        Configs = parse_arguments()       
+
 
         #IF CSV_CONFIG  USE THIS FIRST, THEN COMMAND LINE ARGS
         print( '\t * Checking csv_config ' )
-        if configs['csv_config'] != ''  :
-            configs = apply_csv_config ( configs)
+        if Configs['csv_config'] != ''  :
+            Configs = apply_csv_config ( Configs)
         
             
         # IF THE USER NEEDS TO KNOW WHICH FIELDS TO INCLUDE
-        if configs['csv_input_fields'] :
+        if Configs['csv_input_fields'] :
             print( '\t * Display csv input fields ' )
             display_csv_input_fields()
 
             
         # DISPLAY THE AVAILABLE STRATEGIES 
         # IN THE CLASS NEEDS TO HAVE AN EXPLANATION ABOUT EACH STRATEGY 
-        if configs['list_strategies'] :
+        if Configs['list_strategies'] :
             print( '\t * List strategies' )
             display_strategies() 
 
         # DISPLAY THE CONFIG IF SELECTED
-        if configs['display_config'] :
+        if Configs['display_config'] :
             print( '\t * Display config ' )
-            display_config(  configs)      
+            display_config(  Configs)      
 
 
+        #launch the interface
+        #th_interface = threading.Thread( target=server_interface , args=() )
+
+        #th_interface.start()
+        #th_interface.join()
+
+        
 
         # ACTION == DOWNLOAD / BACK_TEST / TRADE
         hub = {
@@ -1200,7 +1247,7 @@ def main() -> None :
                 'replay_test'   : replay_test
             }
 
-        hub[ configs ['action'] ] ( configs  ) 
+        hub[ Configs ['action'] ] ( Configs  ) 
         
               
         return 

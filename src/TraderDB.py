@@ -76,7 +76,7 @@ class TraderDB:
                 userId = self.Conn.Results[0][0]
                 
         except:      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )     
         finally:
@@ -136,7 +136,7 @@ class TraderDB:
             else:
                 userId = self.Conn.Results[0][0]
         except :      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print(f"\t\tQUERY: {query}")
@@ -175,7 +175,7 @@ class TraderDB:
             else:
                 dateId = self.Conn.Results[0][0]
         except:      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
 
@@ -194,15 +194,15 @@ class TraderDB:
                         stockId ( int ) - stockId from table 
         """
         query       = (f"select stockId from stocks where " +
-                         ( "stock = '{self.Sanitize(stock)}'  or symbol ='{self.Sanitize(stock)}' or  " if stock != '' and stock != None else '' ) +
-                        "  symbol ='{self.Sanitize(symbol).upper()}';" )
+                         ( f"stock = '{self.Sanitize(stock)}'  or symbol ='{self.Sanitize(stock)}' or  " if stock != '' and stock != None else '' ) +
+                        f"  symbol ='{self.Sanitize(symbol).upper()}';" )
         stockId     = None
 
         try:            
             self.Conn.Send( query )
         
             if self.Conn.Results == [] :
-                query =f"INSERT INTO stocks( stock, symbol, description,sector {self.InsertMetaFields( 0) }  ) values  ("                        
+                query =  f"INSERT INTO stocks( stock, symbol, description,sector {self.InsertMetaFields( 0) }  ) values  ("                        
                 query += f"'{self.Sanitize(stock)}','{self.Sanitize(symbol).upper()}','{self.Sanitize(description)}','{self.Sanitize(sector)}' {self.InsertMetaFields( 1) } ); "
             
                 stockId  = self.Conn.Write( query)            
@@ -210,7 +210,7 @@ class TraderDB:
                 stockId = self.Conn.Results[0][0]
                 
         except:      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print( f"\t\tQUERY:{query}")
@@ -278,12 +278,12 @@ class TraderDB:
         
         try:
             for ind in indicatorsId.keys() :
-                contents.append( [orderId, indicatorsId[ind],indicators_in[ind],indicators_out[ind] ,*self.InsertMetaFields(2) ] )
+                contents.append( [orderId, indicatorsId[ind],f"'{round(indicators_in[ind],5) }'", f"'{round( indicators_out[ind],5) }'" ,*self.InsertMetaFields(2) ] )
             if contents != [] :
                 self.Conn.WriteMany( header=header, contents =contents)
             
         except:
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print( f"\t\tQUERY:{query}")
@@ -302,6 +302,7 @@ class TraderDB:
         header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,bidVolume,askVolume," +
                             f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL {self.InsertMetaFields(0) } ) values " )
                             #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
+        query           = ""
         numRec          = 0
         dupeNum         = 0
         contents        = []
@@ -312,9 +313,15 @@ class TraderDB:
         initDateId      = None
         closeDateId     = None
         indicatorsId    = {}
+        
         try:
             print("\t\t * Inserting Order book ")
             print("\t\t   -> user : ", email , " : " ,username)
+
+            if len( orderbook) == 0 :
+                print ("\t\t   -> No orders to save to database, skipping ")
+                return  success
+            
             self.CheckDB()            
             indicatorsId = self.GetIndicators( indicators = orderbook[ list(orderbook.keys())[0]][0]['indicators_in'] )
             
@@ -333,7 +340,7 @@ class TraderDB:
                         query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
                                     f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
                                      f"'{order['bidFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
-                                     f"'{((order['askFilled'] - order['bidFilled'] ) * order['qty'])}' {self.InsertMetaFields(1)} );"  )                        
+                                     f"'{order['actualPL']}' {self.InsertMetaFields(1)} );"  )                        
                         
                         orderId  =  self.Conn.Write( query )
                         if orderId != None :
@@ -346,7 +353,7 @@ class TraderDB:
             print (f"\t\t\t -> Inserted {numRec} entries, while ignoring {dupeNum} duplicates in orderbook" )
             
         except:      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print( f"\t\tQUERY:{query}")
@@ -372,7 +379,7 @@ class TraderDB:
                 self.CreateTables()
             
         except:      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )     
 
@@ -384,14 +391,14 @@ class TraderDB:
             Staging Area to design schema 
         """
         
-        verifyUser = (" DELIMITER // " +
+        verifyUser = (#" DELIMITER // " +
                    "CREATE PROCEDURE verifyUser( IN user_name varchar (20), IN pass_word varchar(30), OUT userId  int  ) " +  
                     " BEGIN  " +
                     "    select userId FROM  users  where username=user_name and pwd_hash = SHA2(pass_word, 256) ; " +                    
                     " end // " +
                     " DELIMITER;  ")
         
-        indicators = ("DELIMITER // "+
+        indicators = (#"DELIMITER // "+
                     " CREATE PROCEDURE createTableIndicators( )  " +
                     " BEGIN  " +
                     " create table if not exists  indicators ( indId int auto_increment PRIMARY KEY not null, " +
@@ -401,22 +408,22 @@ class TraderDB:
                       "('SMA9','Simple Moving Average: 9 day',1,'trader',now(),'trader',now() ), ('SMA14','Simple Moving Average:14 day',1,'trader',now(),'trader',now() ) , " +
                       "('SMA21','Simple Moving Average: 21 day',1,'trader',now(),'trader',now() ), ('SMA50','Simple Moving Average:50 day',1,'trader',now(),'trader',now() ) , " +
                       "('SMA200','Simple Moving Average:200 day',1,'trader',now(),'trader',now() ), ('VWAP','Volume Weighted Price',1,'trader',now(),'trader',now() ) , " +
-                      "('SMA','Simple Moving Average:for the day',1,'trader',now(),'trader',now() ), ('FIB','Fibonacci Retracement: All Time',1,'trader',now(),'trader',now() ) , " +
+                      #"('SMA','Simple Moving Average:for the day',1,'trader',now(),'trader',now() ), ('FIB','Fibonacci Retracement: All Time',1,'trader',now(),'trader',now() ) , " +
                       "('ATH','All Time High: 200 days',1,'trader',now(),'trader',now() ), ('ATL','All Time Low: 200 days',1,'trader',now(),'trader',now() ) , " +
-                      "('HIGH','Daily High',1,'trader',now(),'trader',now() ), ('LOW','Daily Low',1,'trader',now(),'trader',now() ) , ('dFib','Fibonacci Retracement: daily data',1,'trader',now(),'trader',now() ) , " +
+                      "('HIGH','Daily High',1,'trader',now(),'trader',now() ), ('LOW','Daily Low',1,'trader',now(),'trader',now() ) , " + #('dFib','Fibonacci Retracement: daily data',1,'trader',now(),'trader',now() ) , " +
                       "('RSI','Relative Strength Index',1,'trader',now(),'trader',now() ), ('VolIndex','Volatility Index',1,'trader',now(),'trader',now() ) ; " +
                     "end // " +
                     "DELIMITER; " )
-        users   = ("DELIMITER // "+
+        users   = (#"DELIMITER // "+
                     " CREATE PROCEDURE createTableUsers(   )  " +
                     " BEGIN  " +
                     " create table if not exists  users ( userId int auto_increment PRIMARY KEY not null, " +
-                       " firstName varchar(20) , lastName  varchar(20),username varchar(20)  NOT NULL, passwd varchar(20) not null, pwd_hash varchar(256) , email varchar(30) , " +
+                       " firstName varchar(20) , lastName  varchar(20),username varchar(20)  NOT NULL, passwd varchar(20) , pwd_hash varchar(256) , email varchar(30) , " +
                        "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
                     " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
                     "end // " +
                     "DELIMITER; " )
-        dates   = (" DELIMITER // " +
+        dates   = (#" DELIMITER // " +
                    "CREATE PROCEDURE createTableDates(  ) " +  
                     " BEGIN  " +
                     "    create table if not exists  dates  ( dateId int auto_increment PRIMARY KEY not null, " +
@@ -425,7 +432,7 @@ class TraderDB:
                     " end // " +
                     " DELIMITER;  ")
                     
-        stocks  = ("DELIMITER //  " +
+        stocks  = (#"DELIMITER //  " +
                    " CREATE PROCEDURE createTableStocks( )  " +
                     " BEGIN  " +
                     " create table if not exists  stocks ( stockId int auto_increment PRIMARY KEY not null, " +
@@ -435,11 +442,11 @@ class TraderDB:
                     "DELIMITER; ")
 
 
-        orderbook = ("DELIMITER // "+
+        orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderBook(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null,  stockId int not null, " +
-                                "type int not null,bid decimal(10,4) not null , qty  int not null , volume_in int ,  closed  int not null,ask  decimal(10,4), volume_out int, p_l decimal(10,4) , " +
+                                "type int not null,bid decimal(10,4) not null , qty  int not null , bidVolume int ,  closed  int not null,ask  decimal(10,4), askVolume int, p_l decimal(10,4) , " +
                                  "bidReceipt bigint(25) , bidFilled decimal(10,4),  askReceipt bigint(20) , askFilled decimal(10,4), actualPL decimal(10,4), " +                    
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
@@ -448,7 +455,7 @@ class TraderDB:
                                 "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
-        orderIndicates = ("DELIMITER // "+
+        orderIndicates = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderIndicates(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, " +
@@ -459,7 +466,7 @@ class TraderDB:
                         "     END //  "+
                         "     DELIMITER ;  ")
         # NOT SURE A SEPARATE TABLE IS NEEDED FOR THIS 
-        orderOptions = ("DELIMITER // "+
+        orderOptions = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderOptions(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderOptions( orderOptionid int auto_increment PRIMARY KEY not null, orderId int not null, strike  decimal(10,4),  " +
@@ -469,20 +476,21 @@ class TraderDB:
                                 "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
-        v_orderbook = ("DELIMITER // "+
+        v_orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE if not exists createTable_vOrderBook(   )   " +
                         " BEGIN  "+
                         "     create view v_orderbook  as" +
                         "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , " +
-                        "          o.askVolume, o.p_l " + #, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "          o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL " + #, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
                         "     from orderbook o " +
                         "     inner join dates d on o.initiated =d.dateid "+
                         "     inner join dates d2 on o.closed = d2.dateid  "+
                         "     inner join stocks s on o.stockid =s.stockid  "+
-                        "     inner join users u on o.userid=u.userid; "+
+                        "     inner join users u on o.userid=u.userid "+
+                        "     where o.active = 1; " +
                         "     END //  "+
                         "     DELIMITER ;  ")        
-        p_createTables = ("DELIMITER // "+
+        p_createTables = (#"DELIMITER // "+
                             " CREATE PROCEDURE createAllTables( )  " +
                             " BEGIN " +
                             " call createTableIndicators(); " +
@@ -503,9 +511,11 @@ class TraderDB:
             self.Conn.Write( "call createAllTables(); " )
             
         except:      
-            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )  
+                print("\t\t |   " + str(entry) )
+
+
         """
             SELECT 
     ROUTINE_NAME, 

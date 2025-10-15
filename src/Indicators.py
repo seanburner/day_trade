@@ -72,7 +72,8 @@ class Indicators :
         """
         fibs = ['dFib','Fib']
         summary = self.SMA
-        summary |= {'HIGH': self.High, 'LOW':self.Low, 'VWAP':self.VWAP, 'RSI':self.RSI, 'VolIndex' : self.VolIndex, 'dSMA' : self.dSMA}
+        summary |= {'HIGH': self.High, 'LOW':self.Low, 'VWAP':self.VWAP, 'RSI':self.RSI,
+                    'VolIndex' : self.VolIndex, 'dSMA' : self.dSMA ,'ATH': self.ATH, 'ATL':self.ATL}
         for pos,fib in enumerate( [self.dFib, self.Fib]):
             for key in fib.keys():
                 summary.update( {  fibs[pos]+"_"+key : fib[key] } ) 
