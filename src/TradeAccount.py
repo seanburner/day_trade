@@ -107,11 +107,15 @@ class TradeAccount:
 
     def History( self, symbol : str , time_period : int ) -> dict :
         """
-            Get historical entries for the symbol 
+            Get historical entries for the symbol
+            ARGS  :
+                    symbol       ( str )  stock symbol to lookup
+                    time_period  ( int )  number of time intervals to go back looking  
+            RETURNS:
         """
         df              = None 
-        timeStamp       = 0
         endDate         = datetime.now()- timedelta( days = 1 )  # time delta for when working on weekend 
+        timeStamp       = 0
         startDate       = None        
         quote_info      = None
         ticker_row      = None 
@@ -120,10 +124,11 @@ class TradeAccount:
         
         
         try:
-            periodType      = 'month' #'day'
             period          = 1
-            frequencyType   = "daily"
             frequency       = 1
+            periodType      = 'month' #'day'
+            frequencyType   = "daily"
+            
             startDate       = endDate - timedelta( days = frequency * time_period ) 
 
             
@@ -134,7 +139,7 @@ class TradeAccount:
                 return ticker_row
 
             
-            #print( "response : ", response.text)
+            #print( "TradeAccount::HISTORY  response : ", response.text)
             df = pd.DataFrame( response.json()['candles'])
             df.sort_values( by=['datetime'], ascending=False , inplace=True)
             df['date'] = df['datetime'].apply( lambda x : str(datetime.fromtimestamp( x/1000))[:10] )

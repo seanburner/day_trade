@@ -494,13 +494,14 @@ class SchwabAccount :
                 with open( ACCNT_TOKENS_FILE, 'rb') as file :
                     self.Tokens = pickle.load(  file )
             else:
+                print( f"\t\t\t\t  -> Token file missing : {ACCNT_TOKENS_FILE} ")
                 self.Tokens = BLANK_TOKENS
 
             
             # BACKUP JSON FILE
-            theseTokens = self.Tokens | {'expires_at' : None , 'refresh_expires_at' : None }
-            with open( '../files/account_tokens.json', 'w') as file :
-                json.dump( theseTokens, file )
+            #theseTokens = self.Tokens | {'expires_at' : None , 'refresh_expires_at' : None }
+            #with open( '../files/account_tokens.json', 'w') as file :
+            #    json.dump( theseTokens, file )
 
                 
         except:

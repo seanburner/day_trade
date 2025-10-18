@@ -32,7 +32,7 @@ from PDFReport          import PDFReport
 from TraderDB           import TraderDB
 from TradeAccount       import TradeAccount
 from DayTradeStrategy   import DayTradeStrategy
-
+from OptionsTrade       import OptionsTrade
 
 from selenium                           import webdriver
 from selenium.webdriver.chrome.service  import Service as ChromeService
@@ -434,39 +434,6 @@ def system_test( configs : dict  ) -> None :
     date_format     = "%Y-%m-%d %H:%M:%S"    
 
     try:
-        HEADER = "INSERT INTO orderIndicates( orderId,indicateId,bidValue,askValue ,active,createdBy,createdDate,modBy,modDate  ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s);"
-        CONTENTS= [[16, 1, 6.74611, 6.74611,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 2, 6.59036, 6.59036,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 3, 5.72571, 5.72571,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 4, 4.6244, 4.6244,      1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 5, 7.93102, 7.93102,    1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 6, 34.51633, 34.51633,  1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 9, 21.0, 21.0,          1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 10, 3.46, 3.46,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 11, 35.02, 35.02,       1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 12, 9.91, 9.91,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 14, 100.0, 100.0,       1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 15, 0.76352, 0.76352,   1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 31, 26.12571, 26.12571, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 32, 9.91, 9.91,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 33, 29.09404, 29.09404, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 34, 25.42798, 25.42798, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 35, 22.465, 22.465,     1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 36, 19.50202, 19.50202, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 37, 15.28354, 15.28354, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 38,35.02, 35.02,        1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 39, 3.46, 3.46,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 40, 16.86056, 16.86056, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 41, 14.29972, 14.29972, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 42, 12.23, 12.23,       1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 43, 10.16028, 10.16028, 1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 44, 7.21356, 7.21356,   1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01'],
-                   [16, 45, 21.0, 21.0,         1, 'sean', '2025-10-14 15:55:01','sean', '2025-10-14 15:55:01']
-                   ]
-        Conn       = MySQLConn( )
-        Conn.Connect(server ='127.0.0.1', database='trading', username ='trader', passwd ='verified' )
-        Conn.WriteMany ( header=HEADER, contents =CONTENTS)
-        return 
         while True :
             print ( "-> going round in circles ")
             time.sleep( 60 )
@@ -626,6 +593,25 @@ def calculate_new_poll_time( current_time : datetime = datetime.now(), time_inte
 
 
 
+
+
+def options_trading ( configs : dict  ) -> None :
+    """
+        Interface to allow options ( CA::/PUTS) trading
+        ARGS    :
+                    configs     :  dictionary of configuration info                   
+        RETURNS    :
+                    Nothing
+    """
+    optionsDlg = OptionsTrade()
+
+    optionsDlg.Run( width=1100, height=500)
+
+
+
+
+
+
 def  live_trade( configs : dict  ) -> None :
     """
         Trade live on the trading platform ( buys and sells ) - Set params to move to the next level
@@ -638,6 +624,7 @@ def  live_trade( configs : dict  ) -> None :
     trade_center( configs , params  )
 
 
+
     
 def  live_test ( configs : dict  ) -> None :
     """
@@ -645,15 +632,14 @@ def  live_test ( configs : dict  ) -> None :
         Provide  charts for confirmation
         1. pull quotes 
         2. 
-        PARAMETERS :                    
+        ARGS   :   
                     configs     :  dictionary of configuration info                   
-        RETURNS    :
+        RETURNS:
                     Nothing 
     """
     params  = { 'mode' : 'TEST','time_interval' : 900 , 'account_funds' : 5000 , 'funds_ratio' : 0.50}
 
     trade_center( configs , params  )
-
 
 
     
@@ -668,8 +654,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     """    
     msg             = ""
     cont            = True
-    data            = {}
-    isFirst         = True #  First quote of the session should use Quote() not QuoteByInterval()
+    data            = {}    
     account         = None
     success         = False
     date_format     = "%Y-%m-%d %H:%M:%S"  
@@ -713,12 +698,9 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                 symbols         = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                 bought_action   = False 
                 for symbol in symbols:
-                    print(f"\t\t + {symbol}  @ { current_time } " ) 
-                    if isFirst :
-                        ticker_row = account.Quote ( symbols= symbol)[symbol]
-                        isFirst = False 
-                    else:
-                       ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
+                    print(f"\t\t + {symbol}  @ { current_time } " )                    
+                    ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
+                    
                     if ticker_row != None:                    
                         print(f"\t\t\tTICKER_ROW :{ticker_row}")                
                         success , msg , time_interval = Strategies.Run(  ticker_row,  account, configs )
@@ -733,15 +715,14 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                             bought_action |= False          #KEEP TRACK IF NEED TO CHANGE THE INTERVAL BECAUSE BOUGHT ONE OF THE SYMBOLS 
                             print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )
                 # If TargetGoal == 0 then sleep for 30 minutes and readjust DailyFunds, TargetGoal  and Limit
-                """
                 if account.TargetGoal == 0 :
                     account.SetFunds( params['account_funds'] - (params['account_funds'] * 0.10), params['funds_ratio'] - 0.10 )  #5000.00, 0.50 )
                     account.SetTargetGoal( target = 0.5  ) # Target making 50% of our funds ( SetFunds) before auto quitting 
-                    current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , 1800)  # 30 min cool down period 
+                    current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , 1800)  # 30 ( or 15 ? ) min  cool down period 
                 else:
                     current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                 
-                """
-                current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                 
+                
+                #current_time_temp   , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                 
                 print(f"\t\t | Sleeping from : {sleep_interval} - { datetime.now() }",  )
                 time.sleep( sleep_interval )
                 print(f"\t\t \\--> AWAKE  : {time_interval} - { datetime.now() } -> {sleep_interval}",  )                
@@ -800,7 +781,7 @@ def  replay_test( configs: dict  ) -> None :
     
     account.SetFunds( 5000.00, 0.50 )
     try:        
-        print( '\t* About to live test: ', account )
+        print( '\t* About to Replay test: ', account )
         Strategies.Set( configs['strategy'] , account)        
         account.SetMode( "TEST")
         for stock in ( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
@@ -814,8 +795,10 @@ def  replay_test( configs: dict  ) -> None :
             #print("\t\t\t\t + Current Time : " , current_time ) 
             if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
                 cont = False
-                print("\t\t\t\t -> Outside of market hours ")  
-            elif ( current_time.hour == 15 and (current_time.minute   +  (time_interval / 60 )) >= 55)   :               ## Sell whatever is InPlay
+                print("\t\t\t\t -> Outside of market hours ")
+            elif (current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
+                Strategies.SetORB(configs['stock'], account, current_time)    
+            elif ( current_time.hour == 15 and (current_time.minute   +  (time_interval / 60 )) >= 55)   :      # Sell whatever is InPlay
                 print("\t\t\t > Market closing ; shifting InPlay -> Trades" )
                 if  account.InPlay != {} :
                     symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
@@ -857,7 +840,7 @@ def  replay_test( configs: dict  ) -> None :
                     current_time   , sleep_interval   = calculate_new_poll_time( current_time , 1800) #30 min break
                 else:
                 """
-                current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
+            current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
                         
                 #else:
                 #    cont = False
@@ -1093,9 +1076,9 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         contents        = ""
         total_profit    = 0
         print(f"\t {symbol} ORDERBOOK")
-        print(f"\t   === BID=== \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
+        print(f"\t    == OPENED ==\t=== BID=== \t== CLOSED == \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
-            print(f"\t   ${entry['bid'] :.4f}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry['actualPL']:.4f}" )            
+            print(f"\t   {entry['bidTime'] }\t${entry['bid'] :.4f}\t\t{entry['askTime'][11:]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry['actualPL']:.4f}" )            
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
@@ -1239,6 +1222,7 @@ def main() -> None :
 
         # ACTION == DOWNLOAD / BACK_TEST / TRADE
         hub = {
+                'options'       : options_trading,
                 'download'      : download_stock_data,
                 'back_test'     : back_test,
                 'test'          : system_test,

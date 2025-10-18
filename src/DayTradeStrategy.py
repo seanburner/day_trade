@@ -24,6 +24,7 @@ import requests
 
 from datetime       import datetime
 from Indicators     import Indicators
+from TradeAccount   import TradeAccount
 
 
 Date_Format     = "%Y-%m-%d %H:%M:%S"
@@ -93,14 +94,64 @@ class DayTradeStrategy:
         return True
 
 
+    def SetORB ( self , symbols : str ,account : TradeAccount, current_time : datetime ) -> None :
+        """
+            Gets the high/low from the previous day and gets the high/low from current day's opening
+            NOTE L Includes a waiting loop if before 10am 
+            ARGS  :
+                    symbol       ( str )               stock symbol(s)
+                    account      ( TradeAccount )      trading account
+                    current_time ( datetime.datetime)  current time of running
+            RETURNS:
+                    nothing 
+        """        
+        ticker_df       = None
+        ticer_row       = None
+        date_format     = "%Y-%m-%d %H:%M:%S"
+
+        try:
+            if ( current_time.hour < 10  and current_time.minute < 59 ) :  # Pause until 10
+                time_to_sleep = (( 10 - current_time.hour) * 60) - ( 60 - current_time.minute )
+                if time_to_sleep > 0 :
+                    if account.Mode.upper() == 'TEST' :
+                        print ( f" From {current_time} -> 10am - sleep { time_to_sleep }   HOURS: {((current_time.hour - 10) * 60)}  MINUTE : {( 60 - current_time.minute )}")
+                    else:
+                        time.sleep( time_to_sleep )
+                    
+
+            symbols = [ symbols ] if isinstance( symbols, str) else symbols
+            for symbol in symbols:            
+                data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFO FOR SYMBOL 
+                indicators = Indicators ( symbol= symbol, data= data )                 # CALCULATE THE INDICATORS
+                # Previous Day's High/Low
+                ticker_df   = account.History( "SPY", 1)
+                
+                today_date = ticker_df[ :-1]['date'].to_string(index=False)                
+                current_time = datetime.strptime( f"{today_date} 10:00:00", date_format) 
+                ticker_row   = account.QuoteByInterval ( symbols= "SPY",  frequency= 60*30, endDate = current_time)                
+                self.Stocks[ symbol ]  = {                        
+                                    'Price'         : {'Previous': ticker_row[ 4 ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ 4 ], 'Occur' : 0 },
+                                    'Volume'        : {'Previous': ticker_row[ 5], 'Slope' : 1 , 'Bought' : 0},
+                                    'Indicators'    : indicators,
+                                    "PrevDayHigh"   : ticker_df[ :-1]['high'].to_string(index=False),
+                                    "PrevDayLow"    : ticker_df[ :-1]['low'].to_string(index=False),
+                                    "ORB_L"         : ticker_row[2] if ticker_row else 0,
+                                    "ORB_H"         : ticker_row[6] if ticker_row else 0,
+                                    'Losses'        : 0
+                             }
+                
+        except:
+            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
             
-    def Run( self,  ticker_row : list, account : object, configs : dict  ) -> bool :
+    def Run( self,  ticker_row : list, account : TradeAccount, configs : dict  ) -> bool :
         """
             Switching station to control which strategy gets used
             ARGS  :
-                    ticker_row : list of fields for stock quote
-                    account    : initiated account object
-                    configs    : dictionary of configurations 
+                    ticker_row  ( list )         list of fields for stock quote
+                    account     ( TradeAccount)  initiated account object
+                    configs      ( dictionary )  configurations 
             RETURNS:
                     success : True/False
         """
@@ -169,7 +220,8 @@ class DayTradeStrategy:
                    "closePos"               : 3,        # THE CLOSE PRICE LOCATION INTHE TICKER ROW
                    "openPos"                : 4 ,       # Opening Price 
                    "highPos"                : 6,        # THE HIGH PRICE LOCATION INTHE TICKER ROW
-                   "volumePos"              : 5 ,       # VOLUME POSITION  IN TICKER 
+                   "volumePos"              : 5 ,       # VOLUME POSITION  IN TICKER
+                   "numOfLosses"            : 2 ,       # Number of losses to tolerate before stop trading 
                    "risk_percent"           : 0.0015,   # Useful when price starts to fall and need to know when to bail 
                    "time_interval"          : 60,       # Standard Time interval to use
                    "time_interval_bought"   : 60,       # After buying do we need to change time_interval 
@@ -195,6 +247,7 @@ class DayTradeStrategy:
                         bool: True/False - in case something breaks or could not complete    
         """
         params = self.BaseParams()
+        params["numOfLosses"]           = 2 
         params['time_interval']         = 900
         params['time_interval_bought']  = 900
         params['volume_threshold']      = configs['volume_threshold']
@@ -215,6 +268,7 @@ class DayTradeStrategy:
                         bool: True/False - in case something breaks or could not complete                                    
         """
         params = self.BaseParams()
+        params["numOfLosses"]           = 2 
         params['time_interval']         = 60
         params['time_interval_bought']  = 60
         params['volume_threshold']      = configs['volume_threshold']
@@ -236,6 +290,7 @@ class DayTradeStrategy:
                         bool: True/False - in case something breaks or could not complete                         
         """
         params = self.BaseParams()
+        params["numOfLosses"]           = 2 
         params['time_interval']         = 300
         params['time_interval_bought']  = 300
         params['volume_threshold']      = configs['volume_threshold']
@@ -259,7 +314,7 @@ class DayTradeStrategy:
                         bool: True/False - in case something breaks or could not complete                         
         """
         params = self.BaseParams()
-        
+        params["numOfLosses"]               = 2 
         params['time_interval']             = 600
         params['time_interval_bought']      = 600
         params['crash_out_percent']         = 0.85 
@@ -281,7 +336,7 @@ class DayTradeStrategy:
                         bool: True/False - in case something breaks or could not complete                         
         """
         params = self.BaseParams()
-        
+        params["numOfLosses"]               = 2 
         params['time_interval']             = 900
         params['time_interval_bought']      = 900
         params['crash_out_percent']         = 0.85 
@@ -306,6 +361,7 @@ class DayTradeStrategy:
                         bool: True/False - in case something breaks or could not complete                         
         """
         params = self.BaseParams()
+        params["numOfLosses"]           = 2 
         params['time_interval']         = 300
         params['time_interval_bought']  = 60
         params['volume_threshold']      = configs['volume_threshold']
@@ -361,6 +417,7 @@ class DayTradeStrategy:
         risk_percent        = params['risk_percent']
         time_interval       = params['time_interval']
         crash_out_percent   = params['crash_out_percent']      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
+        max_num_of_losses   = params["numOfLosses"]
         
         try :
             # NO BUYING AFTER 3:45
@@ -369,9 +426,9 @@ class DayTradeStrategy:
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
                 return 
             
-            # ADD STOCK ENTRY IF NOT INPLAY
+            # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY 
             if not ( symbol in self.Stocks.keys() ) :
-                data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFOR FOR SYMBOL 
+                data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFO FOR SYMBOL 
                 indicators = Indicators ( symbol= symbol, data= data )                 # CALCULATE THE INDICATORS 
                 self.Stocks[ symbol ]  = {                        
                                     'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
@@ -385,8 +442,8 @@ class DayTradeStrategy:
                        'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
             self.Stocks[ symbol ]['Indicators'].Update( entry = entry)
             
-            #IF MORE THAN 2 LOSSES THEN DONT DO ANY MORE BUYING
-            if ( not (symbol in account.InPlay) and   self.Stocks[symbol]['Losses'] > 1 ):
+            #IF MORE THAN 3 LOSSES THEN DONT DO ANY MORE BUYING - NEED TO ADD TO PARAMS 
+            if ( not (symbol in account.InPlay) and   self.Stocks[symbol]['Losses'] > max_num_of_losses ):
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO MANY LOSSES TO TRADE :   {self.Stocks[symbol]['Losses'] } " )
                 return False, action, time_interval
             
@@ -409,6 +466,12 @@ class DayTradeStrategy:
             current_to_previous    =  round(float(ticker_row[closePos]) / float(self.Stocks[ symbol ]['Price' ]['Previous'] ), 5)            
             crash_trail_stop       =  round(crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought']) ,5)
 
+
+            upward_pressure     =  0.001 if upward_pressure == 0 else upward_pressure
+            downward_pressure   =  0.001 if downward_pressure == 0 else downward_pressure
+
+
+            # INTEGRATE THE ORB VALUES  SOME HOW 
 
             #HOW MANY CONSECUTIVE TIMES THE PRICE HAS RISENS
             if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous']  and  ticker_row[closePos] > ticker_row[openPos]:
@@ -482,7 +545,8 @@ class DayTradeStrategy:
                 print( f"CURRENT : { round(ticker_row [closePos], 5)}   " +
                        f"BOUGHT AT : { round(self.Stocks[ symbol]['Price']['Bought'],5)}  " +
                        f"PREVIOUS AT: {round(self.Stocks[ symbol]['Price']['Previous'] ,5)}  " +
-                       f"OPEN: {round(ticker_row[openPos],5)}   CLOSE :{ round(ticker_row[closePos],5)} ")
+                       f"OPEN: {round(ticker_row[openPos],5)}   CLOSE :{ round(ticker_row[closePos],5)} " +
+                       f" PRESSURE: {upward_pressure} -> {downward_pressure} %{upward_pressure /downward_pressure}  " )
 
 
             #SELL : In profit territory 
