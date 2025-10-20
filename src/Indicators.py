@@ -27,27 +27,30 @@ from datetime       import  datetime
 
 
 class Indicators :
-    def __init__( self, symbol : str , data : dict  ) -> None :
+    def __init__( self, symbol : str , data : dict , seed_df : pd.DataFrame  ) -> None :
         """
             INITIALIZE THE VARIABLES TO WORK WITH THIS CLASS 
             ARGS   :
                         symbol  ( str )    - stock symbol 
-                        data  (Dataframe ) - historical entries for the selected stock symbol 
+                        data    (Dataframe ) - historical entries for the selected stock symbol 
+                        seed_df ( DataFrame) - Open Range Entries - quotes from the first 30 minutes of market open 
             RETURNS:
                         nothing 
         """
-        self.Symbol     = symbol
         self.SMA        = 0
-        self.dSMA       = {}
         self.ATH        = 0
         self.ATL        = 0
         self.Fib        = {}
-        self.dFib       = {}
         self.RSI        = 0
-        self.VolIndex   = 0
+        self.dSMA       = {}
         self.VWAP       = 0
+        self.dFib       = {}
+        self.Symbol     = symbol
+        self.BB_Lower   = 0
+        self.BB_Upper   = 0
+        self.VolIndex   = 0
         
-        self.Set( data )
+        self.Set( data, seed_df )
         
 
                                
@@ -77,7 +80,9 @@ class Indicators :
         for pos,fib in enumerate( [self.dFib, self.Fib]):
             for key in fib.keys():
                 summary.update( {  fibs[pos]+"_"+key : fib[key] } ) 
-        #summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
+
+        summary |= { 'BB_Low' : self.BB_Lower, 'BB_Upper' :self.BB_Upper }
+        
         #summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
         #print( "SUMMARY:", summary )
 
@@ -85,11 +90,12 @@ class Indicators :
 
 
 
-    def Set ( self, data : object ) -> None :
+    def Set ( self, data : pd.DataFrame, seed_df : pd.DataFrame ) -> None :  
         """
             Initial data set will begin the calculations of the indicators  for later updating
             ARGS   :
-                        data  (Dataframe ) - historical entries for the selected stock symbol 
+                        data    (Dataframe ) - historical entries for the selected stock symbol
+                        seed_df ( DataFrame) - Open Range Entries - quotes from the first 30 minutes of market open 
             RETURNS:
                         nothing 
         """
@@ -110,7 +116,8 @@ class Indicators :
         self.Calculate()
         self.Data = self.Data.sort_values( by=["date"], ascending=True)
         self.Data = pd.DataFrame(self.Data.iloc[-1]).T              # FUTURE CALCULATIONS BASED ON ONE PREVIOUS DATA PLUS TODAY'S ENTRIES
-        
+
+        self.Data = pd.concat([self.Data, seed_df ])
         self.Data = self.Data.dropna().reset_index(drop=True)
         
 
@@ -177,6 +184,9 @@ class Indicators :
             # Fibonacci
             self.dFib               = self.CalculateFibonacci( self.Data['close'].max() , self.Data['close'].min() )
 
+            # Bollinger Bands
+            self.CalculateBollinger()
+            
 
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -184,6 +194,35 @@ class Indicators :
                 print("\t\t >>   " + str(entry) )
 
 
+    def CalculateBollinger(self ) -> None:        
+        """
+        Plot the Bollinger Bands from the data provides
+        ARGS   :
+                  data                ( Pandas.DataFrame )  timeseries data for symbol
+                  look_back_interval  ( int )               context to use for data
+        RETURNS:
+                    dataframe with  Bollinger Bands high/low 
+        """
+        look_back_interval  = 15
+        
+        try:            
+            # Calculating the moving average
+            MA = self.Data['close'].rolling(window=look_back_interval).mean()
+            
+
+            # Calculating the standard deviation
+            SD = self.Data['close'].rolling(window=look_back_interval).std()
+            
+            
+            self.BB_Lower = (MA - (2 * SD)).iloc[-1]   # Lower Bollinger Band
+            
+            self.BB_Upper = (MA + (2 * SD)).iloc[-1]  # Upper Bollinger Band
+            
+        except: 
+            print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        
     
     def CalculateDailySMA( self ) -> None:
         """
@@ -203,6 +242,9 @@ class Indicators :
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
+
+
+
 
     def CalculateFibonacci( self, high : float , low : float  ) -> dict :
         """
@@ -224,6 +266,8 @@ class Indicators :
         '100%': high
         }
         return fib_levels 
+
+
                 
     def CalculateRSI(self, data : object , window : int =14) -> pd.Series :
         """

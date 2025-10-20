@@ -118,32 +118,43 @@ class DayTradeStrategy:
                     else:
                         time.sleep( time_to_sleep )
                     
-
-            symbols = [ symbols ] if isinstance( symbols, str) else symbols
+            
+            today_date  = str(current_time)[:10]
+            symbols     = [ symbols ] if isinstance( symbols, str) else symbols            
             for symbol in symbols:            
-                data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFO FOR SYMBOL 
-                indicators = Indicators ( symbol= symbol, data= data )                 # CALCULATE THE INDICATORS
-                # Previous Day's High/Low
-                ticker_df   = account.History( "SPY", 1)
+                data        = account.History ( symbol = symbol, time_range=200 )                # GET HISTORICAL INFO FOR SYMBOL
+                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')                
+                if seed_df == None :
+                    seed_df = data
                 
-                today_date = ticker_df[ :-1]['date'].to_string(index=False)                
-                current_time = datetime.strptime( f"{today_date} 10:00:00", date_format) 
-                ticker_row   = account.QuoteByInterval ( symbols= "SPY",  frequency= 60*30, endDate = current_time)                
+                seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))
+                seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]
+                
+                indicators  = Indicators ( symbol= symbol, data= data , seed_df=seed_df)               # CALCULATE THE INDICATORS
+                 
+                # Previous Day's High/Low
+                ticker_df       = account.History( symbol=symbol, time_range=1)             
+                current_time    = datetime.strptime( f"{today_date} 10:00:00", date_format) 
+                ticker_row      = account.QuoteByInterval ( symbols= symbol,  frequency= 60*30, endDate = current_time) # PULL THE FIRST 30 MINS OF DATA3
                 self.Stocks[ symbol ]  = {                        
                                     'Price'         : {'Previous': ticker_row[ 4 ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ 4 ], 'Occur' : 0 },
                                     'Volume'        : {'Previous': ticker_row[ 5], 'Slope' : 1 , 'Bought' : 0},
                                     'Indicators'    : indicators,
-                                    "PrevDayHigh"   : ticker_df[ :-1]['high'].to_string(index=False),
-                                    "PrevDayLow"    : ticker_df[ :-1]['low'].to_string(index=False),
+                                    "PrevDayHigh"   : ticker_df[ :-1]['high'].to_string(index=False) if ticker_df != None else ticker_row[2] ,
+                                    "PrevDayLow"    : ticker_df[ :-1]['low'].to_string(index=False)  if ticker_df != None else ticker_row[6] ,
                                     "ORB_L"         : ticker_row[2] if ticker_row else 0,
                                     "ORB_H"         : ticker_row[6] if ticker_row else 0,
                                     'Losses'        : 0
                              }
+
                 
         except:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
+
+
+
             
     def Run( self,  ticker_row : list, account : TradeAccount, configs : dict  ) -> bool :
         """
@@ -420,27 +431,38 @@ class DayTradeStrategy:
         max_num_of_losses   = params["numOfLosses"]
         
         try :
+            
             # NO BUYING AFTER 3:45
-            current_time = datetime.now()
+            current_time    = datetime.now()
+            today_date      = str(current_time)[:10]
             if not ( symbol in self.Stocks.keys() )  and ( current_time.hour == 15 and current_time.minute >= 45) :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
                 return 
             
             # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY 
             if not ( symbol in self.Stocks.keys() ) :
-                data = account.History ( symbol = symbol, time_period =200 )           # GET HISTORICAL INFO FOR SYMBOL 
-                indicators = Indicators ( symbol= symbol, data= data )                 # CALCULATE THE INDICATORS 
+                data = account.History ( symbol = symbol, time_range =200 )           # GET HISTORICAL INFO FOR SYMBOL
+                
+                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')
+                if seed_df == None :
+                    seed_df = data
+
+                seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
+                seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
+
+                indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
                 self.Stocks[ symbol ]  = {                        
                                     'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
                                     'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
                                     'Indicators'    : indicators,
                                     'Losses'        : 0
                              }
-
+            
             # Update the indicators 
             entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
                        'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
             self.Stocks[ symbol ]['Indicators'].Update( entry = entry)
+
             
             #IF MORE THAN 3 LOSSES THEN DONT DO ANY MORE BUYING - NEED TO ADD TO PARAMS 
             if ( not (symbol in account.InPlay) and   self.Stocks[symbol]['Losses'] > max_num_of_losses ):
@@ -458,6 +480,7 @@ class DayTradeStrategy:
             #print(f"Price to Previous: {float(ticker_row[ closePos])} -  {float(self.Stocks[ symbol]['Price']['Previous'])} :: { float(ticker_row[ closePos]) -  float(self.Stocks[ symbol]['Price']['Previous'])} --> {params['price_move_change']} " +
             #       f"VOLUME : {float(ticker_row[volumePos])  -  float(self.Stocks[ symbol]['Volume']['Previous'] ) } --> {params['volume_change_ratio']} ")
 
+            
             #account.SetLimit( limit )
             upward_pressure        =  round( float(ticker_row[highPos])  - float(ticker_row[closePos]), 3)
             downward_pressure      =  round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 3)
@@ -473,11 +496,13 @@ class DayTradeStrategy:
 
             # INTEGRATE THE ORB VALUES  SOME HOW 
 
+            
             #HOW MANY CONSECUTIVE TIMES THE PRICE HAS RISENS
             if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous']  and  ticker_row[closePos] > ticker_row[openPos]:
                     self.Stocks[ symbol]['Price']['Occur']  += 1
             else:
                 self.Stocks[ symbol]['Price']['Occur']  = 0
+
             
             #CRITERIA SWITCH 
             criteria            = False

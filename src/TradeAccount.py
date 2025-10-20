@@ -20,9 +20,9 @@ import argparse
 import functools
 import requests
 
-from datetime           import datetime, timedelta
-from SchwabAccount      import SchwabAccount
+from datetime           import datetime, timedelta, timezone
 from Indicators         import Indicators 
+from SchwabAccount      import SchwabAccount
 
 OPTION_NONE = 0
 OPTION_CALL = 1
@@ -44,7 +44,8 @@ class TradeAccount:
         self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage
         self.TargetGoal     = 0                        # Dont get greedy, when reach this amount will quit trading for day
         self.Performance    = {}                       # Keep track of wins and loses
-        self.AccountTypes   = { 'SCHWAB' :  SchwabAccount } 
+        self.AccountTypes   = { 'SCHWAB' :  SchwabAccount }
+        
 
         self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
 
@@ -105,12 +106,13 @@ class TradeAccount:
 
 
 
-    def History( self, symbol : str , time_period : int ) -> dict :
+    def History( self, symbol : str , time_period : str ='daily' , time_range : int =1, period_type ="month" ) -> dict :
         """
             Get historical entries for the symbol
             ARGS  :
                     symbol       ( str )  stock symbol to lookup
-                    time_period  ( int )  number of time intervals to go back looking  
+                    time_range   ( int )  how many ( days ??) to go back 
+                    time_period  ( str )  daily / month / year / ytd 
             RETURNS:
         """
         df              = None 
@@ -126,10 +128,10 @@ class TradeAccount:
         try:
             period          = 1
             frequency       = 1
-            periodType      = 'month' #'day'
-            frequencyType   = "daily"
+            periodType      = period_type #'month' #'day'
+            frequencyType   = time_period
             
-            startDate       = endDate - timedelta( days = frequency * time_period ) 
+            startDate       = endDate - timedelta( days = frequency * time_range ) 
 
             
             response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
@@ -149,7 +151,8 @@ class TradeAccount:
         except:          
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
-                print("\t\t |   " + str(entry) )                
+                print("\t\t |   " + str(entry) )
+            print(f"\t\t| Period: {period} Frequency: {frequency}  PeriodType: {periodType}  FrequencyType:{frequencyType} ")
         finally:            
             return  df
 
@@ -202,11 +205,11 @@ class TradeAccount:
         frequencyTypes  = ["minute","daily","weekly","monthly"]
         
         try:
-            periodType      = 'day'
             period          = 1
-            frequencyType   = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
             frequency       = int (15 if frequency/60 == 0 else frequency/60 )
             startDate       = endDate - timedelta( seconds = frequency * 60) 
+            periodType      = 'day'
+            frequencyType   = ("minute" if not( frequencyType in frequencyTypes) else frequencyType  )
             
             response = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
@@ -480,6 +483,37 @@ class TradeAccount:
             return success 
 
 
+    def Orders( self , time_interval : int = 0  ) -> list :
+        """
+            Gets the FILLED orders from the selected account for the desired time period ( days ) 
+            ARGS   :
+                    time_interval  ( int ) - how many days to look back
+            RETURNS:
+                    list of dictionary of orders  ( or df )             
+        """
+        orders          = None
+        toTime          = None
+        fromTime        = None
+        date_format     = '%Y-%m-%dT%H:%M:%SZ'
+        
+        
+        try:
+            toTime      = (datetime.now(timezone.utc)).strftime( date_format)
+            fromTime    = (datetime.now(timezone.utc)- timedelta( days = time_interval+1) ).strftime('%Y-%m-%dT%H:%M:%SZ')           
+            
+            
+            orders = self.Conn.AccountOrders ( self.Conn.GetAccountHash() ,
+                                fromTime =fromTime,toTime=toTime , status = "FILLED" )
+            #print( f"ORDERS : {orders}")
+        except:
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return orders 
+
+
+
 
 
     def Reconcile ( self) -> None :
@@ -507,10 +541,10 @@ class TradeAccount:
                                        }
                     else:
                         if not('bidReceipt' in trade ):
-                            reconcile.update(self.Conn.Reconcile( symbol, enteredTime=trade['bidTime'], qty=trade['qty'],action='BUY') )
+                            reconcile.update(self.Conn.Orders( symbol, enteredTime=trade['bidTime'], qty=trade['qty'],action='BUY') )
                             
                         if not('askReceipt' in trade ):
-                            reconcile.update( self.Conn.Reconcile( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
+                            reconcile.update( self.Conn.Orders( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
 
                         if 'askFilled' in reconcile and 'bidFilled' in reconcile:
                             reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )

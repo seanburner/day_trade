@@ -160,7 +160,28 @@ class SchwabAccount :
         return "" #contents
 
 
+    def GetAccountHash ( self ) -> str :
+        """
+            Returns the hash of the selected account
+            ARGS   :
+                    nothing
+            RETURNS:
+                    string of accountHash 
+        """
+        return self.Accounts[self.AccountID]['hashValue']
+
+
+    def GetAccountID ( self ) -> str :
+        """
+            Returns the Account ID of the selected account
+            ARGS  :
+                    nothing
+            RETURNS:
+                    string of accountID 
+        """
+        return self.AccountID
         
+    
     def CheckAccessTokens(self) -> bool :
         """
             Check if the connection is still valid  before making a request
@@ -272,8 +293,8 @@ class SchwabAccount :
             RETURNS: 
         """
         if len( self.Accounts) > 0 :
-            #print(self.Accounts[ list( self.Accounts.keys())[0]])
-            return self.Accounts[ list( self.Accounts.keys())[0]]['details'][ 'initialBalances'  ]['cashAvailableForTrading' ]
+            #print(f"self.Accounts[ self.AccountID]['details'] ->{self.Accounts[ self.AccountID]['details']} " )
+            return self.Accounts[ self.AccountID]['details'][ 'initialBalances'  ]['cashBalance' ]  #['cashAvailableForTrading' ]
         else:
             return 0.0
 
@@ -387,6 +408,7 @@ class SchwabAccount :
         temp  = None
 
         try :
+            print(f"FROMTIME : {fromTime} -> {type(fromTime)}")
             print(f'ENDPOINT: {self._base_api_url}/trader/v1/accounts/{accountHash}/orders')
             temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
@@ -405,7 +427,7 @@ class SchwabAccount :
         finally:
             return temp.json()
 
-    def Reconcile ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str ) -> dict :
+    def Orders ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str ) -> dict :
         """
             Reconcile what we submitted ( BUY/SELL ) with how Schwab filled it
             DOES:
@@ -420,7 +442,7 @@ class SchwabAccount :
             RETURNS:
                     dictionary of values 
         """
-        results     = {}
+        results     = []
         toTime      = None
         fromTime    = None
         date_format     = "%Y-%m-%d %H:%M:%S"  
@@ -442,11 +464,21 @@ class SchwabAccount :
                                 qty == orderLeg['quantity']  ):
                         #print(f"\t{orderLeg} -> {order} ")
                         # MIGHT NEED TO ALLOW FOR MULTI LEG INFO IN THE PRICE AND EXECUTION TIME 
-                        results =  { 'symbol' : symbol,
-                                    'bidReceipt'    if action.upper() =='BUY' else 'askReceipt' : order['orderId'],
-                                    'bidFilled'     if action.upper() =='BUY' else 'askFilled'  : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
-                                    'bidFilledAt'   if action.upper() =='BUY' else 'askFilledAt': order['orderActivityCollection'][0]['executionLegs'][0]['time']
-                                } 
+                        results =  { 'symbol' : orderLeg['instrument']['symbol'].upper(),
+                                     'qty' : orderLeg['quantity'] ,
+                                    'bidReceipt'    if orderLeg['instruction'].upper() =='BUY' else 'askReceipt' : order['orderId'],
+                                    'bidFilled'     if orderLeg['instruction'].upper() =='BUY' else 'askFilled'  : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                    'bidFilledAt'   if orderLeg['instruction'].upper() =='BUY' else 'askFilledAt': order['orderActivityCollection'][0]['executionLegs'][0]['time']
+                                }
+                    elif symbol == "" :
+                        results.append( { 'symbol' : orderLeg['instrument']['symbol'].upper(),
+                                            'qty' : orderLeg['quantity'] ,
+                                            'bidReceipt'    if orderLeg['instruction'].upper() =='BUY' else 'askReceipt' : order['orderId'],
+                                            'bidFilled'     if orderLeg['instruction'].upper() =='BUY' else 'askFilled'  : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                            'bidFilledAt'   if orderLeg['instruction'].upper() =='BUY' else 'askFilledAt': order['orderActivityCollection'][0]['executionLegs'][0]['time']
+                                        }
+                                    )
+
         except:   
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():

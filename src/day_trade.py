@@ -141,6 +141,7 @@ def blank_config() -> dict:
                     'strategy'          : '',
                     'app_key'           : '',
                     'app_secret'        : '',
+                    'sync_interval'     : 0,
                     'email'             : 'seanburner@gmail.com',
                     'username'          : 'seanburner',
                     'replay_date'       : '',
@@ -324,11 +325,12 @@ def parse_arguments() -> {} :
                         'email'             : { 'help': 'Email to send the report ',                'action' : None } ,
         		'api_key'           : { 'help': 'API KEY for endpoint' , 		    'action' : None}, 
         		'stock'             : { 'help': 'Stock ticker symbol', 		            'action' : None },
-			'action'            : { 'help': 'Options: download/back_test/trade/test/live_test' ,  'action' : None}, 
+			'action'            : { 'help': 'Options: download/back_test/trade/test/live_test/sync' ,  'action' : None}, 
 			'start_date'        : { 'help': 'Start date', 	                            'action' : None}, 
 			'end_date'          : { 'help': 'End date' ,  			            'action' : None}, 
                         'username'          : { 'help': 'Username to associate with session',       'action' : None},
-			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None }, 
+			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None },                        
+                        'sync_interval'     : { 'help': 'Number or days to go back in the sync ( 0 = today)','action' : None },
 			'input_data'        : { 'help': 'Data file to be used during back_test',    'action' : None },
                         'strategy'          : { 'help': 'Strategy to use [ basic/basic15/basicXm ]','action' : None },
                         'app_key'           : { 'help': 'Schwab application key ',                  'action' : None },
@@ -453,7 +455,7 @@ def system_test( configs : dict  ) -> None :
         print('Preferences: ', account.Conn.Preference )
 
         time_period = 200 + (.50 * 200 )
-        data = account.History( symbol=Configs['stock'], time_period=time_period  ) 
+        data = account.History( symbol=Configs['stock'], time_range=time_period  ) 
         #print( data.columns)
         indicators = Indicators( symbol=Configs['stock'], data=data )    
         print(f"Indicators : {indicators }")
@@ -947,6 +949,53 @@ def  back_test( configs: dict  ) -> None :
 
 
 
+def  sync_broker_transactions( configs: dict  ) -> None :
+    """
+        Sync the local database with the transactions from the selected brokerage account
+        ARGS   :
+                configs  ( dict ) - dictionary of configuratios
+        RETURNS:
+                nothing 
+    """
+    account         = None
+    traderDB        = None
+    
+    try:        
+        account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+        traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+        print( '\t* Syncing transactions from  ', account )
+
+        if not account :
+            print("\t\t\t Could not connect to provided user's trading account ")
+            return
+
+        if not traderDB : 
+            print(f"\t\t\t Could not connect to provided SQL instance {configs['sql_server']} ")
+            return
+                  
+        #GET TRANSACTIONS FROM BROKERAGE 
+        orders = account.Orders( time_interval=int(configs.get('sync_interval',10)))
+        
+
+        #Send the brokerages transactions to TraderDB for processing 
+        traderDB.SyncEntries(orders=orders, time_interval=int(configs.get('sync_interval',10)) )
+        
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+
+
+
+
+
+
+
+
+
+
+
+
 def summary_report ( configs : dict , data : dict , account : object ) -> None :
     """
         Prep and send report of trading
@@ -980,8 +1029,58 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
             print("\t\t >>   " + str(entry) )
 
 
+def Bollinger_Bands(data : pd.DataFrame , look_back_interval : int ):
+    """
+        Plot the Bollinger Bands from the data provides
+        ARGS   :
+                  data                ( Pandas.DataFrame )  timeseries data for symbol
+                  look_back_interval  ( int )               context to use for data
+        RETURNS:
+                    dataframe with  Bollinger Bands high/low 
+    """    
+    # Calculating the moving average
+    MA = data['close'].rolling(window=look_back_interval).mean()
+    
+    # Calculating the standard deviation
+    SD = data['close'].rolling(window=look_back_interval).std()
 
+    data['Lower_BB'] = MA - (2 * SD)  # Lower Bollinger Band
+    data['Upper_BB'] = MA + (2 * SD)  # Upper Bollinger Band
+
+    return data
+
+
+
+
+def plotting( ax  : object , plot_lines : list , x_label : str , y_label : str , has_grid : bool , title : str  ) -> object :
+    """
+        Basic lines to get a line graph draw ( can have multiple lines )
+        ARGS  :
+                plot_lines  ( list of list ) the data and color for each plot line series  ( like Bollinger bands )
+                x_label     ( str )           label on the x axis
+                y_label     ( str )           label on the y axis
+                has_grid    ( bool )          True/False to show grid lines on chart
+                title       ( str )           Title of the chart
+        RETURNS:
+                matplotlib chart object 
+    """
+    try:
+        for line in plot_lines :            
+            ax.plot(line[0]   , color=line[1])   # replace dt1 with df_bollinger
             
+        
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.grid( has_grid ) 
+        ax.set_title(title)
+    except: 
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
+    finally:
+        return ax
+
+    
 def summary_report_engine(symbol : str, data : dict , account : object , report : object ) -> None :
     """
         The contents ofthe summary report process that allows it to be repeatable if necessary
@@ -1009,37 +1108,30 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
             return 
         
         for entry in data[symbol] :
-            print("\t\t ADDING DT1 : " , entry )
+            #print("\t\t ADDING DT1 : " , entry )
             dt1.append(  entry.get('close',0)  )
             
         for entry in account.Trades[symbol]:    
-            print("\t\t ADDING DT2 : " , entry )        
+            #print("\t\t ADDING DT2 / DT3: " , entry )        
             dt2.append( entry.get("p_l", 0) )
-
-            
-        for entry in account.Trades[symbol]:            
-            print("\t\t ADDING DT3 : " , entry )
             dt3.append( entry.get("actualPL", 0) )
 
-                
+        
+        df_bollinger =  Bollinger_Bands( pd.DataFrame( {'close' : dt1} ), look_back_interval=6)
+                 
         pixplt =plt
         fig, (ax1, ax2,ax3) = pixplt.subplots(3, 1)
+        
         # GRAPH 1
-        ax1.plot(dt1, color='blue')
-        #ax1.xticks([930,1100,1230,200,330,500,630])
-        ax1.set_xlabel('time')
-        ax1.set_ylabel('dollars')
-        ax1.set_title(f"{symbol} Activity ")
+        plot_lines =  [[df_bollinger['close']   , 'orange'], [df_bollinger['Lower_BB'], 'blue'],[df_bollinger['Upper_BB'], 'green' ]]        
+        ax1 = plotting( ax = ax1 , plot_lines = plot_lines , x_label="time" , y_label="dollars", has_grid=True , title=f"{symbol} Activity "  )
+        
         # GRAPH 2
-        ax2.plot(dt2, color='orange')
-        ax2.set_xlabel('index')
-        ax2.set_ylabel('dollars')
-        ax2.set_title(f"{symbol} P & L")
-        # GRAPH 2
-        ax3.plot(dt3, color='green')
-        ax3.set_xlabel('index')
-        ax3.set_ylabel('dollars')
-        ax3.set_title(f"{symbol} Actual P & L")
+        ax2 = plotting( ax=ax2 , plot_lines=[[dt2,"green"]], x_label="time" , y_label="dollars", has_grid=True , title=f"{symbol} P & L"  )
+        
+        # GRAPH 3
+        ax2 = plotting( ax=ax3 , plot_lines=[[dt3,"green"]], x_label="time" , y_label="dollars", has_grid=True , title=f"{symbol} Actual P & L" )
+        
         
         chart_graph = "../pix/graph1.png"
         pixplt.tight_layout()
@@ -1062,13 +1154,6 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         plt.axis ('equal')
         #plt.show ()        
         report.AddPieChart( stats, opts)
-
-        #CHART THE STOCK
-        stats = [] 
-        for entry in data[ symbol ] :
-            stats.append ( entry.get("quote", 0 ) )
-
-      #  report.AddLineChart( [stats], ['A','B','C','D'],  500,250)
 
         
         # LIST OF COMPLETED ORDERS
@@ -1228,7 +1313,8 @@ def main() -> None :
                 'test'          : system_test,
                 'live_test'     : live_test,
                 'live_trade'    : live_trade,
-                'replay_test'   : replay_test
+                'replay_test'   : replay_test,
+                'sync'          : sync_broker_transactions
             }
 
         hub[ Configs ['action'] ] ( Configs  ) 

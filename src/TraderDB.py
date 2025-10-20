@@ -11,8 +11,6 @@ import os
 import re
 import sys
 import time
-import pandas as pd
-import numpy  as np 
 import getpass
 import inspect
 import platform
@@ -20,7 +18,10 @@ import argparse
 import functools
 import requests
 
-from datetime           import datetime 
+import pandas           as pd
+import numpy            as np
+
+from datetime           import datetime,timedelta
 from MySQLConn          import MySQLConn
 
 
@@ -43,6 +44,16 @@ class TraderDB:
         self.User       = getpass.getuser()     # CURRENT PERSON LOGGED INT 
         self.Conn       = MySQLConn( )
         self.Conn.Connect(server =self.Server, database='trading', username =self.UserName, passwd =self.Password )
+
+        self.CheckDB()  #Confirm the tables were set up in the database
+        # Probably not necessary anymore 
+        self.BlankOrderBook = {'symbol':'', 'type': 0,
+                               'bidTime': "2025-10-01 09:30:00",    'bid': 1.00,        'bidVolume':1000, 'bidFilled' : 1.01 , 'bidRecipt' : '111111' ,
+                               'askTime':"2025-10-01 09:32:00",     'ask':1.25,         'askVolume':1000, 'askFilled' : 1.19 , 'askReceipt' :'222222',
+                               'qty' :250,                          'p_l': ((1.25 - 1.00) * 250),         'actualPL'  : ((1.19-1.01)*250),                      
+                               'indicators_in': {},                 'indicators_out': {}
+                               }
+                   
 
     def Sanitize ( self, field : object  ) -> object :
         """
@@ -322,7 +333,7 @@ class TraderDB:
                 print ("\t\t   -> No orders to save to database, skipping ")
                 return  success
             
-            self.CheckDB()            
+                      
             indicatorsId = self.GetIndicators( indicators = orderbook[ list(orderbook.keys())[0]][0]['indicators_in'] )
             
             for symbol in orderbook.keys():
@@ -385,7 +396,98 @@ class TraderDB:
 
 
 
+    def Orders ( self, time_interval : int = 0 ) -> list :
+        """
+            Retreives the symbol, bidTime, bidReceipt,qty  from the orderbook
+            ARGS  :
+                    time_interval  ( int ) - days interval for entry retreival
+            RETURNS:
+                    list of list  of entries 
+        """        
+        query           = ""
+        orders          = None
+        date_format     = "%Y-%m-%d %H:%M:%S"
+        from_date       = str( datetime.now() - timedelta( days=time_interval) )[:10]
+        
+        try:
+            query = (f"select s.symbol, d.date,o.bidReceipt,o.askReceipt from orderbook o " +
+                         " inner join stocks s on s.stockid =o.stockid  " +
+                         " inner join dates d on d.dateid = o.initiated " +
+                          " where d.date >='{from_date}'; " )
+            #print("QUERY : " , query )
+            self.Conn.Send( query )
+            orders = self.Conn.Results
+            
+            
+                     
+        except:      
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        return orders
 
+
+
+
+    def SyncEntries ( self, orders : list , time_interval : int ) -> list :
+        """
+            Accepts a list of dictionary representing orders from the brokerage
+            ARGS   :
+                    orders        ( list of dictionary ) - orders from brokerage with keys ( symbol, openedAt, bidReceipt, bid, qty ,   askReceipt, ask, pl )
+                    time_interval ( int )  number of days we need to look bakc 
+            RETURNS:
+                    nothing 
+        """
+        rec         = {}
+        orderbook   = []
+        
+        try:
+            
+            #Get entries from SQL 
+            entries = self.Orders( time_interval=time_interval)
+
+            #Build entries in orderbook format ( ask and bid ) to then send to self.InsertOrderbook( self, orderbook : list , email : str , username : str = '') -> bool:
+            for order in orders :
+                for orderLeg in order['orderLegCollection']:                    
+                    receipt = order['orderId']                    
+                    if not ( str(receipt)  in str(entries) ) :     #this order is not in the SQL so need to start building buy/sell
+                        if ( rec == {} or
+                             ( orderLeg['instrument']['symbol'].upper() == rec['symbol'] and
+                               orderLeg['quantity'] == rec['qty']  and
+                               orderLeg['instruction'].upper() != rec['action']) ) : 
+                            rec |= { 'symbol' : orderLeg['instrument']['symbol'].upper(),
+                                     'qty' : orderLeg['quantity'] ,
+                                     'type' : 0 , # 0 = regular , 1 = options call 2 = options puts 
+                                     'action' : orderLeg['instruction'].upper() ,
+                                    'bidReceipt'        if orderLeg['instruction'].upper() =='BUY' else 'askReceipt'        : order['orderId'],
+                                    'bidFilled'         if orderLeg['instruction'].upper() =='BUY' else 'askFilled'         : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                    'bidFilledAt'       if orderLeg['instruction'].upper() =='BUY' else 'askFilledAt'       : order['orderActivityCollection'][0]['executionLegs'][0]['time'],
+                                    'indicators_in'     if orderLeg['instruction'].upper() =='BUY' else 'indicators_out'    : {}
+                                }
+                        if 'bidReceipt' in rec and 'askReceipt' in rec :
+                            rec.update ({'bid' : rec['bidFilled'], 'ask' : rec['askFilled'],
+                                         'p_l' : (rec['bidFilled'] - rec['bidFilled']) * rec['qty'],
+                                         'actualPL' : rec['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} ) 
+                            orderbook.append( rec )
+                            rec = {}
+            for order in orderbook:                        
+                print( f"Found Orders: { order['symbol']}  { order['action']} { order['qty']}  { order['bidReceipt']}   { order['askReceipt']}" ) 
+            
+        except:  
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+
+        finally:
+            return orderbook 
+
+
+
+
+
+
+
+    
     def CreateTables( self ) -> None :
         """
             Staging Area to design schema 
