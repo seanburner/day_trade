@@ -60,7 +60,8 @@ class Indicators :
         """
         contents  = (f"Symbol : {self.Symbol}  "+ "\n Daily SMA : " + str( self.dSMA) + "\n VWAP : " + str(self.VWAP)+
                          "\n RSI : " + str(self.RSI) + "\n Volatility : " +str( self.VolIndex)  + "\n SMA : " +str( self.SMA)  +
-                        f"\nAT [H/L] : {self.ATH} /{self.ATL}" + f"\n d_FIb: {self.dFib} " + f"\n FIb: {self.Fib} ")
+                        f"\nAT [H/L] : {self.ATH} /{self.ATL}" + f"\n d_FIb: {self.dFib} " + f"\n FIb: {self.Fib} "+
+                         f"\nBollinger Bands : {self.BB_Lower} -> {self.BB_Upper}" )
         
         return contents 
 
@@ -81,7 +82,7 @@ class Indicators :
             for key in fib.keys():
                 summary.update( {  fibs[pos]+"_"+key : fib[key] } ) 
 
-        summary |= { 'BB_Low' : self.BB_Lower, 'BB_Upper' :self.BB_Upper }
+        summary |= { 'BB_Lower' : self.BB_Lower, 'BB_Upper' :self.BB_Upper }
         
         #summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
         #print( "SUMMARY:", summary )

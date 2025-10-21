@@ -21,6 +21,7 @@ import functools
 import requests
 
 from datetime           import datetime, timedelta, timezone
+from TraderDB           import TraderDB
 from Indicators         import Indicators 
 from SchwabAccount      import SchwabAccount
 
@@ -29,16 +30,20 @@ OPTION_CALL = 1
 OPTION_PUT  = 2
 
 class TradeAccount:
-    def __init__(self, funds : float =5000, limit : float = 0.10 , app_type = 'Schwab',app_key ="xxxxx", app_secret = "zzzzzz" ) :
+    def __init__(self, funds : float =5000, limit : float = 0.10 , userName: str = "", email : str= "",
+                 app_type = 'Schwab',app_key ="xxxxx", app_secret = "zzzzzz" ,
+                     sqlServer : str ="127.0.0.1", sqlUserName :str ="", sqlPassword : str ="" ) :
         """
             Initialize the variables for the Trading Account class 
         """
         self.Mode           = ""                       # Are we Testing or Trading or something else
+        self.Email          = email                    # email to associate with trading activities 
         self.Funds          = funds                    # ACCOUNT DOLLAR AMOUNT 
         self.Limit          = 0.0                      # MAX TO SPEND ON ANY ONE TRADE 
         self.Trades         = {}                       # COMPLETED TRADES FOR THE DAY
         self.InPlay         = {}                       # CURRENT TRADES STILL OPEN  
-        self.APP_KEY        = ""
+        self.APP_KEY        = ""                       # APP Key for the underlying account api calls 
+        self.UserName       = userName                 # User name  associated with trading account
         self.LossLimit      = 0                        # HOW MUCH IS TOO MUH TO LOSE ON ONE TRADE   
         self.APP_SECRET     = ""
         self.DailyFunds     = 0                        # Use this to preserve any profits, instead of re-risking them because the LIMIT is based on percentage
@@ -46,13 +51,16 @@ class TradeAccount:
         self.Performance    = {}                       # Keep track of wins and loses
         self.AccountTypes   = { 'SCHWAB' :  SchwabAccount }
         
-
+        self.SQLConn        = None 
         self.Conn           =  self.AccountTypes  [ app_type.upper()] ( app_key, app_secret )
-
         self.Funds          = self.Conn.CashForTrading()
+        
         print(f"\t\t\t Available Cash for Trading : ${ self.Funds} " )
 
         self.SetLimit(limit )                           # INCASE VALUE SENT IN THROUGH CONSTRUCTOR
+        
+        if ( sqlServer != '' and sqlUserName != '' and sqlPassword !='' ) :
+            self.SQLConn = TraderDB( server =sqlServer, userName =sqlUserName, password =sqlPassword )
         
     def __str__(self ) -> str :
         """
@@ -460,17 +468,23 @@ class TradeAccount:
                 print('FUNDS: ', self.Funds , ' : ' , ( self.InPlay[stock]['qty'] * new_price ), ' = ' , ( self.InPlay[stock]['qty'] * new_price )+self.Funds)    
                 self.Funds += ( self.InPlay[stock]['qty'] * new_price )
                 p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )
-                
-                self.Trades[stock].append(  {'symbol':stock, 'type': OPTION_NONE , 'bidTime':self.InPlay[ stock ]['time'],
+
+                new_rec = {'symbol':stock, 'type': OPTION_NONE , 'bidTime':self.InPlay[ stock ]['time'],
                                              'bid':self.InPlay[ stock ]['price'],'bidVolume':self.InPlay[ stock ]['volume'], 'askVolume':ask_volume,
                                              'qty' :self.InPlay[ stock ]['qty'],'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
-                                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()} )
+                                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()}
+                self.Trades[stock].append(  new_rec )                
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
                 if ( ( p_l * -1 ) > 0.01 * self.DailyFunds ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
                     print( f"**Lost TOO MUCH on one deal : { p_l}  -> {self.LossLimit} ")
                     self.TargetGoal = 0 
+
+                if self.Mode.upper() == "TRADE":
+                    self.Reconcile()
+                    success = self.SQLConn.InsertOrderbook( self.Trades[stock][-1], self.Email  , self.Username)
+                    print( f"**Lost TOO MUCH on one deal : { p_l}  -> {self.LossLimit} ")
                 success = True
             else:
                 print ("\t\t --> Account  level did not Execute SELL properly ") 
@@ -533,23 +547,24 @@ class TradeAccount:
             for symbol in temp.keys():
                 self.Trades.update( { symbol : [] } )
                 for trade in temp[symbol] :
-                    if self.Mode.upper() == "TEST":
-                        reconcile   = {
+                    if not ('bidReceipt' in trade  or 'askReceipt' in trade ) :
+                        if self.Mode.upper() == "TEST":
+                            reconcile   = {
                                         'bidReceipt': 11111111,     'bidFilled' : trade['bid'] ,
                                            'askReceipt' : 2222222,  'askFilled' : trade['ask'] ,
                                            'actualPL' : (trade['ask'] - trade['bid'] ) * trade['qty'] 
                                        }
-                    else:
-                        if not('bidReceipt' in trade ):
-                            reconcile.update(self.Conn.Orders( symbol, enteredTime=trade['bidTime'], qty=trade['qty'],action='BUY') )
+                        else:
+                            if not('bidReceipt' in trade ):
+                                reconcile.update(self.Conn.Orders( symbol, enteredTime=trade['bidTime'], qty=trade['qty'],action='BUY') )
                             
-                        if not('askReceipt' in trade ):
-                            reconcile.update( self.Conn.Orders( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
+                            if not('askReceipt' in trade ):
+                                reconcile.update( self.Conn.Orders( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
 
-                        if 'askFilled' in reconcile and 'bidFilled' in reconcile:
-                            reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )
+                            if 'askFilled' in reconcile and 'bidFilled' in reconcile:
+                                reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )
                             
-                    trade.update( reconcile )
+                        trade.update( reconcile )
                     self.Trades[symbol].append(  trade  ) 
             
             

@@ -289,7 +289,7 @@ class TraderDB:
         
         try:
             for ind in indicatorsId.keys() :
-                contents.append( [orderId, indicatorsId[ind],f"'{round(indicators_in[ind],5) }'", f"'{round( indicators_out[ind],5) }'" ,*self.InsertMetaFields(2) ] )
+                contents.append( [orderId, indicatorsId[ind],round(indicators_in[ind],5) , round( indicators_out[ind],5)  ,*self.InsertMetaFields(2) ] )
             if contents != [] :
                 self.Conn.WriteMany( header=header, contents =contents)
             
@@ -450,24 +450,27 @@ class TraderDB:
             for order in orders :
                 for orderLeg in order['orderLegCollection']:                    
                     receipt = order['orderId']                    
-                    if not ( str(receipt)  in str(entries) ) :     #this order is not in the SQL so need to start building buy/sell
+                    if str(entries).find( str(receipt) ) == -1   :     #this order is not in the SQL so need to start building buy/sell                      
+                        symbol = orderLeg['instrument']['underlyingSymbol'] if 'underlyingSymbol' in orderLeg['instrument'] else orderLeg['instrument']['symbol']
                         if ( rec == {} or
-                             ( orderLeg['instrument']['symbol'].upper() == rec['symbol'] and
+                             ( symbol.upper() == rec['symbol'] and
                                orderLeg['quantity'] == rec['qty']  and
                                orderLeg['instruction'].upper() != rec['action']) ) : 
-                            rec |= { 'symbol' : orderLeg['instrument']['symbol'].upper(),
-                                     'qty' : orderLeg['quantity'] ,
-                                     'type' : 0 , # 0 = regular , 1 = options call 2 = options puts 
-                                     'action' : orderLeg['instruction'].upper() ,
-                                    'bidReceipt'        if orderLeg['instruction'].upper() =='BUY' else 'askReceipt'        : order['orderId'],
-                                    'bidFilled'         if orderLeg['instruction'].upper() =='BUY' else 'askFilled'         : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
-                                    'bidFilledAt'       if orderLeg['instruction'].upper() =='BUY' else 'askFilledAt'       : order['orderActivityCollection'][0]['executionLegs'][0]['time'],
-                                    'indicators_in'     if orderLeg['instruction'].upper() =='BUY' else 'indicators_out'    : {}
+                            rec |= { 'symbol'   : symbol, #orderLeg['instrument']['underlyingSymbol'].upper(),   # orderLeg['instrument']['symbol'].upper()
+                                     'legType'  : orderLeg['orderLegType'], #  'EQUITY' or OPTION
+                                     'qty'      : orderLeg['quantity'] ,
+                                     'type'     : 0 , # 0 = regular , 1 = options call 2 = options puts 
+                                     'action'   : orderLeg['instruction'].upper() ,
+                                    'bidReceipt'        if orderLeg['instruction'].upper().find("BUY") > -1  else 'askReceipt'        : order['orderId'],
+                                    'bidFilled'         if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilled'         : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                    'bidFilledAt'       if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilledAt'       : order['orderActivityCollection'][0]['executionLegs'][0]['time'],
+                                    'indicators_in'     if orderLeg['instruction'].upper().find("BUY") > -1  else 'indicators_out'    : {}
                                 }
                         if 'bidReceipt' in rec and 'askReceipt' in rec :
                             rec.update ({'bid' : rec['bidFilled'], 'ask' : rec['askFilled'],
-                                         'p_l' : (rec['bidFilled'] - rec['bidFilled']) * rec['qty'],
-                                         'actualPL' : rec['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} ) 
+                                         'p_l' : (rec['bidFilled'] - rec['bidFilled']) * rec['qty'] } )
+                            
+                            rec.update ({'actualPL' : rec['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} ) 
                             orderbook.append( rec )
                             rec = {}
             for order in orderbook:                        
@@ -561,7 +564,7 @@ class TraderDB:
                         " CREATE PROCEDURE createTableOrderIndicates(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderIndicates( id int auto_increment PRIMARY KEY not null, orderId int not null, " +
-                                "indicateId  int  not null, bidValue decimal(10,4), askValue decimal(10,4) not null ,  " +                    
+                                "indicateId  int  not null, bidValue decimal(10,4), askValue decimal(10,4)  ,  " +                    
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( orderId  )     REFERENCES orderbook(id) , " +
                                 "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +

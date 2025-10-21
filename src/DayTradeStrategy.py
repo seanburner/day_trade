@@ -52,7 +52,7 @@ class DayTradeStrategy:
 
         self.Stocks     = {
                             'Stock' : {
-                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Occur' : 0},
+                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Occur' : 0, 'down' : 0},
                                     'Volume'        :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0 },
                                     'Indicators'    :   None
                                 }
@@ -110,6 +110,7 @@ class DayTradeStrategy:
         date_format     = "%Y-%m-%d %H:%M:%S"
 
         try:
+            print("\t\t\t * Building ORB levels ")
             if ( current_time.hour < 10  and current_time.minute < 59 ) :  # Pause until 10
                 time_to_sleep = (( 10 - current_time.hour) * 60) - ( 60 - current_time.minute )
                 if time_to_sleep > 0 :
@@ -562,7 +563,8 @@ class DayTradeStrategy:
                         self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
                         self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
-                        self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]                    
+                        self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
+                        self.Stocks[ symbol]['Price']['down']       = 0
                         action          = "bought"
                     
             
@@ -583,8 +585,12 @@ class DayTradeStrategy:
                                 f" NEW PRICE : { round(ticker_row[ closePos ],3) }  " +
                                 f" PRESSURE: {upward_pressure} -> {downward_pressure} %{upward_pressure /downward_pressure}  "   )                 
                  #  THERE IS SOMETHING ABOUT THE UPWARD PRESSURE == 0 THAT SIGNALS A TURNAROUND TO MAXIMIZE PROFITS , FIGURE IT OUT
-                 # MAYBE NEEDS ALL 3   CURRENT TO PREVIOUS > 95  AND CLOSE > OPEN AND UPPER PRESSURE MORE THAN DOWNWARD FOR IT TO TRIGGER 
-                 if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
+                 # MAYBE NEEDS ALL 3   CURRENT TO PREVIOUS > 95  AND CLOSE > OPEN AND UPPER PRESSURE MORE THAN DOWNWARD FOR IT TO TRIGGER
+                 if  round(float(ticker_row[ closePos ]), 5) < round( float(self.Stocks[ symbol]['Price']['Previous']) , 5)  :
+                     self.Stocks[ symbol]['Price']['down'] += 1
+                 else:
+                     self.Stocks[ symbol]['Price']['down'] = 0
+                 if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) and self.Stocks[ symbol]['Price']['down'] < 2 ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
                      print( f"\t\t\t  \\-> SELL SIGNAL [ RESCIND ] IN PROFIT  : " +
                             f" More upward than downward pressure : { round( float(ticker_row[highPos]) - float(ticker_row[closePos]), 5) } -> " +
                             f"{ round(float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 5 )} "  )
@@ -605,6 +611,7 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
                          self.Stocks[ symbol ]['Price' ]['High']   = 0
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
+                         self.Stocks[ symbol]['Price']['down']     = 0
                          action          = "closed"
                         
         
@@ -628,6 +635,7 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
                          self.Stocks[ symbol ]['Price' ]['High']   = 0
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
+                         self.Stocks[ symbol]['Price']['down']    = 0
                          action          = "closed"
                          self.Stocks[symbol]['Losses']    += 1
             

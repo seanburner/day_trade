@@ -435,6 +435,79 @@ def system_test( configs : dict  ) -> None :
     account         = None
     date_format     = "%Y-%m-%d %H:%M:%S"    
 
+
+    email       = 'seanburner@gmail.com'
+    HEADER      =  "INSERT INTO orderIndicates( orderId,indicateId,bidValue,askValue ,active,createdBy,createdDate,modBy,modDate  ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s);"
+    CONTENTS    =  [
+                    [26, 1, 4.88, 4.88,         1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 2, 4.68071, 4.68071,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 3, 4.39762, 4.39762,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 4, 3.6724, 3.6724,     1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 5, 3.55109, 3.55109,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 6, 13.75277, 13.75277, 1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 9, 5.74, 5.74,         1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 10, 1.8, 1.8,          1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 11, 17.49, 17.49,      1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 12, 5.08, 5.08,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 14, 56.48152, 56.48152,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 15, 0.15607, 0.15607,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 31, 14.27141, 14.27141,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 32, 5.08, 5.08,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 33, 14.56124, 14.56124,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 34, 12.74938, 12.74938,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 35, 11.285, 11.285,    1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 36, 9.82062, 9.82062,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 37, 7.73574, 7.73574,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 38, 17.49, 17.49,      1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 39, 1.8, 1.8,          1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 40, 4.81016, 4.81016,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 41, 4.23492, 4.23492,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 42, 3.77, 3.77,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 43, 3.30508, 3.30508,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 44, 2.64316, 2.64316,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 45, 5.74, 5.74,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 46, 8.66085, 8.66085,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [26, 47, 19.8139, 19.8139,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],	
+                    [27, 1, 4.88, 4.88,         1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 2, 4.68071, 4.68071,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 3, 4.39762, 4.39762,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 4, 3.6724, 3.6724,     1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 5, 3.55109, 3.55109,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 6, 13.75277, 13.75277, 1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 9, 5.74, 5.74,         1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 10, 1.8, 1.8,          1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 11, 17.49, 17.49,      1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 12, 5.08, 5.08,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 14, 56.48152, 56.48152,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 15, 0.15607,0.15607,   1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 31, 14.27141,14.27141, 1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 32, 5.08, 5.08,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 33, 14.56124, 14.56124,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 34, 12.74938, 12.74938,1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 35, 11.285, 11.285,    1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 36, 9.82062, 9.82062,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 37, 7.73574, 7.73574,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 38, 17.49, 17.49,      1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 39, 1.8, 1.8,          1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 40, 4.81016, 4.81016,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 41, 4.23492, 4.23492,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 42, 3.77, 3.77,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 43, 3.30508, 3.30508,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 44, 2.64316, 2.64316,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 45, 5.74, 5.74,        1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 46, 8.66085, 8.66085,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18'],
+                    [27, 47, 19.8139, 19.8139,  1, 'sean', '2025-10-20 15:55:18', 'sean', '2025-10-20 15:55:18']
+                   ]
+
+                   
+
+    account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    sqlConn     = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+    sqlConn.Conn.WriteMany( header=HEADER, contents =CONTENTS)
+    return 
+
+
+
     try:
         while True :
             print ( "-> going round in circles ")
@@ -495,16 +568,43 @@ def system_test_old( configs : dict ) -> None :
         Transiant - tests the integration of different code 
     """
     email       = 'seanburner@gmail.com'
-    orderbook   = [
-                    ['OPEN', '2025-09-05 10:45:00', 6.1501, 406, '2025-09-05 11:00:00', 6.325,  71.00940000000037],
-                    ['OPEN', '2025-09-05 11:15:00', 6.442,  388, '2025-09-05 11:45:00', 6.4725, 11.833999999999833],
-                    ['OPEN', '2025-09-05 12:15:00', 6.46,   386, '2025-09-05 12:45:00', 6.515,  21.230000000000018],
-                    ['OPEN', '2025-09-05 13:15:00', 6.585,  379, '2025-09-05 13:30:00', 6.6254, 15.311599999999999],
-                    ['OPEN', '2025-09-05 13:45:00', 6.7375, 371, '2025-09-05 14:45:00', 6.655,  -30.607499999999618],
-                    ['OPEN', '2025-09-05 15:00:00', 6.69,   373, '2025-09-05 15:30:00', 6.6,    -33.57000000000062],
-                    ['OPEN', '2025-09-05 15:45:00', 6.64,   376, '2025-09-05 18:39:47', 6.64,   0.0]
-                ]
+    HEADER      =  "INSERT INTO orderIndicates( orderId,indicateId,bidValue,askValue ,active,createdBy,createdDate,modBy,modDate  ) values (%s,%s,%s,%s,%s,%s,%s,%s,%s);"
+    CONTENTS    =  [
+                        [28, 1, 4.88, 4.88, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 2, 4.68071, 4.68071, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 3, 4.39762, 4.39762, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 4, 3.6724, 3.6724, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 5, 3.55109, 3.55109, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 6, 16.03, 16.03, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 9, 5.74, 5.74, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 10, 1.8, 1.8, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 11, 17.73, 17.73, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 12, 5.08, 5.08, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 14, 52.51877, 52.51877, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 15, 0.1458, 0.1458, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 31, 15.33702, 15.33702, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 32, 5.08, 5.08, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 33, 14.7446, 14.7446, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 34, 12.8977, 12.8977, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 35, 11.405, 11.405, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 36, 9.9123, 9.9123, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 37, 7.7871, 7.7871, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 38, 17.73, 17.73, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 39, 1.8, 1.8, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 40, 4.81016, 4.81016, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 41, 4.23492, 4.23492, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 42, 3.77, 3.77, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 43, 3.30508, 3.30508, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 44, 2.64316, 2.64316, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 45, 5.74, 5.74, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 46, 9.31682, 9.31682, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"],
+                        [28, 47, 22.16452, 22.16452, 1, 'sean', "2025-10-20 15:55:18", 'sean', "2025-10-20 15:55:18"]
+                    ]
+
     account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
+    sqlConn     = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+    sqlConn.Conn.WriteMany( header=header, contents =contents)
+    return 
     account.SetFunds( 5000.00, 0.50 )    
     account.SetTargetGoal( 0.025  )
     account.SetMode("LIVE")
@@ -666,8 +766,9 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     try:  
         configs['stock'] = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
         
-        account      = TradeAccount(funds=100, limit=0.10, app_type=configs['trading_platform'],
-                                        app_key = configs['app_key'], app_secret = configs['app_secret'])
+        account      = TradeAccount(funds=100, limit=0.10, app_type=configs['trading_platform'], userName = configs['username'], email=configs['email'],
+                                        app_key = configs['app_key'], app_secret = configs['app_secret'] ,
+                                    sqlServer =configs['sql_server'], sqlUserName =configs['sql_user'], sqlPassword =configs['sql_password'] )
         account.SetFunds( params['account_funds'], params['funds_ratio'] )  #5000.00, 0.50 )     
         account.SetMode( params['mode'] )      
         
@@ -777,7 +878,9 @@ def  replay_test( configs: dict  ) -> None :
     data            = {}
     isFirst         = True  # First quote requested should be on the 1 min chart 
     success         = False
-    account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    account         = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'],userName = configs['username'], email=configs['email'],
+                                        app_key = configs['app_key'], app_secret = configs['app_secret'] )
+                                    #sqlServer =configs['sql_server'], sqlUserName =configs['sql_user'], sqlPassword =configs['sql_password'] )
     date_format     = "%Y-%m-%d %H:%M:%S"
     current_time    = ""
     
@@ -887,7 +990,9 @@ def  back_test( configs: dict  ) -> None :
     data        = None
     new_data    = {}
     success     = False 
-    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
+    account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], userName = configs['username'], email=configs['email'],
+                                        app_key = configs['app_key'], app_secret = configs['app_secret'] )# ,
+                                    #sqlServer =configs['sql_server'], sqlUserName =configs['sql_user'], sqlPassword =configs['sql_password'] )
     interval    = 900
     thorHammer  = { }
     account.SetFunds( funds=5000.00, limit=0.10 )
@@ -975,7 +1080,7 @@ def  sync_broker_transactions( configs: dict  ) -> None :
                   
         #GET TRANSACTIONS FROM BROKERAGE 
         orders = account.Orders( time_interval=int(configs.get('sync_interval',10)))
-        
+        #print( orders ) 
 
         #Send the brokerages transactions to TraderDB for processing 
         traderDB.SyncEntries(orders=orders, time_interval=int(configs.get('sync_interval',10)) )
@@ -984,12 +1089,6 @@ def  sync_broker_transactions( configs: dict  ) -> None :
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
-
-
-
-
-
-
 
 
 
@@ -1163,7 +1262,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         print(f"\t {symbol} ORDERBOOK")
         print(f"\t    == OPENED ==\t=== BID=== \t== CLOSED == \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
-            print(f"\t   {entry['bidTime'] }\t${entry['bid'] :.4f}\t\t{entry['askTime'][11:]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry['actualPL']:.4f}" )            
+            print(f"\t   {entry['bidTime'][:19] }\t${entry['bid'] :.4f}\t\t{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry['actualPL']:.4f}" )            
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
