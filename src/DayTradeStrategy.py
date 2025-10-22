@@ -125,7 +125,7 @@ class DayTradeStrategy:
             for symbol in symbols:            
                 data        = account.History ( symbol = symbol, time_range=200 )                # GET HISTORICAL INFO FOR SYMBOL
                 seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')                
-                if seed_df == None :
+                if not isinstance(seed_df, pd.DataFrame) or len(seed_df) ==0 :
                     seed_df = data
                 
                 seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))
@@ -439,15 +439,16 @@ class DayTradeStrategy:
             if not ( symbol in self.Stocks.keys() )  and ( current_time.hour == 15 and current_time.minute >= 45) :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
                 return 
-            
+   #    self.Data = pd.concat( [df, self.Data ],  ignore_index=True).reset_index( drop=True)
+         
             # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY 
             if not ( symbol in self.Stocks.keys() ) :
                 data = account.History ( symbol = symbol, time_range =200 )           # GET HISTORICAL INFO FOR SYMBOL
                 
-                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')
-                if seed_df == None :
+                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')                
+                if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0  :
                     seed_df = data
-
+                
                 seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
                 seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
 
@@ -499,7 +500,7 @@ class DayTradeStrategy:
 
             
             #HOW MANY CONSECUTIVE TIMES THE PRICE HAS RISENS
-            if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous']  and  ticker_row[closePos] > ticker_row[openPos]:
+            if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous'] :# and  ticker_row[closePos] > ticker_row[openPos]:
                     self.Stocks[ symbol]['Price']['Occur']  += 1
             else:
                 self.Stocks[ symbol]['Price']['Occur']  = 0
@@ -549,11 +550,12 @@ class DayTradeStrategy:
                 
                 print( f"\t\t\t  *  BUY:: Volume increase OKAY : {ticker_row[ volumePos ]} from" +
                        f" newPrice - previous = ${round( round(float(ticker_row[ closePos ]),5) -  round(float(self.Stocks[ symbol]['Price']['Previous']), 5) , 5) } " +
-                       f" Volume :  from { round( self.Stocks[ symbol]['Volume']['Previous'] , 5)  } ==> {volume_increase} " +
+                       f" Volume :  from { round( self.Stocks[ symbol]['Volume']['Previous'] , 5)  } ==> { round(volume_increase, 5 ) } " +
                        f" PRESSURE :  upward : { round(upward_pressure,5)} ==>  downward :{ round(downward_pressure,5)} " +
                        f" OCCUR : {self.Stocks[symbol]['Price']['Occur'] }  -> {params['bounce_up_min'] } " +
-                       f" BODY vs WICK : {(ticker_row[closePos] - ticker_row[openPos])} --> {(ticker_row[highPos] - ticker_row[closePos])} "    )  
-                if   (ticker_row[closePos] - ticker_row[openPos]) > (ticker_row[highPos] - ticker_row[closePos]) and upward_pressure > downward_pressure :
+                       f" BODY vs WICK : {round( (ticker_row[closePos] - ticker_row[openPos]) ,5 ) } --> { round( (ticker_row[highPos] - ticker_row[closePos]) , 5 )} "    )
+                # 2025-10-21  Playing around to get best results 
+                if upward_pressure > downward_pressure : # (ticker_row[closePos] - ticker_row[openPos]) > (ticker_row[highPos] - ticker_row[closePos]) or upward_pressure > downward_pressure :
                     print( f"\t\t\t\t  -  BUY:: ATTEMPTING to Submit a BUY" )
                     if ( account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,

@@ -477,13 +477,13 @@ class TradeAccount:
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
-                if ( ( p_l * -1 ) > 0.01 * self.DailyFunds ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
+                if (  p_l  < ( -0.01 * self.DailyFunds) ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
                     print( f"**Lost TOO MUCH on one deal : { p_l}  -> {self.LossLimit} ")
                     self.TargetGoal = 0 
 
                 if self.Mode.upper() == "TRADE":
                     self.Reconcile()
-                    success = self.SQLConn.InsertOrderbook( self.Trades[stock][-1], self.Email  , self.Username)
+                    success = self.SQLConn.InsertOrderbook( orderbook={symbol: [self.Trades[stock][-1]]}, email=self.Email  , username=self.UserName)
                     print( f"**Lost TOO MUCH on one deal : { p_l}  -> {self.LossLimit} ")
                 success = True
             else:
@@ -539,13 +539,18 @@ class TradeAccount:
                     none 
             
         """
-        reconcile   = {}
         temp        = self.Trades
+        orders      = []
+        reconcile   = {}
         
         try:           
             self.Trades = {}
             for symbol in temp.keys():
                 self.Trades.update( { symbol : [] } )
+                
+                if self.Mode.upper() == "TRADE":    #PULLS ALL TRADES FOR THIS SYMBOL ONCE , MORE EFFICIENT 
+                    orders = self.Conn.Orders( symbol, enteredTime=temp[symbol]['askTime'], qty=0 ,action=['BUY'/'SELL'])
+                    
                 for trade in temp[symbol] :
                     if not ('bidReceipt' in trade  or 'askReceipt' in trade ) :
                         if self.Mode.upper() == "TEST":
@@ -554,12 +559,12 @@ class TradeAccount:
                                            'askReceipt' : 2222222,  'askFilled' : trade['ask'] ,
                                            'actualPL' : (trade['ask'] - trade['bid'] ) * trade['qty'] 
                                        }
-                        else:
+                        else:                            
                             if not('bidReceipt' in trade ):
-                                reconcile.update(self.Conn.Orders( symbol, enteredTime=trade['bidTime'], qty=trade['qty'],action='BUY') )
+                                reconcile.update( orders )
                             
                             if not('askReceipt' in trade ):
-                                reconcile.update( self.Conn.Orders( symbol, enteredTime=trade['askTime'], qty=trade['qty'],action='SELL') )
+                                reconcile.update( orders )
 
                             if 'askFilled' in reconcile and 'bidFilled' in reconcile:
                                 reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )

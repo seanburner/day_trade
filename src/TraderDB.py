@@ -41,7 +41,7 @@ class TraderDB:
         self.UserName   = userName
         self.Password   = password
         self.EncKey     = ""
-        self.User       = getpass.getuser()     # CURRENT PERSON LOGGED INT 
+        self.User       = getpass.getuser()     # CURRENT PERSON LOGGED IN 
         self.Conn       = MySQLConn( )
         self.Conn.Connect(server =self.Server, database='trading', username =self.UserName, passwd =self.Password )
 
@@ -289,7 +289,9 @@ class TraderDB:
         
         try:
             for ind in indicatorsId.keys() :
-                contents.append( [orderId, indicatorsId[ind],round(indicators_in[ind],5) , round( indicators_out[ind],5)  ,*self.InsertMetaFields(2) ] )
+                if ind in indicators_in and ind in indicators_out:
+                    contents.append( [orderId, indicatorsId[ind],round(float(indicators_in[ind]),5) ,
+                                      round( float(indicators_out[ind]),5)  ,*self.InsertMetaFields(2) ] )
             if contents != [] :
                 self.Conn.WriteMany( header=header, contents =contents)
             
@@ -297,7 +299,7 @@ class TraderDB:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-            print( f"\t\tQUERY:{query}")
+            print( f"\t\tQUERY:{header } -> {contents}")
             
     
     def InsertOrderbook( self, orderbook : list , email : str , username : str = '') -> bool:
@@ -338,7 +340,7 @@ class TraderDB:
             
             for symbol in orderbook.keys():
                 dupeNum = 0 
-                for order in orderbook[symbol]  :                    
+                for order in  orderbook[symbol]  : 
                     userId      = self.InsertUser(  email  = email, userName =username )
                     stockId     = self.InsertStock( symbol = symbol )
                     initDateId  = self.InsertDate(  date   = order['bidTime'] )
@@ -429,7 +431,7 @@ class TraderDB:
 
 
 
-    def SyncEntries ( self, orders : list , time_interval : int ) -> list :
+    def SyncEntries ( self, orders : list , time_interval : int , username : str , email : str ) -> list :
         """
             Accepts a list of dictionary representing orders from the brokerage
             ARGS   :
@@ -439,6 +441,12 @@ class TraderDB:
                     nothing 
         """
         rec         = {}
+        types       = { 'OPTION': {
+                                    'CALL' : 1 ,
+                                    'PUT'  : 2
+                                },
+                          'EQUITY': 0
+                      }
         orderbook   = []
         
         try:
@@ -455,34 +463,39 @@ class TraderDB:
                         if ( rec == {} or
                              ( symbol.upper() == rec['symbol'] and
                                orderLeg['quantity'] == rec['qty']  and
-                               orderLeg['instruction'].upper() != rec['action']) ) : 
+                               orderLeg['instruction'].upper() != rec['action']) ) :
+                            if orderLeg['orderLegType'] == 'EQUITY':
+                                otype = types[orderLeg['orderLegType']]
+                            else:
+                                otype = types[orderLeg['orderLegType']][ orderLeg['instrument']['putCall']]
+                            
                             rec |= { 'symbol'   : symbol, #orderLeg['instrument']['underlyingSymbol'].upper(),   # orderLeg['instrument']['symbol'].upper()
                                      'legType'  : orderLeg['orderLegType'], #  'EQUITY' or OPTION
                                      'qty'      : orderLeg['quantity'] ,
-                                     'type'     : 0 , # 0 = regular , 1 = options call 2 = options puts 
-                                     'action'   : orderLeg['instruction'].upper() ,
+                                     'type'     : otype , # 0 = regular , 1 = options call 2 = options puts 
+                                     'action'   : orderLeg['instruction'].upper() ,                            
+                                    'bidTime'           if orderLeg['instruction'].upper().find("BUY") > -1  else 'askTime'           : str(order['enteredTime'])[:19].replace('T',' '),
                                     'bidReceipt'        if orderLeg['instruction'].upper().find("BUY") > -1  else 'askReceipt'        : order['orderId'],
                                     'bidFilled'         if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilled'         : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
                                     'bidFilledAt'       if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilledAt'       : order['orderActivityCollection'][0]['executionLegs'][0]['time'],
                                     'indicators_in'     if orderLeg['instruction'].upper().find("BUY") > -1  else 'indicators_out'    : {}
                                 }
                         if 'bidReceipt' in rec and 'askReceipt' in rec :
-                            rec.update ({'bid' : rec['bidFilled'], 'ask' : rec['askFilled'],
-                                         'p_l' : (rec['bidFilled'] - rec['bidFilled']) * rec['qty'] } )
-                            
-                            rec.update ({'actualPL' : rec['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} ) 
+                            rec.update ({'bid' : rec['bidFilled'], 'ask' : rec['askFilled'], 'price' : rec['bidFilled']} )
+                            rec.update ({  'p_l' : (rec['bidFilled'] - rec['bidFilled']) * rec['qty'] } )
+                            rec.update ({'actualPL' : rec['p_l'] * (100 if otype > 0 else 1 ), 'bidVolume' : 0, 'askVolume' : 0} )
+                           # print ( order )
                             orderbook.append( rec )
                             rec = {}
             for order in orderbook:                        
                 print( f"Found Orders: { order['symbol']}  { order['action']} { order['qty']}  { order['bidReceipt']}   { order['askReceipt']}" ) 
-            
+
+            self.InsertOrderbook(  orderbook = {symbol : orderbook }, email=email  , username=username)
         except:  
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
 
-        finally:
-            return orderbook 
 
 
 

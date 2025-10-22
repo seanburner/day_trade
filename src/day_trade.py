@@ -796,6 +796,8 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                         account.Sell(stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] ,
                                      ask_volume=ticker_row[5], indicators=Strategies.Stocks[symbol]['Indicators'] )
                 cont = False
+            elif (current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
+                Strategies.SetORB(configs['stock'], account, current_time)    
             else:
                 current_time    = datetime.strptime( str(current_time)[:17] +"00", date_format) 
                 symbols         = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
@@ -1083,7 +1085,7 @@ def  sync_broker_transactions( configs: dict  ) -> None :
         #print( orders ) 
 
         #Send the brokerages transactions to TraderDB for processing 
-        traderDB.SyncEntries(orders=orders, time_interval=int(configs.get('sync_interval',10)) )
+        traderDB.SyncEntries(orders=orders, time_interval=int(configs.get('sync_interval',10)), username=configs['username'], email=configs['email'] )
         
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )

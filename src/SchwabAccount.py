@@ -408,8 +408,8 @@ class SchwabAccount :
         temp  = None
 
         try :
-            print(f"FROMTIME : {fromTime} -> {type(fromTime)}")
-            print(f'ENDPOINT: {self._base_api_url}/trader/v1/accounts/{accountHash}/orders')
+            #print(f"FROMTIME : {fromTime} -> {type(fromTime)}")
+            #print(f'ENDPOINT: {self._base_api_url}/trader/v1/accounts/{accountHash}/orders')
             temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
                             headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params={'maxResults': 50,
@@ -427,7 +427,7 @@ class SchwabAccount :
         finally:
             return temp.json()
 
-    def Orders ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str ) -> dict :
+    def Orders ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str | list) -> dict :
         """
             Reconcile what we submitted ( BUY/SELL ) with how Schwab filled it
             DOES:
@@ -436,9 +436,10 @@ class SchwabAccount :
             2. Gets filled orders
             3. Builds dictionary for marching order at time and symbol and qty
             ARGS   :
-                    symbol       ( str )  stock symbol to search for
-                    enteredTime  ( datetime ) time the BUY/SELL was submitted
-                    qty          ( int ) qty of stock BOUGHT/SOLD
+                    symbol       ( str )        stock symbol to search for
+                    enteredTime  ( datetime )   time the BUY/SELL was submitted
+                    qty          ( int )        qty of stock BOUGHT/SOLD
+                    action       ( str / list ) some flexibility when filtering on action 
             RETURNS:
                     dictionary of values 
         """
@@ -460,8 +461,13 @@ class SchwabAccount :
             for order in filledOrders:
                 for orderLeg in order['orderLegCollection']:
                     if (orderLeg['instrument']['symbol'].upper() == symbol.upper()  and
-                            action.upper() == orderLeg['instruction'].upper()   and
-                                qty == orderLeg['quantity']  ):
+                            (   (isinstance( action, str ) and action.upper() == orderLeg['instruction'].upper() )   or
+                                    (isinstance( action, list ) and  orderLeg['instruction'].upper() in str(action).upper() ) 
+                             ) and
+                             (
+                                ( qty > 0 and qty == orderLeg['quantity'] ) or
+                                ( orderLeg['quantity'] > 0 ) 
+                            ) ):
                         #print(f"\t{orderLeg} -> {order} ")
                         # MIGHT NEED TO ALLOW FOR MULTI LEG INFO IN THE PRICE AND EXECUTION TIME 
                         results =  { 'symbol' : orderLeg['instrument']['symbol'].upper(),
@@ -671,7 +677,8 @@ class SchwabAccount :
             else:
                 print("\t\t\t\t  -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
                 
-            print(f"\t\t\t\t\t  |  BUY ORDER Response: {buy_response.status_code}  {buy_response.text} ") #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            print(f"\t\t\t\t\t  |  BUY ORDER Response: {buy_response.status_code}  {buy_response.text}  {qty} {symbol}  @ ${price} = ${ qty * price }")
+            #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
             
             
         except Exception as e:                      
@@ -730,7 +737,7 @@ class SchwabAccount :
             else:
                 print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
             
-            print(f"\t\t\t\t\t  |  SELL ORDER  Response: {sell_response.status_code} -> {sell_response.text} " )
+            print(f"\t\t\t\t\t  |  SELL ORDER  Response: {sell_response.status_code} -> {sell_response.text}     {qty} {symbol}  @ ${price} = ${ qty * price }" )
 
         except Exception as e:                      
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
