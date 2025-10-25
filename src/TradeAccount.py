@@ -11,19 +11,25 @@ import os
 import re
 import sys
 import time
-import pandas as pd
-import numpy  as np 
 import getpass
+import warnings
 import inspect
 import platform
 import argparse
 import functools
 import requests
 
+
+import pandas           as pd
+import numpy            as np 
+
 from datetime           import datetime, timedelta, timezone
 from TraderDB           import TraderDB
 from Indicators         import Indicators 
 from SchwabAccount      import SchwabAccount
+
+warnings.filterwarnings('ignore')
+
 
 OPTION_NONE = 0
 OPTION_CALL = 1
@@ -147,7 +153,7 @@ class TradeAccount:
             #print( response.text )
             if response.status_code != 200 :
                 return ticker_row
-
+            #print( response.text)
             
             #print( "TradeAccount::HISTORY  response : ", response.text)
             df = pd.DataFrame( response.json()['candles'])
@@ -483,8 +489,9 @@ class TradeAccount:
 
                 if self.Mode.upper() == "TRADE":
                     self.Reconcile()
-                    success = self.SQLConn.InsertOrderbook( orderbook={symbol: [self.Trades[stock][-1]]}, email=self.Email  , username=self.UserName)
-                    print( f"**Lost TOO MUCH on one deal : { p_l}  -> {self.LossLimit} ")
+                    success = self.SQLConn.InsertOrderbook(
+                        orderbook={stock: [self.Trades[stock][-1]]}, email=self.Email  , username=self.UserName  )
+                    
                 success = True
             else:
                 print ("\t\t --> Account  level did not Execute SELL properly ") 
@@ -543,34 +550,34 @@ class TradeAccount:
         orders      = []
         reconcile   = {}
         
-        try:           
+        try:            
             self.Trades = {}
             for symbol in temp.keys():
                 self.Trades.update( { symbol : [] } )
-                
-                if self.Mode.upper() == "TRADE":    #PULLS ALL TRADES FOR THIS SYMBOL ONCE , MORE EFFICIENT 
-                    orders = self.Conn.Orders( symbol, enteredTime=temp[symbol]['askTime'], qty=0 ,action=['BUY'/'SELL'])
+                if len( temp[symbol]) > 0 :
+                    if self.Mode.upper() == "TRADE":    #PULLS ALL TRADES FOR THIS SYMBOL ONCE , MORE EFFICIENT                        
+                        orders = self.Conn.Orders( symbol=symbol, enteredTime=temp[symbol][-1]['askTime'], qty=0 ,action=['BUY','SELL'])
                     
-                for trade in temp[symbol] :
-                    if not ('bidReceipt' in trade  or 'askReceipt' in trade ) :
-                        if self.Mode.upper() == "TEST":
-                            reconcile   = {
-                                        'bidReceipt': 11111111,     'bidFilled' : trade['bid'] ,
-                                           'askReceipt' : 2222222,  'askFilled' : trade['ask'] ,
-                                           'actualPL' : (trade['ask'] - trade['bid'] ) * trade['qty'] 
+                    for trade in temp[symbol] :
+                        if not ('bidReceipt' in trade  or 'askReceipt' in trade ) :
+                            if self.Mode.upper() == "TEST":
+                                reconcile   = {
+                                            'bidReceipt': 11111111,     'bidFilled' : trade['bid'] ,
+                                            'askReceipt': 2222222,      'askFilled' : trade['ask'] ,
+                                            'actualPL'  : (trade['ask'] - trade['bid'] ) * trade['qty'] 
                                        }
-                        else:                            
-                            if not('bidReceipt' in trade ):
-                                reconcile.update( orders )
+                            else:                            
+                                if not('bidReceipt' in trade ) and symbol == orders['symbol']:
+                                    reconcile.update( orders )
                             
-                            if not('askReceipt' in trade ):
-                                reconcile.update( orders )
+                                if not('askReceipt' in trade ) and symbol == orders['symbol']:
+                                    reconcile.update( orders )
 
-                            if 'askFilled' in reconcile and 'bidFilled' in reconcile:
-                                reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )
-                            
-                        trade.update( reconcile )
-                    self.Trades[symbol].append(  trade  ) 
+                                if 'askFilled' in reconcile and 'bidFilled' in reconcile:
+                                    reconcile.update( { 'actualPL' : (reconcile['askFilled'] - reconcile['bidFilled'] ) * trade['qty'] } )
+                            if 'askReceipt' in reconcile and 'bidReceipt' in reconcile :
+                                trade.update( reconcile )
+                        self.Trades[symbol].append(  trade  ) 
             
             
         except:

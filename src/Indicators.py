@@ -17,6 +17,7 @@ import time
 import base64
 import getpass
 import inspect
+import warnings
 import platform
 
 import pandas       as      pd
@@ -24,6 +25,8 @@ import numpy        as      np
 
 
 from datetime       import  datetime 
+
+warnings.filterwarnings('ignore')
 
 
 class Indicators :
@@ -137,7 +140,8 @@ class Indicators :
         try:
             df = pd.DataFrame(entry).T
             df['date'] = df['datetime'].apply( lambda x: str(datetime.fromtimestamp(x/1000))[:10])
-            
+
+            self.Data = self.Data.dropna()
             self.Data = pd.concat( [df, self.Data ],  ignore_index=True).reset_index( drop=True)
             if 0 in self.Data.columns :
                 self.Data = self.Data.drop(0, axis=1)

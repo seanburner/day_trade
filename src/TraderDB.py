@@ -302,11 +302,11 @@ class TraderDB:
             print( f"\t\tQUERY:{header } -> {contents}")
             
     
-    def InsertOrderbook( self, orderbook : list , email : str , username : str = '') -> bool:
+    def InsertOrderbook( self, orderbook : dict , email : str , username : str = '') -> bool:
         """
             Insert the transactions from the order book in to the database properly normalized
             ARGS   :
-                        orderbook  ( list )  - entries to be added to orderbook table
+                        orderbook  ( dict )  - entries to be added to orderbook table
                         email      ( str )   - email of user to associate with orderbook entries
                         username   ( str )   - user name to associate with session entries
             RETURNS:
@@ -339,28 +339,29 @@ class TraderDB:
             indicatorsId = self.GetIndicators( indicators = orderbook[ list(orderbook.keys())[0]][0]['indicators_in'] )
             
             for symbol in orderbook.keys():
-                dupeNum = 0 
-                for order in  orderbook[symbol]  : 
-                    userId      = self.InsertUser(  email  = email, userName =username )
-                    stockId     = self.InsertStock( symbol = symbol )
-                    initDateId  = self.InsertDate(  date   = order['bidTime'] )
-                    closeDateId = self.InsertDate(  date   = order['askTime'] )
-                    self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
-                    if self.Conn.Results != [] :
-                        print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
-                        dupeNum += 1
-                    else:
-                        query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
+                dupeNum = 0
+                if len( orderbook[symbol]) > 0 :
+                    for order in  orderbook[symbol]  : 
+                        userId      = self.InsertUser(  email  = email, userName =username )
+                        stockId     = self.InsertStock( symbol = symbol )
+                        initDateId  = self.InsertDate(  date   = order['bidTime'] )
+                        closeDateId = self.InsertDate(  date   = order['askTime'] )
+                        self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
+                        if self.Conn.Results != [] :
+                            print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
+                            dupeNum += 1
+                        else:
+                            query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
                                     f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
                                      f"'{order['bidFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
                                      f"'{order['actualPL']}' {self.InsertMetaFields(1)} );"  )                        
                         
-                        orderId  =  self.Conn.Write( query )
-                        if orderId != None :
-                            self.InsertOrderIndicators( indicatorsId=indicatorsId, orderId=orderId, 
+                            orderId  =  self.Conn.Write( query )
+                            if orderId != None :
+                                self.InsertOrderIndicators( indicatorsId=indicatorsId, orderId=orderId, 
                                                         indicators_in=order['indicators_in'],indicators_out=order['indicators_out'] )
-                            numRec += 1
-                            success = True 
+                                numRec += 1
+                                success = True 
   
         
             print (f"\t\t\t -> Inserted {numRec} entries, while ignoring {dupeNum} duplicates in orderbook" )
@@ -429,7 +430,29 @@ class TraderDB:
         return orders
 
 
-
+    def SyncEntryRecord( self, symbol : str , order : dict , orderLeg : dict , order_type : int   )-> dict :
+        """
+            Build the SyncEntry record - this might need to be in the SchwabAccount 
+            ARGS    :
+                        symbol     ( str )  stock symbol
+                        order      ( dict ) the full order structure ( including orderLeg) for time/price  ( overkill )
+                        orderLeg   ( dict ) order leg info from platform
+                        order_type ( int )  0 = EQUITY  1 =OPTIONS_CALL  2=OPTIONS_PUT
+            RETURNS :
+                        dictionary of values
+        """
+        return { 'symbol'   : symbol, #orderLeg['instrument']['underlyingSymbol'].upper(),   # orderLeg['instrument']['symbol'].upper()
+                                     'legType'  : orderLeg['orderLegType'], #  'EQUITY' or OPTION
+                                     'qty'      : orderLeg['quantity'] ,
+                                     'type'     : order_type , # 0 = regular , 1 = options call 2 = options puts 
+                                     'action'   : orderLeg['instruction'].upper() ,                            
+                                    'bidTime'           if orderLeg['instruction'].upper().find("BUY") > -1  else 'askTime'           : str(order['enteredTime'])[:19].replace('T',' '),
+                                    'bidReceipt'        if orderLeg['instruction'].upper().find("BUY") > -1  else 'askReceipt'        : order['orderId'],
+                                    'bidFilled'         if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilled'         : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                    'bidFilledAt'       if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilledAt'       : order['orderActivityCollection'][0]['executionLegs'][0]['time'],
+                                    'indicators_in'     if orderLeg['instruction'].upper().find("BUY") > -1  else 'indicators_out'    : {}
+                                } 
+        
 
     def SyncEntries ( self, orders : list , time_interval : int , username : str , email : str ) -> list :
         """
@@ -440,57 +463,72 @@ class TraderDB:
             RETURNS:
                     nothing 
         """
-        rec         = {}
+        pos         = 0
+        recs        = []
+        found       = False 
         types       = { 'OPTION': {
                                     'CALL' : 1 ,
                                     'PUT'  : 2
                                 },
                           'EQUITY': 0
-                      }
-        orderbook   = []
+                      }        
+        orderbook  = {}
+        order_type  = 0
         
-        try:
-            
+        try:            
             #Get entries from SQL 
             entries = self.Orders( time_interval=time_interval)
 
             #Build entries in orderbook format ( ask and bid ) to then send to self.InsertOrderbook( self, orderbook : list , email : str , username : str = '') -> bool:
             for order in orders :
+                #print(f"\n** FULL ORDER : { order }")
                 for orderLeg in order['orderLegCollection']:                    
-                    receipt = order['orderId']                    
-                    if str(entries).find( str(receipt) ) == -1   :     #this order is not in the SQL so need to start building buy/sell                      
+                    receipt     = order['orderId']
+                    order_date  = order['enteredTime'][:10]
+                    if str(entries).find( str(receipt) ) == -1   :     #this order is not in the SQL so need to start building buy/sell                        
                         symbol = orderLeg['instrument']['underlyingSymbol'] if 'underlyingSymbol' in orderLeg['instrument'] else orderLeg['instrument']['symbol']
-                        if ( rec == {} or
-                             ( symbol.upper() == rec['symbol'] and
-                               orderLeg['quantity'] == rec['qty']  and
-                               orderLeg['instruction'].upper() != rec['action']) ) :
-                            if orderLeg['orderLegType'] == 'EQUITY':
-                                otype = types[orderLeg['orderLegType']]
-                            else:
-                                otype = types[orderLeg['orderLegType']][ orderLeg['instrument']['putCall']]
+                        if not(symbol in orderbook):
+                            orderbook.update( { symbol : [] })
                             
-                            rec |= { 'symbol'   : symbol, #orderLeg['instrument']['underlyingSymbol'].upper(),   # orderLeg['instrument']['symbol'].upper()
-                                     'legType'  : orderLeg['orderLegType'], #  'EQUITY' or OPTION
-                                     'qty'      : orderLeg['quantity'] ,
-                                     'type'     : otype , # 0 = regular , 1 = options call 2 = options puts 
-                                     'action'   : orderLeg['instruction'].upper() ,                            
-                                    'bidTime'           if orderLeg['instruction'].upper().find("BUY") > -1  else 'askTime'           : str(order['enteredTime'])[:19].replace('T',' '),
-                                    'bidReceipt'        if orderLeg['instruction'].upper().find("BUY") > -1  else 'askReceipt'        : order['orderId'],
-                                    'bidFilled'         if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilled'         : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
-                                    'bidFilledAt'       if orderLeg['instruction'].upper().find("BUY") > -1  else 'askFilledAt'       : order['orderActivityCollection'][0]['executionLegs'][0]['time'],
-                                    'indicators_in'     if orderLeg['instruction'].upper().find("BUY") > -1  else 'indicators_out'    : {}
-                                }
-                        if 'bidReceipt' in rec and 'askReceipt' in rec :
-                            rec.update ({'bid' : rec['bidFilled'], 'ask' : rec['askFilled'], 'price' : rec['bidFilled']} )
-                            rec.update ({  'p_l' : (rec['bidFilled'] - rec['bidFilled']) * rec['qty'] } )
-                            rec.update ({'actualPL' : rec['p_l'] * (100 if otype > 0 else 1 ), 'bidVolume' : 0, 'askVolume' : 0} )
-                           # print ( order )
-                            orderbook.append( rec )
-                            rec = {}
-            for order in orderbook:                        
-                print( f"Found Orders: { order['symbol']}  { order['action']} { order['qty']}  { order['bidReceipt']}   { order['askReceipt']}" ) 
+                        if orderLeg['orderLegType'] == 'EQUITY':
+                            order_type = types[orderLeg['orderLegType']]
+                        else:
+                            order_type = types[orderLeg['orderLegType']][ orderLeg['instrument']['putCall']]
+                        
+                        if len(recs) == 0 :
+                            recs.append( self.SyncEntryRecord( symbol=symbol , order=order, orderLeg=orderLeg , order_type=order_type   )  )                            
+                        else:
+                            pos     = 0
+                            found   = False 
+                            for indx in range(len(recs) ):                                
+                                if ( symbol.upper() == recs[indx]['symbol'] and
+                                           orderLeg['quantity'] == recs[indx]['qty']  and
+                                           orderLeg['instruction'].upper() != recs[indx]['action']  and
+                                           order_date == (recs[indx]['bidTime'][:10] if 'bidTime' in recs[indx] else recs[indx]['askTime'][:10] )
+                                     ) :
+                                    found = True
+                                    pos = indx                                   
+                                    recs[indx] |=  self.SyncEntryRecord( symbol=symbol , order=order, orderLeg=orderLeg , order_type=order_type   )  
+                            
+                            if not found :                                
+                                pos = len( recs )
+                                recs.append( self.SyncEntryRecord( symbol=symbol , order=order, orderLeg=orderLeg , order_type=order_type   )   )
+                                
+                        if 'bidReceipt' in recs[pos] and 'askReceipt' in recs[pos] :
+                            recs[pos].update ({'bid'        : recs[pos]['bidFilled'], 'ask' : recs[pos]['askFilled'], 'price' : recs[pos]['bidFilled']} )
+                            recs[pos].update ({  'p_l'      : ( (recs[pos]['askFilled'] - recs[pos]['bidFilled']) * recs[pos]['qty'] ) * (100 if order_type > 0 else 1 ) } )
+                            recs[pos].update ({'actualPL'   : recs[pos]['p_l'] * (100 if order_type > 0 else 1 ), 'bidVolume' : 0, 'askVolume' : 0} )                                                       
+                            orderbook[symbol].append( recs[pos] )
+                            recs.pop( pos )
+            print( f"\n\t\t Orders to sync ")
+            print( f"\t\t\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tBIDRECEIPT\tASKRECEIPT ")
+            for symbol in orderbook.keys():     
+                for order in orderbook[symbol]:                        
+                    print( f"\t\t\t{ order['bidTime']}\t{order['askTime'][11:16]}\t\t{ order['symbol']}\t{ order['qty']}\t{ order['bidReceipt']}\t{ order['askReceipt']}" ) 
+               # print( f" Orders: { order}" )
+            print("\nLEFT OVER : " , recs )
 
-            self.InsertOrderbook(  orderbook = {symbol : orderbook }, email=email  , username=username)
+          #  self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
         except:  
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():

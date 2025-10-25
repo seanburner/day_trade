@@ -815,10 +815,13 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                                               'volume':float(ticker_row[5]), 'interval': time_interval/60 , 'msg':msg } )
                         if msg.upper() == "BOUGHT" :
                             bought_action = True 
-                            print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                    
+                            print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                            
                         elif msg.upper() == "CLOSED" :
                             bought_action |= False          #KEEP TRACK IF NEED TO CHANGE THE INTERVAL BECAUSE BOUGHT ONE OF THE SYMBOLS 
                             print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )
+                    else:
+                        print(f"\t\t\t Did not get ticker info for symbol { symbol }, CHECK SYMBOL AND TRY AGAIN ")
+                        return 
                 # If TargetGoal == 0 then sleep for 30 minutes and readjust DailyFunds, TargetGoal  and Limit
                 if account.TargetGoal == 0 :
                     account.SetFunds( params['account_funds'] - (params['account_funds'] * 0.10), params['funds_ratio'] - 0.10 )  #5000.00, 0.50 )
@@ -1070,7 +1073,7 @@ def  sync_broker_transactions( configs: dict  ) -> None :
     try:        
         account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
         traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
-        print( '\t* Syncing transactions from  ', account )
+        print( f'\t* Syncing transactions from  {configs["sync_interval"] } days prior for :', account )
 
         if not account :
             print("\t\t\t Could not connect to provided user's trading account ")

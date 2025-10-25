@@ -327,7 +327,7 @@ class SchwabAccount :
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-
+            print(f"\t\t-> TOKENS : {self.Tokens}")
                 
         
     def Preference( self ) -> dict :
