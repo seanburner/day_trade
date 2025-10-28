@@ -329,7 +329,7 @@ class TraderDB:
         
         try:
             print("\t\t * Inserting Order book ")
-            print("\t\t   -> user : ", email , " : " ,username)
+            print(f"\t\t   -> user : {username} [ {email} ] " )
 
             if len( orderbook) == 0 :
                 print ("\t\t   -> No orders to save to database, skipping ")
@@ -521,14 +521,17 @@ class TraderDB:
                             orderbook[symbol].append( recs[pos] )
                             recs.pop( pos )
             print( f"\n\t\t Orders to sync ")
-            print( f"\t\t\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tBIDRECEIPT\tASKRECEIPT ")
-            for symbol in orderbook.keys():     
+            print( f"\t\t\tSTOCK\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tPRICE\t\t\tBIDRECEIPT\tASKRECEIPT ")
+            for symbol in orderbook.keys():
+                print( f"\t\t\t{symbol}")
                 for order in orderbook[symbol]:                        
-                    print( f"\t\t\t{ order['bidTime']}\t{order['askTime'][11:16]}\t\t{ order['symbol']}\t{ order['qty']}\t{ order['bidReceipt']}\t{ order['askReceipt']}" ) 
-               # print( f" Orders: { order}" )
+                    print( f"\t\t\t\t{ order['bidTime']}\t{order['askTime'][11:16]}\t\t{ order['symbol']}"+
+                           f"\t{ int( order['qty'] )}\t${ order['bidFilled']:.2f} -> ${ order['askFilled']:.2f}"+
+                           f"\t\t{ order['bidReceipt']}\t{ order['askReceipt']}" ) 
+               
             print("\nLEFT OVER : " , recs )
 
-          #  self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
+            self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
         except:  
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():

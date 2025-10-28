@@ -94,7 +94,7 @@ class DayTradeStrategy:
         return True
 
     
-    def PrimeStockEntry( self, symbol : str, ticker_row : list, current_time : datetime,
+    def PrimeStockEntry( self, symbol : str, ticker_df : pd.DataFrame, ticker_row : list, current_time : datetime,
                          account : TradeAccount, closePos : int = 3, highPos : int = 6, volumePos : int = 5 ) -> dict :
         """
             Set the Stock object entry for a new stock symbol
@@ -104,6 +104,7 @@ class DayTradeStrategy:
         """
         data            = None
         seed_df         = None
+        ticker_df       = None 
         time_range      = 200
         today_date      = str(current_time)[:10]
         stock_entry     = {}
@@ -117,7 +118,8 @@ class DayTradeStrategy:
                 
             seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
             seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
-
+            
+            # Previous Day's High/Low            
             indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
             stock_entry = {                        
                                     'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
@@ -158,22 +160,23 @@ class DayTradeStrategy:
         try:
             print("\t\t\t * Building ORB levels ")
             if ( current_time.hour < 10  and current_time.minute < 59 ) :  # Pause until 10
-                time_to_sleep = (( 10 - current_time.hour) * 60) - ( 60 - current_time.minute ) * 60
+                time_to_sleep = ( 60 - current_time.minute ) *60 #(( 10 - current_time.hour) * 60 * 60) - ( 60 - current_time.minute ) 
+                print(f" Pausing for   { time_to_sleep}")
                 if time_to_sleep > 0 :
                     print ( f" From {current_time} -> 10am - sleep { time_to_sleep }   "+
                                 f"HOURS: {((current_time.hour - 10) * 60)}  MINUTE : {( 60 - current_time.minute )}")
-                    if self.Mode.upper() == "TRADE" :
+                    if account.Mode.upper() == "TRADE" :
                         time.sleep( time_to_sleep )
-                    
+            else:
+                print("No Need to pause  {current_time}")
             
             today_date  = str(current_time)[:10]
             symbols     = [ symbols ] if isinstance( symbols, str) else symbols            
-            for symbol in symbols:
-                 # Previous Day's High/Low
-                ticker_df       = account.History( symbol=symbol, time_range=1)             
+            for symbol in symbols:          
                 current_time    = datetime.strptime( f"{today_date} 10:00:00", date_format) 
-                ticker_row      = account.QuoteByInterval ( symbols= symbol,  frequency= 60*30, endDate = current_time) 
-                stock_entry     = self.PrimeStockEntry(  symbol, ticker_row, current_time ,
+                ticker_df       = account.History( symbol=symbol, time_range=1)   
+                ticker_row      = account.QuoteByInterval ( symbols= symbol,  frequency= 60*30, endDate = current_time)
+                stock_entry     = self.PrimeStockEntry(  symbol, ticker_df, ticker_row, current_time ,
                                                      account , closePos = 3, highPos = 6, volumePos = 5 )
                 self.Stocks[ symbol ]  = stock_entry
                 """
@@ -294,7 +297,7 @@ class DayTradeStrategy:
                    "price_move_change"      : 0.02,     # Price needs to move by this much before we start doing something
                    "volume_change_ratio"    : 0.70,     # Ratio of new volume to previous volume  ( may be unnecessary  unless building out trends )
                    "volume_change_avg_ratio": -0.30,    # Quantifying the change in volume to act ( probably over thinking things )
-                   "bounce_up_min"          : 1 ,       # Checks how many consecutive moves upwards before acting
+                   "bounce_up_min"          : 2 ,       # Checks how many consecutive moves upwards before acting
                    "volume_threshold"       : 70000     # Safety net to consider when appropriate to enter a trade, but may not be necessary 
                 }
 
@@ -498,7 +501,8 @@ class DayTradeStrategy:
          
             # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY 
             if not ( symbol in self.Stocks.keys() ) :
-                self.Stocks[symbol] = self.PrimeStockEntry( symbol=symbol , ticker_row=ticker_row , current_time=current_time,
+                ticker_df       = account.History( symbol=symbol, time_range=1)   
+                self.Stocks[symbol] = self.PrimeStockEntry( symbol=symbol , ticker_df=ticker_df,ticker_row=ticker_row , current_time=current_time,
                                                             account=account, closePos = closePos , highPos=highPos , volumePos=volumePos)
                 """
                 data = account.History ( symbol = symbol, time_range =200 )           # GET HISTORICAL INFO FOR SYMBOL

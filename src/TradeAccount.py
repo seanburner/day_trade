@@ -476,9 +476,9 @@ class TradeAccount:
                 p_l         = ( self.InPlay[stock]['qty'] * new_price )  - ( self.InPlay[ stock ]['qty'] *  self.InPlay[ stock ]['price'] )
 
                 new_rec = {'symbol':stock, 'type': OPTION_NONE , 'bidTime':self.InPlay[ stock ]['time'],
-                                             'bid':self.InPlay[ stock ]['price'],'bidVolume':self.InPlay[ stock ]['volume'], 'askVolume':ask_volume,
-                                             'qty' :self.InPlay[ stock ]['qty'],'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
-                                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()}
+                            'bid':self.InPlay[ stock ]['price'],    'bidVolume':self.InPlay[ stock ]['volume'], 'askVolume':ask_volume,
+                            'qty' :self.InPlay[ stock ]['qty'],     'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
+                            'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()}
                 self.Trades[stock].append(  new_rec )                
                 print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
