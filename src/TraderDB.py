@@ -154,6 +154,39 @@ class TraderDB:
         finally:
             return userId
 
+       
+    def InsertReason( self, reason :  str ) -> int | None  :
+        """
+            Checks/Inserts a reason element into the reasons tables
+            ARGS    :
+                        reason  ( str ) -  reason for entering or exiting the trade
+                        
+            RETURNS :
+                        reasonId (int ) - reason entry id from the reasons table 
+        """
+        query           = ""
+        reasonId        = None
+        
+
+        try:
+            query           = f"select reaspmId from reasons where reason = '{reason}' ;"
+            self.Conn.Send( query )
+            
+            if self.Conn.Results == [] :
+                query =  f"INSERT INTO reasons( reason {self.InsertMetaFields( 0) }  ) values "       
+                query += f"('{reason}' {self.InsertMetaFields( 1) } ); "
+           
+                reasonId  = self.Conn.Write( query)
+            else:
+                reasonId = self.Conn.Results[0][0]
+        except:      
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+
+            print( f"\t\tQUERY:{query}")
+        finally:
+            return reasonId
         
     def InsertDate( self, date : datetime | str ) -> int | None  :
         """
@@ -346,6 +379,8 @@ class TraderDB:
                         stockId     = self.InsertStock( symbol = symbol )
                         initDateId  = self.InsertDate(  date   = order['bidTime'] )
                         closeDateId = self.InsertDate(  date   = order['askTime'] )
+                        reasonInId  = self.InsertReason(  reason   = order.get('reasonIn','N/A') )
+                        reasonInOut = self.InsertReason(  reason   = order.get('reasonIn','N/A') )
                         self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
                         if self.Conn.Results != [] :
                             print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
@@ -599,7 +634,7 @@ class TraderDB:
                     "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
                     " end // "+ 
                     "DELIMITER; ")
-/
+
 
         orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderBook(    )   " +
