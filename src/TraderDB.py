@@ -517,7 +517,7 @@ class TraderDB:
                         if 'bidReceipt' in recs[pos] and 'askReceipt' in recs[pos] :
                             recs[pos].update ({'bid'        : recs[pos]['bidFilled'], 'ask' : recs[pos]['askFilled'], 'price' : recs[pos]['bidFilled']} )
                             recs[pos].update ({  'p_l'      : ( (recs[pos]['askFilled'] - recs[pos]['bidFilled']) * recs[pos]['qty'] ) * (100 if order_type > 0 else 1 ) } )
-                            recs[pos].update ({'actualPL'   : recs[pos]['p_l'] * (100 if order_type > 0 else 1 ), 'bidVolume' : 0, 'askVolume' : 0} )                                                       
+                            recs[pos].update ({'actualPL'   : recs[pos]['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} )                                                       
                             orderbook[symbol].append( recs[pos] )
                             recs.pop( pos )
             print( f"\n\t\t Orders to sync ")
@@ -599,19 +599,22 @@ class TraderDB:
                     "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
                     " end // "+ 
                     "DELIMITER; ")
-
+/
 
         orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderBook(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null,  stockId int not null, " +
                                 "type int not null,bid decimal(10,4) not null , qty  int not null , bidVolume int ,  closed  int not null,ask  decimal(10,4), askVolume int, p_l decimal(10,4) , " +
-                                 "bidReceipt bigint(25) , bidFilled decimal(10,4),  askReceipt bigint(20) , askFilled decimal(10,4), actualPL decimal(10,4), " +                    
+                                 "bidReceipt bigint(25) , bidFilled decimal(10,4),  askReceipt bigint(20) , askFilled decimal(10,4), actualPL decimal(10,4), " +
+                                " reasonIn int , reasonOut int , comments varchar(200), " +
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
                                 "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
                                 "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
                                 "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
-                                "FOREIGN KEY ( closed)    REFERENCES dates(dateId)     ); " +
+                                "FOREIGN KEY ( closed)    REFERENCES dates(dateId)   , " +
+                                "FOREIGN KEY ( reasonIn)  REFERENCES reasons(reasonId), " +
+                                "FOREIGN KEY ( reasonOut)  REFERENCES reasons(reasonId)); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
         orderIndicates = (#"DELIMITER // "+
@@ -635,6 +638,28 @@ class TraderDB:
                                 "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
+        reasons     = (#"DELIMITER // "+
+                        " CREATE PROCEDURE createTableReasons(    )   " +
+                        " BEGIN  "+
+                             "create table if not exists reasons( reasonid int auto_increment PRIMARY KEY not null," +
+                                " reason varchar(40)  not null , description varchar(200) , " +                    
+                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
+                        " INSERT INTO reasons (reason,description, active,createdBy,createdDate,modBy, modDate ) values  "+
+                        "  ('AUTO','Trading bot',1,'trader',now(),'trader',now()), " +
+                        "  ('ANALYSIS: Bollinger Bands', 'Interpretation of the Bollinger Bands',1,'trader',now(),'trader',now() ), "+
+                        "  ('ANALYSIS: Risk Management', 'Did not calculate Stop-Loss properly',1,'trader',now(),'trader',now()),  " +
+                        "  ('ANALYSIS: Wick','Did not interpret wicks properly',1,'trader',now(),'trader',now()), " +
+                        "  ('ANALYSIS: Chop', 'Chop managment problems',1,'trader',now(),'trader',now()), " +
+                        "  ('ANALYSIS: Followed DR' ,'Followed Dan Rawitch advice',1,'trader',now(),'trader',now()), ",
+                        "  ('ANALYSIS: Greeks',' Did not allow for Options Delta or Gamma',1,'trader',now(),'trader',now()),"+
+                        "  ('ANALYSIS: Key Levels' ,'Price broke, held and show momentum above level',1,'trader',now(),'trader',now()),"+
+                        "  ('ANALYSIS: Trend Lines','Identifying up/down trends with trend lines',1,'trader',now(),'trader',now())," +
+                        "  ('ANALYSIS: Profit Target','Identifying when to expect/take profit',1,'trader',now(),'trader',now()) ,"+
+                        "  ('EMOTIONAL: Distracted','Wasnt paying attention',1,'trader',now(),'trader',now()),"+
+                        "  ('EMOTIONAL: Revenge','Revenge trading to make up for previous losses',1,'trader',now(),'trader',now())," +
+                        "  ('EMOTIONAL: FOMO', 'Reacted without proper analysis becaused too anxious',1,'trader',now(),'trader',now());"+
+                        "     END //  "+
+                        "     DELIMITER ;  ")
         v_orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE if not exists createTable_vOrderBook(   )   " +
                         " BEGIN  "+
@@ -646,7 +671,7 @@ class TraderDB:
                         "     inner join dates d2 on o.closed = d2.dateid  "+
                         "     inner join stocks s on o.stockid =s.stockid  "+
                         "     inner join users u on o.userid=u.userid "+
-                        "     where o.active = 1; " +
+                        "     where o.active = 1  order by initiated asc; " +
                         "     END //  "+
                         "     DELIMITER ;  ")        
         p_createTables = (#"DELIMITER // "+
@@ -656,6 +681,7 @@ class TraderDB:
                             " call createTableDates(); " +
                             " call createTableUsers(); " +
                             " call createTableStocks(); " +
+                            " call createTableReasons(); " +
                             " call createTableOrderbook(); " +
                             " call createTableOrderIndicates(); " +
                             " call createTable_vOrderbook(); " +
@@ -676,6 +702,30 @@ class TraderDB:
 
 
         """
+CREATE PROCEDURE createTableReasons(    )  
+                         BEGIN  
+                             create table if not exists reasons( reasonid int auto_increment PRIMARY KEY not null,
+                                 reason varchar(40)  not null , description varchar(200) ,                     
+                                 active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime );
+                              INSERT INTO reasons (reason,description, active,createdBy,createdDate,modBy, modDate ) values  
+                              ('AUTO','Trading bot',1,'trader',now(),'trader',now()), 
+                              ('ANALYSIS: Bollinger Bands', 'Interpretation of the Bollinger Bands',1,'trader',now(),'trader',now() ), 
+                              ('ANALYSIS: Risk Management', 'Did not calculate Stop-Loss properly',1,'trader',now(),'trader',now()),  
+                              ('ANALYSIS: Wick','Did not interpret wicks properly',1,'trader',now(),'trader',now()), 
+                              ('ANALYSIS: Chop', 'Chop managment problems',1,'trader',now(),'trader',now()), 
+                              ('ANALYSIS: Followed DR' ,'Followed Dan Rawitch advice',1,'trader',now(),'trader',now()), 
+                              ('ANALYSIS: Greeks',' Did not allow for Options Delta or Gamma',1,'trader',now(),'trader',now()),
+                              ('ANALYSIS: Key Levels' ,'Price broke, held and show momentum above level',1,'trader',now(),'trader',now()),
+                              ('ANALYSIS: Trend Lines','Identifying up/down trends with trend lines',1,'trader',now(),'trader',now()),
+                              ('ANALYSIS: Profit Target','Identifying when to expect/take profit',1,'trader',now(),'trader',now()) ,
+                              ('EMOTIONAL: Distracted','Wasnt paying attention',1,'trader',now(),'trader',now()),
+                              ('EMOTIONAL: Revenge','Revenge trading to make up for previous losses',1,'trader',now(),'trader',now()),
+                              ('EMOTIONAL: FOMO', 'Reacted without proper analysis becaused too anxious',1,'trader',now(),'trader',now());                             
+                             END //  
+
+
+
+
             SELECT 
     ROUTINE_NAME, 
     ROUTINE_SCHEMA, 
@@ -687,7 +737,9 @@ FROM
 WHERE 
     ROUTINE_TYPE = 'PROCEDURE' 
     AND ROUTINE_SCHEMA = 'your_database_name';
+    
             SHOW CREATE PROCEDURE your_procedure_name;
+            
             SELECT * FROM mysql.proc WHERE name = 'your_procedure_name' \G
 
 

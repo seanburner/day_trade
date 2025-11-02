@@ -1267,7 +1267,8 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         print(f"\t {symbol} ORDERBOOK")
         print(f"\t    == OPENED ==\t=== BID=== \t== CLOSED == \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
-            print(f"\t   {entry['bidTime'][:19] }\t${entry['bid'] :.4f}\t\t{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry['actualPL']:.4f}" )            
+            print(f"\t   {entry['bidTime'][:19] }\t${entry['bid'] :.4f}\t\t" +
+                  "{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry.get('actualPL',0):.4f}" )            
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
@@ -1286,7 +1287,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         for rec in account.Trades[symbol] :
             row = [] 
             for key in ['symbol', 'bidTime','bid', 'qty','askTime','ask','p_l'] :
-                row.append ( rec[key] )
+                row.append ( rec.get(key, 0) )
             table.append( row ) 
         
         report.AddTable( table , "h3", 1 )        

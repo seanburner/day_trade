@@ -52,7 +52,7 @@ class DayTradeStrategy:
 
         self.Stocks     = {
                             'Stock' : {
-                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Occur' : 0, 'down' : 0},
+                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Upward' : 0, 'Downwad' : 0},
                                     'Volume'        :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0 },
                                     'Indicators'    :   None
                                 }
@@ -122,7 +122,7 @@ class DayTradeStrategy:
             # Previous Day's High/Low            
             indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
             stock_entry = {                        
-                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
+                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Upward' : 0 , 'Downward': 0 },
                                     'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
                                     'Indicators'    : indicators,
                                     'Losses'        : 0,
@@ -165,7 +165,7 @@ class DayTradeStrategy:
                 if time_to_sleep > 0 :
                     print ( f" From {current_time} -> 10am - sleep { time_to_sleep }   "+
                                 f"HOURS: {((current_time.hour - 10) * 60)}  MINUTE : {( 60 - current_time.minute )}")
-                    if account.Mode.upper() == "TRADE" :
+                    if account.Mode.upper() == "TRADE"  or account.Mode.upper() == "TEST" :
                         time.sleep( time_to_sleep )
             else:
                 print("No Need to pause  {current_time}")
@@ -193,7 +193,7 @@ class DayTradeStrategy:
                  
                # PULL THE FIRST 30 MINS OF DATA3
                 self.Stocks[ symbol ]  = {                        
-                                    'Price'         : {'Previous': ticker_row[ 4 ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ 4 ], 'Occur' : 0 },
+                                    'Price'         : {'Previous': ticker_row[ 4 ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ 4 ], 'Upward' : 0 },
                                     'Volume'        : {'Previous': ticker_row[ 5], 'Slope' : 1 , 'Bought' : 0},
                                     'Indicators'    : indicators,
                                     "PrevDayHigh"   : ticker_df[ :-1]['high'].to_string(index=False) if ticker_df != None else ticker_row[2] ,
@@ -516,7 +516,7 @@ class DayTradeStrategy:
 
                 indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
                 self.Stocks[ symbol ]  = {                        
-                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Occur' : 0 },
+                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Upward' : 0 , 'Downward' :0},
                                     'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
                                     'Indicators'    : indicators,
                                     'Losses'        : 0
@@ -565,9 +565,9 @@ class DayTradeStrategy:
             
             #HOW MANY CONSECUTIVE TIMES THE PRICE HAS RISENS
             if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous'] :# and  ticker_row[closePos] > ticker_row[openPos]:
-                    self.Stocks[ symbol]['Price']['Occur']  += 1
+                    self.Stocks[ symbol]['Price']['Upward']  += 1
             else:
-                self.Stocks[ symbol]['Price']['Occur']  = 0
+                self.Stocks[ symbol]['Price']['Upward']  = 0
 
             
             #CRITERIA SWITCH 
@@ -606,8 +606,8 @@ class DayTradeStrategy:
                     return False, action, time_interval
             
                 
-                if self.Stocks[symbol]['Price']['Occur']  < params["bounce_up_min"] :  # TWO consecutive upward moves with appropriate volume 
-                    print( f"\t\t\t  *  BUY [TEST SIGNAL ]:: Consecutive upward moves with volumes : {self.Stocks[ symbol]['Price']['Occur']} " )
+                if self.Stocks[symbol]['Price']['Upward']  < params["bounce_up_min"] :  # TWO consecutive upward moves with appropriate volume 
+                    print( f"\t\t\t  *  BUY [TEST SIGNAL ]:: Consecutive upward moves with volumes : {self.Stocks[ symbol]['Price']['Upward']} " )
                     self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )
                     return False, action, time_interval
                 
@@ -616,7 +616,7 @@ class DayTradeStrategy:
                        f" newPrice - previous = ${round( round(float(ticker_row[ closePos ]),5) -  round(float(self.Stocks[ symbol]['Price']['Previous']), 5) , 5) } " +
                        f" Volume :  from { round( self.Stocks[ symbol]['Volume']['Previous'] , 5)  } ==> { round(volume_increase, 5 ) } " +
                        f" PRESSURE :  upward : { round(upward_pressure,5)} ==>  downward :{ round(downward_pressure,5)} " +
-                       f" OCCUR : {self.Stocks[symbol]['Price']['Occur'] }  -> {params['bounce_up_min'] } " +
+                       f" OCCUR : {self.Stocks[symbol]['Price']['Upward'] }  -> {params['bounce_up_min'] } " +
                        f" BODY vs WICK : {round( (ticker_row[closePos] - ticker_row[openPos]) ,5 ) } --> { round( (ticker_row[highPos] - ticker_row[closePos]) , 5 )} "    )
                 # 2025-10-21  Playing around to get best results 
                 if upward_pressure > downward_pressure : # (ticker_row[closePos] - ticker_row[openPos]) > (ticker_row[highPos] - ticker_row[closePos]) or upward_pressure > downward_pressure :
@@ -630,10 +630,12 @@ class DayTradeStrategy:
                         self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
-                        self.Stocks[ symbol]['Price']['down']       = 0
+                        self.Stocks[ symbol]['Price']['Downward']  = 0
+                        self.Stocks[ symbol]['Price']['Upward']    = 0
                         action          = "bought"
+                else:    
+                    print( f"\t\t\t  *  BUY::  Upward {upward_pressure}  less than downward pressure  {downward_pressure}" )
                     
-            
             if action != 'bought' and self.Stocks[ symbol]['Price']['Bought'] > 0 :
                 print( f"CURRENT : { round(ticker_row [closePos], 5)}   " +
                        f"BOUGHT AT : { round(self.Stocks[ symbol]['Price']['Bought'],5)}  " +
@@ -653,10 +655,10 @@ class DayTradeStrategy:
                  #  THERE IS SOMETHING ABOUT THE UPWARD PRESSURE == 0 THAT SIGNALS A TURNAROUND TO MAXIMIZE PROFITS , FIGURE IT OUT
                  # MAYBE NEEDS ALL 3   CURRENT TO PREVIOUS > 95  AND CLOSE > OPEN AND UPPER PRESSURE MORE THAN DOWNWARD FOR IT TO TRIGGER
                  if  round(float(ticker_row[ closePos ]), 5) < round( float(self.Stocks[ symbol]['Price']['Previous']) , 5)  :
-                     self.Stocks[ symbol]['Price']['down'] += 1
+                     self.Stocks[ symbol]['Price']['Downward'] += 1
                  else:
-                     self.Stocks[ symbol]['Price']['down'] = 0
-                 if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) and self.Stocks[ symbol]['Price']['down'] < 2 ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
+                     self.Stocks[ symbol]['Price']['Downward'] = 0
+                 if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) and self.Stocks[ symbol]['Price']['Downward'] < 2 ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
                      print( f"\t\t\t  \\-> SELL SIGNAL [ RESCIND ] IN PROFIT  : " +
                             f" More upward than downward pressure : { round( float(ticker_row[highPos]) - float(ticker_row[closePos]), 5) } -> " +
                             f"{ round(float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 5 )} "  )
@@ -677,10 +679,13 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
                          self.Stocks[ symbol ]['Price' ]['High']   = 0
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
-                         self.Stocks[ symbol]['Price']['down']     = 0
+                         self.Stocks[ symbol]['Price']['Downward'] = 0
+                         self.Stocks[ symbol]['Price']['Upward']   = 0
                          action          = "closed"
+
+                         print(f"\t\t\t   Indicators [IN ] : {account.InPlay[symbol]['indicators_in']}  [OUT] {self.Stocks[symbol]['Indicators']}  ") 
                         
-        
+                        
 
             #SELL : TRAILING STOPS  Current price less than previous price or less than bought price   
             if ( action != 'bought' and round(float(self.Stocks[ symbol]['Price']['Bought']) , 5) > 0 and
@@ -701,9 +706,13 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
                          self.Stocks[ symbol ]['Price' ]['High']   = 0
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
-                         self.Stocks[ symbol]['Price']['down']    = 0
+                         self.Stocks[ symbol]['Price']['Downward'] = 0
+                         self.Stocks[ symbol]['Price']['Upward']   = 0
                          action          = "closed"
                          self.Stocks[symbol]['Losses']    += 1
+
+                         print(f"\t\t\t   Indicators [IN ] : {account.InPlay[symbol]['indicators_in']}  [OUT] {self.Stocks[symbol]['Indicators']}  ") 
+
             
             
             
