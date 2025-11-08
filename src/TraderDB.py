@@ -346,8 +346,8 @@ class TraderDB:
                         nothing 
         """
         header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,bidVolume,askVolume," +
-                            f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL {self.InsertMetaFields(0) } ) values " )
-                            #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
+                            f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL,resonIn,reasonOut,comments {self.InsertMetaFields(0) } ) values " )
+                            #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
         query           = ""
         numRec          = 0
         dupeNum         = 0
@@ -380,7 +380,7 @@ class TraderDB:
                         initDateId  = self.InsertDate(  date   = order['bidTime'] )
                         closeDateId = self.InsertDate(  date   = order['askTime'] )
                         reasonInId  = self.InsertReason(  reason   = order.get('reasonIn','N/A') )
-                        reasonInOut = self.InsertReason(  reason   = order.get('reasonIn','N/A') )
+                        reasonInOut = self.InsertReason(  reason   = order.get('reasonOut','N/A') )
                         self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
                         if self.Conn.Results != [] :
                             print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
@@ -389,7 +389,7 @@ class TraderDB:
                             query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
                                     f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
                                      f"'{order['bidFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
-                                     f"'{order['actualPL']}' {self.InsertMetaFields(1)} );"  )                        
+                                     f"'{order['actualPL']}',{reasonInId}, {reasonOutId},{order.get('comments','')} {self.InsertMetaFields(1)} );"  )                        
                         
                             orderId  =  self.Conn.Write( query )
                             if orderId != None :
@@ -510,7 +510,7 @@ class TraderDB:
         orderbook  = {}
         order_type  = 0
         
-        try:            
+        try:
             #Get entries from SQL 
             entries = self.Orders( time_interval=time_interval)
 
@@ -555,24 +555,97 @@ class TraderDB:
                             recs[pos].update ({'actualPL'   : recs[pos]['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} )                                                       
                             orderbook[symbol].append( recs[pos] )
                             recs.pop( pos )
-            print( f"\n\t\t Orders to sync ")
-            print( f"\t\t\tSTOCK\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tPRICE\t\t\tBIDRECEIPT\tASKRECEIPT ")
-            for symbol in orderbook.keys():
-                print( f"\t\t\t{symbol}")
-                for order in orderbook[symbol]:                        
-                    print( f"\t\t\t\t{ order['bidTime']}\t{order['askTime'][11:16]}\t\t{ order['symbol']}"+
-                           f"\t{ int( order['qty'] )}\t${ order['bidFilled']:.2f} -> ${ order['askFilled']:.2f}"+
-                           f"\t\t{ order['bidReceipt']}\t{ order['askReceipt']}" ) 
-               
-            print("\nLEFT OVER : " , recs )
 
-            self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
+            print( f"\n\t\t Orders to sync ")
+            indx = self.DisplayOrderbook(  orderbook=orderbook )
+            
+            print("\n\t\t\tLEFT OVER : " , recs )
+
+            #Add option to continue then get reason in out and comments
+            if indx > 0 :
+                cont = input("\t\t\t\t Continue with sync process ( add to SQL ) [ Y/n ] ")
+                if cont.upper().find("Y" ) > -1 :
+                    print("\t\t\t\t Continuing with the sync process ")
+                    self.OrderbookReasonsAndComments( orderbook = orderbook, email=email  , username=username)
+                    self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
         except:  
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
 
 
+
+
+    def DisplayOrderbook( self, orderbook : dict ) -> int :
+        """
+            Standardized method to display the provided order book
+            ARGS   :
+                    orderbook  ( dict ) position entries 
+            RETURNS:
+                    nothing
+        """
+        indx  = 0 
+        try:
+            print( f"\t\t\tSTOCK\tINDEX\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tPRICE\t\t\tBIDRECEIPT\tASKRECEIPT ")
+            
+            for symbol in orderbook.keys():
+                indx = 0
+                print( f"\t\t\t{symbol}")
+                for order in orderbook[symbol]:                        
+                    print( f"\t\t\t\t{indx}\t{ order['bidTime']}\t{order['askTime'][11:16]}\t\t{ order['symbol']}"+
+                           f"\t{ int( order['qty'] )}\t${ order['bidFilled']:.2f} -> ${ order['askFilled']:.2f}"+
+                           f"\t\t{ order['bidReceipt']}\t{ order['askReceipt']}" )
+                    indx += 1
+               
+        except: 
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return indx 
+        
+
+    def OrderbookReasonsAndComments(self,  orderbook : dict , email : str , username : str) -> None :
+        """
+            Add Reasons for entering and exiting position and any comments for each entry
+            ARGS   :
+                        orderbook  ( dict )  entries by stock/symbol
+                        email      ( str  )  email of user
+                        username   ( str  )  username of user to assign to entries 
+            RETURNS:
+                        nothing 
+        """
+        indx  = 0
+        cont  = ''
+        try:
+            cont = input("\n\t\t\t Add Reasons and comments to orderbook [Y/n ]: " )
+            if cont.upper().find( 'Y') > -1 :
+                #Get Reasons
+                self.Conn.Send("select reasonId, reason,description from reasons where active = 1;")
+                reasons = self.Conn.Results
+
+                print("\n\t\t\tReasons and Comments" )
+                print("\n\t\t\t   ID\t REASON\t\t\t\t DESCRIPTION")
+                for reason in reasons :                
+                    print(f"\t\t\t   {indx}\t {reason[1].ljust(30, ' ') }\t {reason[2].ljust(50, ' ') }")
+                    indx += 1
+                
+                for symbol in orderbook.keys() :
+                    for indx in range( len( orderbook[symbol] ) ) :
+                        print(f"\n\t\t\tORDER: { orderbook[symbol][indx]['bidTime']} -> {orderbook[symbol][indx]['askTime'][11:16]} " +
+                              f"{ int( orderbook[symbol][indx]['qty'] ) } {orderbook[symbol][indx]['symbol']}") 
+                        reasonIn    = input(f"\t\t\t   What was the reason for entering this position : ")
+                        reasonIn    = reasons[int(reasonIn)][1] if reasonIn.isdigit() else reasonIn                    
+                        reasonOut   = input(f"\t\t\t   What was the reason for exiting this position : ")
+                        reasonOut   = reasons[int(reasonOut)][1] if reasonOut.isdigit() else reasonOut
+                        comments    = input(f"\t\t\t   Comments about this postion: ")
+                        orderbook[symbol][indx].update( { 'reasonIn': reasonIn , 'reasonOut' : reasonOut, 'comments' : comments} )
+            else:
+                print( "\n\t\t\t Skipping adding Reasons and Comments to orderbook")
+        except:
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
 
 
 

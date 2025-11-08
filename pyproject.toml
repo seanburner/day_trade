@@ -7,17 +7,18 @@ description 	= "Day_Trade"
 
 [tool.poetry.dependencies]
 python   		= "^3.11"
-pandas   		= "^2.0"
-requests 		= "^2.32"
-mysql-connector-python 	= "^9.4"
-mysqlclient            	= "^2.2"
+Gtk                     = "^3.0"
 pyodbc  		= "^5.2"
-pymssql  		= "^2.3"
-matplotlib   		= "^3.10"
-reportlab       	= "^4.4"
+pandas   		= "^2.0"
 loguru          	= "^0.7"
+pymssql  		= "^2.3"
+requests 		= "^2.32"
 selenium        	= "^4.34"
+reportlab       	= "^4.4"
+matplotlib   		= "^3.10"
+mysqlclient            	= "^2.2"
 webdriver-manager 	= "^4.0"
+mysql-connector-python 	= "^9.4"
 
 
 [tool.poetry.group.dev.dependencies]
