@@ -1,0 +1,22 @@
+name: Day_Trade Test
+
+on: [push, pull_request]
+
+jobs:
+  tox_test:
+    name: Tox test
+    # 💡 Set the environment variable at the job level
+    env:
+      PIP_NO_CACHE_DIR: "1"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tox tests
+        id: test
+        # 💡 The action will now inherit the PIP_NO_CACHE_DIR environment variable
+        uses: fedora-python/tox-github-action@main
+        with:
+          tox_env: py313,py312
+          dnf_install: |
+            poetry
+            mariadb-devel

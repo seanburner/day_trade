@@ -1,0 +1,777 @@
+## ###################################################################################################################
+##  Program :   Schwab Account 
+##  Author  :
+##  Install :   pip3 install requests  inspect platform argparse 
+##  Example :
+##              python3 
+##              python3 
+##  Notes   :   https://docs.python.org/3/tutorial/classes.html
+##              Schwab API   : https://www.reddit.com/r/Schwab/comments/1c2ioe1/the_unofficial_guide_to_charles_schwabs_trader/
+##                              https://developer.schwab.com/products/trader-api--individual/details/documentation/Retail%20Trader%20API%20Production
+## ###################################################################################################################
+import os
+import re
+import sys
+import json
+import time
+import pickle
+import base64
+import getpass
+import inspect
+import platform
+import requests
+import webbrowser
+
+
+from loguru     import logger
+from datetime   import datetime, timedelta, timezone 
+
+
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, WebDriverException
+
+ACCNT_TOKENS_FILE = "../files/account_tokens"
+BLANK_TOKENS    = {'expires_in': 0, 'token_type': 'Bearer', 'scope': 'api',
+                               'expires_at' : datetime.now(),
+                                'refresh_token': '',
+                                   'access_token': '',
+                                       'id_token': '',
+                                       'refresh_expires_at':''
+                           }
+class SchwabAccount :
+    
+    def __init__(self, app_key : str,  app_secret : str ) -> None :
+        """
+            Initialize the variables for the Trading Account class 
+        """
+        self.APP_KEY        = app_key
+        self.APP_SECRET     = app_secret
+        self.Trades         = []                       # COMPLETED TRADES FOR THE DAY
+        self.InPlay         = {'STOCK':{}}             # CURRENT TRADES STILL OPEN  
+        #self.Funds          = funds                    # ACCOUNT DOLLAR AMOUNT 
+        self.Limit          = 0.0                      # MAX TO SPEND ON ANY ONE TRADE 
+        self.TargetGoal     = 0                        # Dont get greedy, when reach this amount will quit trading for day
+        self.Mode           = ""                       # Are we Testing or Trading or something else
+        self.Endpoints      = {
+                            "login"   : f"https://api.schwabapi.com/v1/oauth/authorize?client_id={self.APP_KEY}&redirect_uri=https://127.0.0.1",
+                            "refresh" :  "https://api.schwabapi.com/v1/oauth/token"
+                        }
+        self.Accounts       = {}
+        self.Tokens         = {}
+        self.Type           = "Schwab"
+
+
+
+        #self.UpdateTokensFile()
+        self.Tokens = self.LoadTokensFile()
+        print( "PAY ATTENTION WHEN TOKENS FAIL: " , self.Tokens ) 
+       # self.Tokens['refresh_expires_at'] = datetime.now() + timedelta( seconds=900*96*5 ) 
+        self.CheckAccessTokens()
+       # self.UpdateTokensFile()
+        
+        print ("\t\t\t\t  ->  Schwab Account Initiated ") 
+        
+        self._base_api_url = "https://api.schwabapi.com"
+        self.Timeout = 1800
+       
+        self.LinkedAccounts()
+        self.AccountDetails()
+        self.AccountID = list(self.Accounts.keys())[0]
+        self.Preference()
+
+        """
+        print ("\t\t\t -> Orders ")
+        statuses = ['AWAITING_PARENT_ORDER', 'AWAITING_CONDITION', 'AWAITING_STOP_CONDITION', 'AWAITING_MANUAL_REVIEW',
+                  'ACCEPTED', 'AWAITING_UR_OUT', 'PENDING_ACTIVATION', 'QUEUED', 'WORKING','REJECTED', 'PENDING_CANCEL',
+                  'CANCELED', 'PENDING_REPLACE', 'REPLACED', 'FILLED', 'EXPIRED', 'NEW', 'AWAITING_RELEASE_TIME',
+                  'PENDING_ACKNOWLEDGEMENT', 'PENDING_RECALL','UNKNOWN']
+        for accnt in self.Accounts.keys() :
+            print ("\t\t\t   |  ", accnt )
+            for status in statuses:
+                print ("\t\t\t\t   \\->  ", status)
+                self.AccountOrders ( self.Accounts[accnt]['hashValue'], "2025-08-07T23:43:02.120605Z","2025-09-07T23:43:02.120605Z",status) #str( datetime.now()) , str( datetime.now()) ,  status  = "open"  )
+
+        """
+
+
+
+
+    def _params_parser(self, params: dict):
+        """
+                Removes None (null) values
+
+                Args:
+                    params (dict): params to remove None values from
+
+                Returns:
+                    dict: params without None values
+
+                Example:
+                    params = {'a': 1, 'b': None}
+                    client._params_parser(params)
+                    {'a': 1}
+        """
+        for key in list(params.keys()):
+            if params[key] is None: del params[key]
+        return params
+
+
+#    def _time_convert(self, dt=None, format: str | TimeFormat = "") -> str | int | None:
+#        """
+#        Convert time to the correct format, passthrough if a string, preserve None if None for params parser
+
+#        Args:
+#            dt (datetime.datetime): datetime object to convert
+#            form (str): format to convert to (check source for options)
+
+#        Returns:
+#            str | None: converted time (or None passed through)
+#        """
+#        if dt is None or not isinstance(dt, datetime.datetime):
+#            return dt
+#        match format:
+#            case TimeFormat.ISO_8601 | TimeFormat.ISO_8601.value:
+#                return f"{dt.isoformat().split('+')[0][:-3]}Z"
+#            case TimeFormat.EPOCH | TimeFormat.EPOCH.value:
+#                return int(dt.timestamp())
+#            case TimeFormat.EPOCH_MS | TimeFormat.EPOCH_MS.value:
+#                return int(dt.timestamp() * 1000)
+#            case TimeFormat.YYYY_MM_DD | TimeFormat.YYYY_MM_DD.value:
+#                return dt.strftime('%Y-%m-%d')
+#            case _:
+#                raise ValueError(f"Unsupported time format: {format}")
+
+
+    def __str__(self ) -> str :
+        """
+            Returns string representation of the object
+        """
+        contents = "ACCOUNT  \t\t "
+        
+        for accnt in self.Accounts.keys():
+            contents += accnt + str(self.Accounts[accnt]['details'].keys())
+            
+        return "" #contents
+
+
+    def GetAccountHash ( self ) -> str :
+        """
+            Returns the hash of the selected account
+            ARGS   :
+                    nothing
+            RETURNS:
+                    string of accountHash 
+        """
+        return self.Accounts[self.AccountID]['hashValue']
+
+
+    def GetAccountID ( self ) -> str :
+        """
+            Returns the Account ID of the selected account
+            ARGS  :
+                    nothing
+            RETURNS:
+                    string of accountID 
+        """
+        return self.AccountID
+        
+    
+    def CheckAccessTokens(self) -> bool :
+        """
+            Check if the connection is still valid  before making a request
+            ARGS    :
+            RETURNS :
+                        Nothing 
+        """
+        success  : bool  = False
+        #print("\t\t\t\t  -> Access Schwab Tokens ")
+        # Needs to add expires at for refresh token
+        if ( self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or
+             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys())  or
+             (self.Tokens['expires_at'] + timedelta(minutes=self.Tokens['expires_in'] ) )< datetime.now() ):
+            success = self.Authenticate() 
+        elif self.Tokens['expires_at'] < datetime.now() :          
+            success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
+        else:
+            #print ( "\t\t\t\t  ->  Tokens still good :" , self.Tokens['expires_at'] )
+            success = True
+            
+        return success 
+
+
+
+   
+
+    def QuoteByInterval(self, symbol: str, periodType: str | None = None, period: str | None = None, frequencyType: str | None = None, frequency: int = 15, startDate: datetime | str | None = None,
+                      endDate: datetime | str  = None, needExtendedHoursData: bool | None = None, needPreviousClose: bool | None = None) -> requests.Response:
+        """
+            Gets the price history of a stock, this seems more useful for the 15 / 5 / 1 min candles than getting the quotes 
+
+            Args:
+                symbol                (str): ticker symbol
+                periodType            (str): period type ("day"|"month"|"year"|"ytd")
+                period                (int): period
+                frequencyType         (str): frequency type ("minute"|"daily"|"weekly"|"monthly")
+                frequency             (int): frequency (frequencyType: options), (minute: 1, 5, 10, 15, 30), (daily: 1), (weekly: 1), (monthly: 1)
+                startDate             (datetime.pyi | str): start date
+                endDate               (datetime.pyi | str): end date
+                needExtendedHoursData (bool): need extended hours data (True|False)
+                needPreviousClose     (bool): need previous close (True|False)
+
+            Returns:
+                request.Response: Dictionary containing candle history
+        """
+        response = ""
+        
+        try:
+            self.CheckAccessTokens() 
+            #print( f"\t\t >> AGAIN Comparing {startDate}  -> { endDate}")
+            #print(" Now TimeStamp : " , int(datetime.now().timestamp()  * 1000) )
+            response =requests.get(f'{self._base_api_url}/marketdata/v1/pricehistory',
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            params=self._params_parser({'symbol': symbol,
+                                                        'periodType': periodType,
+                                                        'period': period,
+                                                        'frequencyType': frequencyType,
+                                                        'frequency': frequency,
+                                                        'startDate': int(startDate.timestamp() * 1000 ),
+                                                        'endDate':  int(endDate.timestamp() * 1000 ) ,
+                                                        'needExtendedHoursData': needExtendedHoursData,
+                                                        'needPreviousClose': needPreviousClose}),
+                            timeout=self.Timeout)
+        
+            #print(f"Schwab:QuoteByInterval - {response} - {response.text}")
+        
+        except:   
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+
+            print(f"\n-> ERROR: {response if isinstance(response, str) else response.text}")
+        finally:
+            return response 
+
+  
+    def Quote ( self, symbol :  str  ) -> requests.Response :
+        """
+            Gets the quote for list of stocks
+            ARGS    :
+                        symbol : ( str )  stock abbrev
+            RETURNS :
+                        dictionary of stock quote information 
+        """
+        response = None 
+
+        try:
+            self.CheckAccessTokens()
+            response = requests.get(f'{self._base_api_url}/marketdata/v1/quotes',
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            params={'symbols': symbol,
+                                 'fields': ['quote','regular'],
+                                 'indicative': False},
+                            timeout=self.Timeout)        
+            #print(f"Schwab:Quote - {type(symbol)} -> {response} - {response.text}")
+        
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        finally:
+            return {} if response == None  else response.json()
+
+        
+    def CashForTrading( self ) -> float :
+        """
+            Return the amount of cash in the account for trading ( defaults to the first account ) 
+            ARGS   :
+            RETURNS: 
+        """
+        if len( self.Accounts) > 0 :
+            #print(f"self.Accounts[ self.AccountID]['details'] ->{self.Accounts[ self.AccountID]['details']} " )
+            return self.Accounts[ self.AccountID]['details'][ 'initialBalances'  ]['cashBalance' ]  #['cashAvailableForTrading' ]
+        else:
+            return 0.0
+
+    def LinkedAccounts( self ) -> None :
+        """
+            Obtains the linked accounts for
+            ARGS:
+                    Nothing 
+            RETURNS:
+                    Nothing 
+        """
+        temp  = None
+        success = False 
+        try:
+            temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            timeout=self.Timeout).json()
+            if 'errors' in temp :
+                print(f'\t\t\t\t  -> SchwabAcccount::LinkedAccounts() - returned error from request : {temp} - Re-Authorizing')
+                success = self.Authenticate()
+                temp  = requests.get(f'{self._base_api_url}/trader/v1/accounts/accountNumbers',
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            timeout=self.Timeout).json()
+             
+            
+            for entry in temp:
+                self.Accounts[ entry['accountNumber'] ] = {'hashValue' : entry['hashValue'], 'details' : None }
+                
+        except :      
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+            print(f"\t\t-> TOKENS : {self.Tokens}")
+                
+        
+    def Preference( self ) -> dict :
+        """
+            To stream data from Schwab you need to get the preferences first 
+        """
+        try:
+            url = f'{self._base_api_url}/trader/v1/userPreference'
+            
+            self.Preference = requests.get(url,
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'}
+                                ).json()
+                            #params="", #self._params_parser({'fields': fields}),
+                            #timeout=self.Timeout).json()
+           
+            
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+
+
+                
+    def  AccountDetails( self) -> None :
+        """
+            Details on each of the linked accounts
+            ARGS    :
+                        nothing 
+            RETURNS :
+                        nothing 
+        """
+        fields = None
+        temp = ""
+        try:
+            print("\t\t * Linked Accounts ") 
+            temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/',
+                            headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            params="", #self._params_parser({'fields': fields}),
+                            timeout=self.Timeout).json()
+            if 'errors' in temp :
+                print(f'\t\t\t SchwabAcccount::AccountDetails() - returned error from request : {temp}')
+                return
+
+            for accntDetail in temp :
+             #   print( f"ACCOUNTDETAIL  {accntDetail}  ") 
+             #   print( f"ACCOUNTDETAIL  KEYS {accntDetail.keys()}  ") 
+                for accntType in accntDetail.keys():   
+             #       print( f"ACCOUNT TYPE  {accntType} -> {accntDetail[accntType]} ")                  
+                    for accnt in self.Accounts.keys() :
+                        if ( ( 'accountNumber' in accntDetail[accntType] ) and (accnt == accntDetail[accntType]['accountNumber']) ) :
+              #              print( f"{accntType} -> {accnt}  ") 
+                            self.Accounts[ accnt ]['details'] = accntDetail[accntType]
+                            continue 
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        """        
+        for entry in temp:
+            for currentKey in entry.keys():                
+                for accntKey in self.Accounts.keys():                
+                    if ( ('accountNumber' in entry[currentKey]) and (accntKey == entry[currentKey]['accountNumber'] ) ):
+                        self.Accounts[ accntKey ] ['AccountType'] = currentKey
+                        for key in entry[currentKey].keys() :
+                            self.Accounts[accntKey][key] = entry[currentKey][key]
+        """       
+
+
+    def AccountOrders ( self, accountHash : str , fromTime : datetime , toTime : datetime , status : str = "open"  ) -> dict:
+        """
+            Get the orders for a specific account
+            ARGS   :
+                    account  - account hashid as str
+            RETURNS:
+                    dictionary of orders for account 
+        """
+        temp  = None
+
+        try :
+            #print(f"FROMTIME : {fromTime} -> {type(fromTime)}")
+            #print(f'ENDPOINT: {self._base_api_url}/trader/v1/accounts/{accountHash}/orders')
+            temp = requests.get(f'{self._base_api_url}/trader/v1/accounts/{accountHash}/orders',
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}'},
+                            params={'maxResults': 50,
+                                 'fromEnteredTime': fromTime ,#str( datetime.now() - timedelta( days = 30) ),
+                                 'toEnteredTime'  : toTime, # str( datetime.now() ),
+                                 'status': status},
+                            timeout=self.Timeout)
+            #print("\t\t\t\t      * ", temp.text )
+            
+        except:      
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+
+        finally:
+            return temp.json()
+
+    def Orders ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str | list) -> dict :
+        """
+            Reconcile what we submitted ( BUY/SELL ) with how Schwab filled it
+            DOES:
+            0. Should run as async
+            1. Change time from local to UTC
+            2. Gets filled orders
+            3. Builds dictionary for marching order at time and symbol and qty
+            ARGS   :
+                    symbol       ( str )        stock symbol to search for
+                    enteredTime  ( datetime )   time the BUY/SELL was submitted
+                    qty          ( int )        qty of stock BOUGHT/SOLD
+                    action       ( str / list ) some flexibility when filtering on action 
+            RETURNS:
+                    dictionary of values 
+        """
+        results     = []
+        toTime      = None
+        fromTime    = None
+        date_format     = "%Y-%m-%d %H:%M:%S"  
+
+        try:
+            if isinstance( enteredTime, str ) :
+                enteredTime = datetime.strptime( enteredTime[:19] , date_format)
+            fromTime    = (datetime.fromtimestamp(enteredTime.timestamp() ,tz=timezone.utc)- timedelta( days = 10) ).strftime('%Y-%m-%dT%H:%M:%SZ')
+            toTime      = (datetime.now(timezone.utc)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            accountHash = self.Accounts[self.AccountID]['hashValue']
+            #print( f"OpenOrders: {accountHash}   {fromTime} -> {toTime} ")
+            filledOrders= self.AccountOrders ( accountHash ,
+                                fromTime =fromTime,toTime=toTime , status = "FILLED"  )
+            for order in filledOrders:
+                for orderLeg in order['orderLegCollection']:
+                    if (orderLeg['instrument']['symbol'].upper() == symbol.upper()  and
+                            (   (isinstance( action, str ) and action.upper() == orderLeg['instruction'].upper() )   or
+                                    (isinstance( action, list ) and  orderLeg['instruction'].upper() in str(action).upper() ) 
+                             ) and
+                             (
+                                ( qty > 0 and qty == orderLeg['quantity'] ) or
+                                ( orderLeg['quantity'] > 0 ) 
+                            ) ):
+                        #print(f"\t{orderLeg} -> {order} ")
+                        # MIGHT NEED TO ALLOW FOR MULTI LEG INFO IN THE PRICE AND EXECUTION TIME 
+                        results =  { 'symbol' : orderLeg['instrument']['symbol'].upper(),
+                                     'qty' : orderLeg['quantity'] ,
+                                    'bidReceipt'    if orderLeg['instruction'].upper() =='BUY' else 'askReceipt' : order['orderId'],
+                                    'bidFilled'     if orderLeg['instruction'].upper() =='BUY' else 'askFilled'  : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                    'bidFilledAt'   if orderLeg['instruction'].upper() =='BUY' else 'askFilledAt': order['orderActivityCollection'][0]['executionLegs'][0]['time']
+                                }
+                    elif symbol == "" :
+                        results.append( { 'symbol' : orderLeg['instrument']['symbol'].upper(),
+                                            'qty' : orderLeg['quantity'] ,
+                                            'bidReceipt'    if orderLeg['instruction'].upper() =='BUY' else 'askReceipt' : order['orderId'],
+                                            'bidFilled'     if orderLeg['instruction'].upper() =='BUY' else 'askFilled'  : order['orderActivityCollection'][0]['executionLegs'][0]['price'],
+                                            'bidFilledAt'   if orderLeg['instruction'].upper() =='BUY' else 'askFilledAt': order['orderActivityCollection'][0]['executionLegs'][0]['time']
+                                        }
+                                    )
+
+        except:   
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return results
+        
+    def UpdateTokensFile( self ) -> bool :
+        """
+            Serialize the Tokens structure and send to file for future use
+            ARGS    :
+                        nothing 
+            RETURNS :
+                        bool of success True/False 
+        """
+        success  = False
+
+        try:
+            with open( ACCNT_TOKENS_FILE, 'wb') as file :
+                pickle.dump( self.Tokens, file )
+
+            success = True 
+            #print ( "\t\t\t\t  -> Updated the tokens file ", self.Tokens)
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        finally:
+            return success 
+
+
+
+    def LoadTokensFile( self ) -> dict :
+        """
+            Load Serialize file into Tokens structure 
+            ARGS    :
+                        nothing 
+            RETURNS :
+                        bool of success True/False 
+        """
+        try:
+            print("\t\t\t\t  ->  Loading Schwab Tokens ")
+            if os.path.exists( ACCNT_TOKENS_FILE ):
+                print( "\t\t\t\t  -> Reading from Tokens file ")
+                with open( ACCNT_TOKENS_FILE, 'rb') as file :
+                    self.Tokens = pickle.load(  file )
+            else:
+                print( f"\t\t\t\t  -> Token file missing : {ACCNT_TOKENS_FILE} ")
+                self.Tokens = BLANK_TOKENS
+
+            
+            # BACKUP JSON FILE
+            #theseTokens = self.Tokens | {'expires_at' : None , 'refresh_expires_at' : None }
+            #with open( '../files/account_tokens.json', 'w') as file :
+            #    json.dump( theseTokens, file )
+
+                
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        finally:
+            return self.Tokens
+
+
+
+                         
+    def Authenticate( self ) -> bool :
+        """
+            Authenticate this connection to the Schwab account using OAuth
+            PARAMETERS :
+                           Nothing   
+            RETURNS    :
+                           bool -> True / False  
+        """        
+        service = None     
+        try:
+            service = ChromeService(ChromeDriverManager().install())
+            options = webdriver.ChromeOptions()
+            driver = webdriver.Chrome(service=service, options=options)
+            driver.get(  self.Endpoints['login'])
+            print(   self.Endpoints['login'])
+            returned_code = input("\t\t Follow the prompts in the web browser, then copy and paste the final address location here : " )         
+        except:
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )            
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+       
+        success = self.RefreshToken("authorization_code",  returned_code)
+        self.Tokens['refresh_expires_at'] = datetime.now() + timedelta( seconds=900*96*7 )  # MARK EXPIRATION FOR 7 DAYS FROM NOW ( 15 MINS * ( 4 * 24 ) * 7 )
+        return success 
+
+
+
+
+    def RefreshToken(self, grant_type : str = "authorization_code", code :str = 'code=C0.b2F1dGgyLmNkYy5zY2h3YWIuY29t.2ZbKajZihU0qBU2xipFUp7_cy9OAf76YXqP6ve7p_fA%40&session=368390b2-754e-43a8-9580-6f300d318520') -> bool:
+        """
+            Depends on the grant_type if getting the initial authorization or getting a refresh
+            ARGS    :
+                        grant_type  = 'authorization_code" / "refresh_code"
+                        code        = code from the web browser interaction or refresh_token from initial authorization   
+            RETURNS :
+
+        """
+        refresh_current_expire =  self.Tokens['refresh_expires_at'] 
+        if "code=" in code :
+            code = f"{code[code.index('code=') + 5:code.index('%40')]}@"
+        
+            
+        headers = {'Authorization': f'Basic {base64.b64encode(bytes(f"{self.APP_KEY}:{self.APP_SECRET}", "utf-8")).decode("utf-8")}',
+                   'Content-Type': 'application/x-www-form-urlencoded'}
+
+     
+        if grant_type == 'authorization_code':  # gets access and refresh tokens using authorization code
+            data = {'grant_type':  grant_type,
+                    'code': code,
+                    'redirect_uri': "https://127.0.0.1"}
+        elif grant_type == 'refresh_token':  # refreshes the access token
+            data = {'grant_type':  grant_type,
+                    'refresh_token': code}
+        else:
+            raise Exception("Invalid grant type; options are 'authorization_code' or 'refresh_token'")
+        
+        try:
+            response = requests.post('https://api.schwabapi.com/v1/oauth/token', headers=headers, data=data)    
+            
+            self.Tokens                         = response.json()
+            self.Tokens['expires_at']           = datetime.now() +  timedelta(seconds=1750)
+            self.Tokens['refresh_expires_at']   = datetime.now() +  timedelta(hours=23.45*7)
+           
+        except:
+            print("\t\t|EXCEPTION: MAIN::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+        
+        return  self.UpdateTokensFile(  )
+
+
+
+
+
+    def Buy( self, symbol : str , price : float, qty : int  ) -> bool :
+        """
+            Interface with Schwab account to place a BUY order for the symbol
+            ARGS    :
+                        symbol (str )   - stock symbol to buy
+                        price  ( float) - price to buy stock for
+                        qty    ( int )  - number of shares of the stock to purchase 
+            RETURNS  :
+                        True/False ( success ) 
+        """
+        success = False
+        
+        if self.Mode.lower()  == "test":
+            print( "\t\t\t\t  -> BUY Command : in test mode ")
+            return True
+
+        
+        
+        accnt =  self.AccountID #list(self.Accounts.keys())[0] 
+        buy_order = {
+            "orderType"                 : "MARKET",
+            "session"                   : "NORMAL",
+            "duration"                  : "DAY",            
+         #   "price"                     : price,
+            "orderStrategyType"         : "SINGLE",
+        #    "complexOrderStrategyType"  : "NONE",
+            "orderLegCollection"        : [
+                    {
+                        "instruction"   : "BUY",
+                        "quantity"      : qty,  # Number of shares
+                        "instrument"    : {
+                                                "symbol": symbol,
+                                                "assetType": "EQUITY"
+                                            }
+                        }
+                    ]
+            }
+        
+        try:
+            startTime = str( datetime.now() ) 
+            buy_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]["hashValue"]}/orders',  
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
+                            json=buy_order)
+            
+            if buy_response.status_code == 201  or buy_response.status_code == 200:
+                print("\t\t\t\t  ->  SchwabAccount -  BUY ORDER submitted successsfully ")
+                success = True               
+            else:
+                print("\t\t\t\t  -> SchwabAccount -  BUY ORDER submitted UNSUCCESSFULLY")
+                
+            print(f"\t\t\t\t\t  |  BUY ORDER Response: {buy_response.status_code}  {buy_response.text}  {qty} {symbol}  @ ${price} = ${ qty * price }")
+            #-> {self._base_api_url}/trader/v1/accounts/{self.Accounts[accnt]['hashValue']}/orders " )
+            
+            
+        except Exception as e:                      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )   
+        finally:
+            return success
+
+
+
+
+    def Sell( self, symbol : str , price : float, qty : int  ) -> bool :
+        """
+            Interface with Schwab account to place a SELL order for the symbol
+            ARGS    :
+                        symbol (str )   - stock symbol to SELL
+                        price  ( float) - price to SELL stock for
+                        qty    ( int )  - number of shares of the stock to purchase 
+            RETURNS  :
+                        True/False ( success ) 
+        """
+        success = False 
+        if self.Mode.lower()  == "test":
+            print( "\t\t\t\t  -> SELL Command : in test mode ")
+            return True
+        
+        accnt =  self.AccountID  #list(self.Accounts.keys())[0] 
+        sell_order = {
+                    "orderType"                 : "MARKET",
+                    "session"                   : "NORMAL",
+                    "duration"                  : "DAY",
+                  #  "price"                     : price,           # PRICE IS ONLY VALID WITH ORDERTYPE =LIMIT
+                    "orderStrategyType"         : "SINGLE",
+                    "complexOrderStrategyType"  : "NONE",
+                    "orderLegCollection": [
+                        {
+                                "instruction"       : "SELL",
+                                "quantity"          : qty,  # Number of shares
+                                "instrument"        : {
+                                                "symbol"    : symbol,
+                                                "assetType" : "EQUITY"
+                                }
+                        }
+                    ]
+            }
+        try:            
+            startTime = str( datetime.now() ) 
+            sell_response = requests.post(f'{self._base_api_url}/trader/v1/accounts/{ self.Accounts[accnt]["hashValue"]}/orders', 
+                            headers={"Accept": "application/json", 'Authorization': f'Bearer {self.Tokens["access_token"]}',"Content-Type": "application/json"},
+                            json=sell_order)
+            
+            if sell_response.status_code == 201 or sell_response.status_code == 200 :
+                print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted successsfully ")
+                success = True                
+            else:
+                print("\t\t\t\t  -> SchwabAccount -  SELL ORDER submitted UNSUCCESSFULLY")
+            
+            print(f"\t\t\t\t\t  |  SELL ORDER  Response: {sell_response.status_code} -> {sell_response.text}     {qty} {symbol}  @ ${price} = ${ qty * price }" )
+
+        except Exception as e:                      
+            print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )   
+        finally:
+            return success
+
+
+
+
+    
+        
+    def __str__(self ) -> str :
+        """
+            Returns string representation of the object 
+        """
+        return f'\n\t\t |Funds : {self.APP_KEY}\n\t\t |Limit : {self.APP_SECRET}'
+
+
+    
+    def __iter__(self) -> object:
+        """
+            Iter through a collection of tradeAccounts
+        """
+        return self
+
+
+    
+    def __next__(self) -> object:
+        """
+            Iter through a collection of tradeAccounts
+        """
+        if self.index == 0:
+            raise StopIteration
+        self.index = self.index - 1
+        return self.data[self.index]
