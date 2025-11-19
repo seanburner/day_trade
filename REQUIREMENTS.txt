@@ -1,4 +1,15 @@
+<<<<<<< HEAD
 pip3 install requests   pandas  thefuzz
 
 sudo dnf install python-reportlab* python-selenium python-pymssql 
 pip3 install loguru selenium chrome webdriver-manager pymssql mysql-connector
+=======
+pip3 install requests, json , pandas, csv , thefuzz
+
+sudo dnf install python-reportlab*
+pip3 install reportlab*
+pip3 install reportlab* loguru
+pip3 install reportlab* loguru selenium
+pip3 install reportlab* loguru selenium chrome
+pip3 install webdriver-manager
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226

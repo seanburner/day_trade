@@ -50,7 +50,17 @@ class DayTradeStrategy:
                                 'opening_range' :{ 'detail' : 'Use first candle to provide range of interest',      'method': self.OpeningRange} 
                           }
 
+<<<<<<< HEAD
         self.Stocks     = {}
+=======
+        self.Stocks     = {
+                            'Stock' : {
+                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Upward' : 0, 'Downwad' : 0},
+                                    'Volume'        :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0 },
+                                    'Indicators'    :   None
+                                }
+                         }
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
        
         self.StrategyName = ""
         
@@ -106,16 +116,24 @@ class DayTradeStrategy:
         try:
             data        = account.History ( symbol = symbol, time_range=time_range )           # GET HISTORICAL INFO FOR SYMBOL               
             seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')
+<<<<<<< HEAD
             #print(f"DATA : {data}")    
             if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0:
                 seed_df = data
             #print(f"SEED : {seed_df}")    
+=======
+            
+            if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0:
+                seed_df = data
+                
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
             seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
             
             # Previous Day's High/Low            
             indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
             stock_entry = {                        
+<<<<<<< HEAD
                                     'Price'         : {
                                                         'Previous'  : ticker_row[ closePos ],       'Slope'  : 1 , 'Bought'  : 0,
                                                        'High'       :ticker_row[ highPos ],         'Upward' : 0 , 'Downward': 0
@@ -123,6 +141,10 @@ class DayTradeStrategy:
                                     'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
                                     'AvgNumMoves'   : [],
                                     'AvgAmount'     : [],
+=======
+                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Upward' : 0 , 'Downward': 0 },
+                                    'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                                     'Indicators'    : indicators,
                                     'Losses'        : 0,
                                                            
@@ -167,7 +189,11 @@ class DayTradeStrategy:
                     if account.Mode.upper() == "TRADE"  or account.Mode.upper() == "TEST" :
                         time.sleep( time_to_sleep )
             else:
+<<<<<<< HEAD
                 print(f"No Need to pause  {current_time}")
+=======
+                print("No Need to pause  {current_time}")
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             
             today_date  = str(current_time)[:10]
             symbols     = [ symbols ] if isinstance( symbols, str) else symbols            
@@ -177,8 +203,37 @@ class DayTradeStrategy:
                 ticker_row      = account.QuoteByInterval ( symbols= symbol,  frequency= 60*30, endDate = current_time)
                 stock_entry     = self.PrimeStockEntry(  symbol, ticker_df, ticker_row, current_time ,
                                                      account , closePos = 3, highPos = 6, volumePos = 5 )
+<<<<<<< HEAD
                 self.Stocks.update( {symbol : stock_entry } ) 
 
+=======
+                self.Stocks[ symbol ]  = stock_entry
+                """
+                data        = account.History ( symbol = symbol, time_range=200 )                # GET HISTORICAL INFO FOR SYMBOL
+                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')
+                
+                if not isinstance(seed_df, pd.DataFrame) or len(seed_df) ==0 :
+                    seed_df = data
+                
+                seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))
+                seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]
+                
+                indicators  = Indicators ( symbol= symbol, data= data , seed_df=seed_df)               # CALCULATE THE INDICATORS
+                 
+               # PULL THE FIRST 30 MINS OF DATA3
+                self.Stocks[ symbol ]  = {                        
+                                    'Price'         : {'Previous': ticker_row[ 4 ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ 4 ], 'Upward' : 0 },
+                                    'Volume'        : {'Previous': ticker_row[ 5], 'Slope' : 1 , 'Bought' : 0},
+                                    'Indicators'    : indicators,
+                                    "PrevDayHigh"   : ticker_df[ :-1]['high'].to_string(index=False) if ticker_df != None else ticker_row[2] ,
+                                    "PrevDayLow"    : ticker_df[ :-1]['low'].to_string(index=False)  if ticker_df != None else ticker_row[6] ,
+                                    "ORB_L"         : ticker_row[2] if ticker_row else 0,
+                                    "ORB_H"         : ticker_row[6] if ticker_row else 0,
+                                    'Losses'        : 0
+                             }
+                """
+                
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         except:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -472,15 +527,40 @@ class DayTradeStrategy:
             if not ( symbol in self.Stocks.keys() )  and ( current_time.hour == 15 and current_time.minute >= 45) :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
                 return 
+<<<<<<< HEAD
 
             # ADD MECHANISM FOR DETERMINING THE AVG NUMBER OF MOVES BEFORE PIVOTING AND THE AVG $ MOVES  BEFORE PIVOTING
+=======
+   
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
          
             # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY 
             if not ( symbol in self.Stocks.keys() ) :
                 ticker_df       = account.History( symbol=symbol, time_range=1)   
                 self.Stocks[symbol] = self.PrimeStockEntry( symbol=symbol , ticker_df=ticker_df,ticker_row=ticker_row , current_time=current_time,
                                                             account=account, closePos = closePos , highPos=highPos , volumePos=volumePos)
+<<<<<<< HEAD
              
+=======
+                """
+                data = account.History ( symbol = symbol, time_range =200 )           # GET HISTORICAL INFO FOR SYMBOL
+                
+                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')                
+                if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0  :
+                    seed_df = data
+                
+                seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
+                seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
+
+                indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
+                self.Stocks[ symbol ]  = {                        
+                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Upward' : 0 , 'Downward' :0},
+                                    'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
+                                    'Indicators'    : indicators,
+                                    'Losses'        : 0
+                             }
+                """
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             
             # Update the indicators            
             entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
@@ -515,7 +595,11 @@ class DayTradeStrategy:
             crash_trail_stop       =  round(crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought']) ,5)
 
 
+<<<<<<< HEAD
             upward_pressure     =  0.001 if upward_pressure == 0   else upward_pressure
+=======
+            upward_pressure     =  0.001 if upward_pressure == 0 else upward_pressure
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             downward_pressure   =  0.001 if downward_pressure == 0 else downward_pressure
 
 
@@ -526,7 +610,10 @@ class DayTradeStrategy:
             if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous'] :# and  ticker_row[closePos] > ticker_row[openPos]:
                     self.Stocks[ symbol]['Price']['Upward']  += 1
             else:
+<<<<<<< HEAD
                 self.Stocks[ symbol]['AvgNumMoves'].append( self.Stocks[ symbol]['Price']['Upward'] )
+=======
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 self.Stocks[ symbol]['Price']['Upward']  = 0
 
             
@@ -585,12 +672,23 @@ class DayTradeStrategy:
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                     volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators'])   ) :
                     
+<<<<<<< HEAD
                         success     = True                                               
                         action      = "bought"
                         self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
                         self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos] 
+=======
+                        success = True
+                        self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
+                        self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
+                        self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
+                        self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
+                        self.Stocks[ symbol]['Price']['Downward']  = 0
+                        self.Stocks[ symbol]['Price']['Upward']    = 0
+                        action          = "bought"
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 else:    
                     print( f"\t\t\t  *  BUY::  Upward {upward_pressure}  less than downward pressure  {downward_pressure}" )
                     
@@ -615,10 +713,14 @@ class DayTradeStrategy:
                  if  round(float(ticker_row[ closePos ]), 5) < round( float(self.Stocks[ symbol]['Price']['Previous']) , 5)  :
                      self.Stocks[ symbol]['Price']['Downward'] += 1
                  else:
+<<<<<<< HEAD
                      self.Stocks[ symbol]['AvgNumMoves'].append( self.Stocks[ symbol]['Price']['Downward'] )
                      self.Stocks[ symbol]['Price']['Downward'] = 0
                      
 
+=======
+                     self.Stocks[ symbol]['Price']['Downward'] = 0
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                  if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) and self.Stocks[ symbol]['Price']['Downward'] < 2 ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
                      print( f"\t\t\t  \\-> SELL SIGNAL [ RESCIND ] IN PROFIT  : " +
                             f" More upward than downward pressure : { round( float(ticker_row[highPos]) - float(ticker_row[closePos]), 5) } -> " +
@@ -636,6 +738,7 @@ class DayTradeStrategy:
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ])  ,
                                        current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                            ask_volume=float(ticker_row[ volumePos ] ),  indicators=self.Stocks[symbol]['Indicators'])  :
+<<<<<<< HEAD
                          success    = True                         
                          action     = "closed"
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
@@ -644,6 +747,17 @@ class DayTradeStrategy:
                          
 
                          print(f"\t\t\t   Indicators [IN ] : {account.Trades[symbol]['indicators_in']}  [OUT] {account.Trades[symbol]['indicators_out']}  ") 
+=======
+                         success = True
+                         self.Stocks[ symbol ]['Price' ]['Bought'] = 0
+                         self.Stocks[ symbol ]['Price' ]['High']   = 0
+                         self.Stocks[ symbol ]['Volume']['Bought'] = 0
+                         self.Stocks[ symbol]['Price']['Downward'] = 0
+                         self.Stocks[ symbol]['Price']['Upward']   = 0
+                         action          = "closed"
+
+                         print(f"\t\t\t   Indicators [IN ] : {account.InPlay[symbol]['indicators_in']}  [OUT] {self.Stocks[symbol]['Indicators']}  ") 
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                         
                         
 
@@ -662,6 +776,7 @@ class DayTradeStrategy:
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ]) ,
                                            current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ),
                                        ask_volume=float(ticker_row[ volumePos ] ), indicators=self.Stocks[symbol]['Indicators'] )  :
+<<<<<<< HEAD
                          success        = True
                          action         = "closed"
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
@@ -670,6 +785,18 @@ class DayTradeStrategy:
                          self.Stocks[symbol]['Losses']    += 1
 
                          print(f"\t\t\t   Indicators [IN ] : {account.Trades[symbol]['indicators_in']}  [OUT] {account.Trades[symbol]['indicators_out']}  ") 
+=======
+                         success = True
+                         self.Stocks[ symbol ]['Price' ]['Bought'] = 0
+                         self.Stocks[ symbol ]['Price' ]['High']   = 0
+                         self.Stocks[ symbol ]['Volume']['Bought'] = 0
+                         self.Stocks[ symbol]['Price']['Downward'] = 0
+                         self.Stocks[ symbol]['Price']['Upward']   = 0
+                         action          = "closed"
+                         self.Stocks[symbol]['Losses']    += 1
+
+                         print(f"\t\t\t   Indicators [IN ] : {account.InPlay[symbol]['indicators_in']}  [OUT] {self.Stocks[symbol]['Indicators']}  ") 
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
 
             
             

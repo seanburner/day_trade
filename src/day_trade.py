@@ -503,17 +503,23 @@ def system_test( configs : dict  ) -> None :
 
     account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
     sqlConn     = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
+<<<<<<< HEAD
 
     sqlConn.CreateTables()
     return
     
+=======
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
     sqlConn.Conn.WriteMany( header=HEADER, contents =CONTENTS)
     return 
 
 
 
     try:
+<<<<<<< HEAD
 
+=======
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         while True :
             print ( "-> going round in circles ")
             time.sleep( 60 )
@@ -764,7 +770,10 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     data            = {}    
     account         = None
     success         = False
+<<<<<<< HEAD
     orb_calced      = False 
+=======
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
     date_format     = "%Y-%m-%d %H:%M:%S"  
     
 
@@ -788,9 +797,13 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         current_time    = datetime.now()
         
         while ( cont )  :
+<<<<<<< HEAD
             if (current_time.hour >= 16 ) :
                 cont = False                
             elif (current_time.hour < 9  and current_time.minute < 30  ) or ( current_time.hour >= 17 ) :                
+=======
+            if (current_time.hour < 9  and current_time.minute < 30  ) or ( current_time.hour >= 17 ) :                
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 cont = False
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
@@ -804,9 +817,14 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                         account.Sell(stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] ,
                                      ask_volume=ticker_row[5], indicators=Strategies.Stocks[symbol]['Indicators'] )
                 cont = False
+<<<<<<< HEAD
             elif  not orb_calced :#(current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
                 Strategies.SetORB(configs['stock'], account, current_time)
                 orb_calced = True
+=======
+            elif (current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
+                Strategies.SetORB(configs['stock'], account, current_time)    
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             else:
                 current_time    = datetime.strptime( str(current_time)[:17] +"00", date_format) 
                 symbols         = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
@@ -1277,8 +1295,12 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         print(f"\t    == OPENED ==\t=== BID=== \t== CLOSED == \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
             print(f"\t   {entry['bidTime'][:19] }\t${entry['bid'] :.4f}\t\t" +
+<<<<<<< HEAD
                   f"{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t"+
                   f"${entry['p_l']:.4f}\t\t${ entry.get('actualPL',0):.4f}" )            
+=======
+                  "{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry.get('actualPL',0):.4f}" )            
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY

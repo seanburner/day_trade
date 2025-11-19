@@ -150,9 +150,14 @@ class TradeAccount:
             
             response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
+<<<<<<< HEAD
             
             if response.status_code != 200 :
                 print( f"\t\t\t TradeAccount::History()  did not get Quote :{response.text}" )
+=======
+            #print( response.text )
+            if response.status_code != 200 :
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 return ticker_row
             #print( response.text)
             
@@ -431,8 +436,12 @@ class TradeAccount:
 
 
 
+<<<<<<< HEAD
     def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()),
                                                   ask_volume : int = 0, indicators : Indicators = None )  -> bool :
+=======
+    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()), ask_volume : int = 0, indicators : Indicators = None )  -> bool :
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         """
            Sell the stock currently holding , True = succeeded , False = failed
            Updates
@@ -482,7 +491,11 @@ class TradeAccount:
                             'qty' :self.InPlay[ stock ]['qty'],     'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()}
                 self.Trades[stock].append(  new_rec )                
+<<<<<<< HEAD
                 print ( f"\t\t\t \\-> SOLD :  from ${self.InPlay[stock]['price']} -> ${new_price }"  )
+=======
+                print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
+>>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
                 if (  p_l  < ( -0.01 * self.DailyFunds) ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
