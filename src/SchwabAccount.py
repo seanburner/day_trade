@@ -191,10 +191,10 @@ class SchwabAccount :
         """
         success  : bool  = False
         #print("\t\t\t\t  -> Access Schwab Tokens ")
-        # Needs to add expires at for refresh token
-        if ( self.Tokens == BLANK_TOKENS or self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or
-             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys())  or
-             (self.Tokens['expires_at'] + timedelta(minutes=self.Tokens['expires_in'] ) )< datetime.now() ):
+        # Needs to add expires at for refresh token             self.Tokens['expires_at'] < datetime.now() or
+        if ( self.Tokens == BLANK_TOKENS or  self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or
+             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()) ): # or
+             #(self.Tokens['expires_at'] + timedelta(minutes=self.Tokens['expires_in'] ) )< datetime.now() ):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
             success = self.RefreshToken("refresh_token",  self.Tokens['refresh_token'])             
@@ -559,12 +559,16 @@ class SchwabAccount :
                            Nothing   
             RETURNS    :
                            bool -> True / False  
-        """        
-        service = None     
+        """
+        success         = False 
+        service         = None
+        returned_code   = ""
+        
         try:
+            print(f"TOKENS: { self.Tokens } ")
             service = ChromeService(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
-            driver = webdriver.Chrome(service=service, options=options)
+            driver  = webdriver.Chrome(service=service, options=options)
             driver.get(  self.Endpoints['login'])
             print(   self.Endpoints['login'])
             returned_code = input("\t\t Follow the prompts in the web browser, then copy and paste the final address location here : " )         
@@ -575,7 +579,7 @@ class SchwabAccount :
 
        
         success = self.RefreshToken("authorization_code",  returned_code)
-        self.Tokens['refresh_expires_at'] = datetime.now() + timedelta( seconds=900*96*7 )  # MARK EXPIRATION FOR 7 DAYS FROM NOW ( 15 MINS * ( 4 * 24 ) * 7 )
+        self.Tokens['refresh_expires_at']   = datetime.now() + timedelta( seconds=900*96*7 )  # MARK EXPIRATION FOR 7 DAYS FROM NOW ( 15 MINS * ( 4 * 24 ) * 7 )       
         return success 
 
 
@@ -613,7 +617,7 @@ class SchwabAccount :
             response = requests.post('https://api.schwabapi.com/v1/oauth/token', headers=headers, data=data)    
             
             self.Tokens                         = response.json()
-            self.Tokens['expires_at']           = datetime.now() +  timedelta(seconds=1750)
+            self.Tokens['expires_at']           = datetime.now() +  timedelta(seconds=1750)   # CHANGED FROM SECONDS TO HOURS 
             self.Tokens['refresh_expires_at']   = datetime.now() +  timedelta(hours=23.45*7)
            
         except:

@@ -31,9 +31,10 @@ class OptionsTrade:
         """
             Initialize the class variables
         """
-        self.AppId       = 'org.aegesware.trading.options'
-        self.Window = None 
-        pass
+        self.AppId      = 'org.aegesware.trading.options'
+        self.Window     = None
+        self.ClassName  = "OptionTrade"
+        
 
     def MainWindow( self , width : int = 700, height : int = 400 ) -> None :
         """

@@ -21,10 +21,7 @@ import requests
 import pandas           as pd
 import numpy            as np
 
-<<<<<<< HEAD
 from thefuzz            import fuzz
-=======
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
 from datetime           import datetime,timedelta
 from MySQLConn          import MySQLConn
 
@@ -173,11 +170,7 @@ class TraderDB:
         
 
         try:
-<<<<<<< HEAD
             query           = f"select reasonId from reasons where reason = '{reason}' ;"
-=======
-            query           = f"select reaspmId from reasons where reason = '{reason}' ;"
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             self.Conn.Send( query )
             
             if self.Conn.Results == [] :
@@ -320,8 +313,8 @@ class TraderDB:
             ARGS   :
                         orderId       ( int )  ID for the overall order
                         indicatorsId  ( dict ) ID for the inidcators in the sql table 
-                        inidcators_in ( dict ) indicators for the bid
-                        inidcators_out( dict ) indicators for the ask
+                        indicators_in ( dict ) indicators for the bid
+                        indicators_out( dict ) indicators for the ask
             RETURNS:
                         nothing
         """
@@ -354,11 +347,7 @@ class TraderDB:
                         nothing 
         """
         header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,bidVolume,askVolume," +
-<<<<<<< HEAD
                             f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL,reasonIn,reasonOut,comments {self.InsertMetaFields(0) } ) values " )
-=======
-                            f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL,resonIn,reasonOut,comments {self.InsertMetaFields(0) } ) values " )
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                             #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
         query           = ""
         numRec          = 0
@@ -391,13 +380,8 @@ class TraderDB:
                         stockId     = self.InsertStock( symbol = symbol )
                         initDateId  = self.InsertDate(  date   = order['bidTime'] )
                         closeDateId = self.InsertDate(  date   = order['askTime'] )
-<<<<<<< HEAD
                         reasonInId  = self.InsertReason(  reason   = order.get('reasonIn',None) )
                         reasonOutId = self.InsertReason(  reason   = order.get('reasonOut',None) )
-=======
-                        reasonInId  = self.InsertReason(  reason   = order.get('reasonIn','N/A') )
-                        reasonInOut = self.InsertReason(  reason   = order.get('reasonOut','N/A') )
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                         self.Conn.Send( f"select id from orderbook where userId ={userId} and initiated ={initDateId} and stockId={stockId} ;")
                         if self.Conn.Results != [] :
                             print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
@@ -406,12 +390,8 @@ class TraderDB:
                             query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
                                     f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
                                      f"'{order['bidFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
-<<<<<<< HEAD
                                      f"'{order['actualPL']}',{NULL if reasonInId == None else reasonInId}, "+
                                      f" {NULL if reasonOutId == None else reasonOutId},'{order.get('comments','')}' {self.InsertMetaFields(1)} );"  )                        
-=======
-                                     f"'{order['actualPL']}',{reasonInId}, {reasonOutId},{order.get('comments','')} {self.InsertMetaFields(1)} );"  )                        
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                         
                             orderId  =  self.Conn.Write( query )
                             if orderId != None :
@@ -583,21 +563,12 @@ class TraderDB:
             
             print("\n\t\t\tLEFT OVER : " , recs )
 
-<<<<<<< HEAD
             #Add option to continue then get reason in/out and comments
             if indx > 0 :
                 cont = input("\t\t\t\t Continue with sync process ( add to SQL ) [ Y/n ] ")
                 if cont.upper().find("Y" ) > -1 :
                     print("\t\t\t\t  Continuing with the sync process ")
                     orderbook = self.OrderbookReasonsAndComments( orderbook = orderbook)
-=======
-            #Add option to continue then get reason in out and comments
-            if indx > 0 :
-                cont = input("\t\t\t\t Continue with sync process ( add to SQL ) [ Y/n ] ")
-                if cont.upper().find("Y" ) > -1 :
-                    print("\t\t\t\t Continuing with the sync process ")
-                    self.OrderbookReasonsAndComments( orderbook = orderbook, email=email  , username=username)
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                     self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
         except:  
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -617,7 +588,6 @@ class TraderDB:
         """
         indx  = 0 
         try:
-<<<<<<< HEAD
             if len( orderbook.keys()) > 0 :
                 print( f"\t\t\tSTOCK\tINDEX\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tPRICE\t\t\tBIDRECEIPT\tASKRECEIPT ")
             
@@ -631,19 +601,6 @@ class TraderDB:
                         indx += 1
             else:
                 print( f"\t\t\t No transactions in orderbook to display")
-=======
-            print( f"\t\t\tSTOCK\tINDEX\tDATE/TIME\t\tCLOSED\t\tSYMBOL\tQTY\tPRICE\t\t\tBIDRECEIPT\tASKRECEIPT ")
-            
-            for symbol in orderbook.keys():
-                indx = 0
-                print( f"\t\t\t{symbol}")
-                for order in orderbook[symbol]:                        
-                    print( f"\t\t\t\t{indx}\t{ order['bidTime']}\t{order['askTime'][11:16]}\t\t{ order['symbol']}"+
-                           f"\t{ int( order['qty'] )}\t${ order['bidFilled']:.2f} -> ${ order['askFilled']:.2f}"+
-                           f"\t\t{ order['bidReceipt']}\t{ order['askReceipt']}" )
-                    indx += 1
-               
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         except: 
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -651,35 +608,59 @@ class TraderDB:
         finally:
             return indx 
         
+    def FuzzyMatchReason( self, ureason : str , reasons : list ) -> str :
+        """
+            Incorporate a FuzzyMatch algorithm to match the reason the user supplied with one that already exists.
+            If cannot get a minimum match ( 70 % )  then the provided reason from the user will be used as a new entry
+            ARGS   :
+                        ureason ( str  )  - supplied by user
+                        reasons ( list )  - entries from SQL 
+            RETURNS:
+                        reason ( str ) final version of the reason to be used
+        """
+        match_ratio         = [0,0]    # fuzzy matched ratio for the reason title and description  
+        matched_entry       = [0,0]    # list of matched reason index and match ratio
+        matched_reason      = ureason
+        match_ratio_minimum = 70
+        
+        try :            
+            for reason in reasons :
+                match_ratio[0] = fuzz.partial_ratio( ureason , reason[1] )
+                match_ratio[1] = fuzz.partial_ratio( ureason , reason[2] )
+            
+                if match_ratio[1] > match_ratio[0]:
+                    match_ratio[0] = match_ratio[1]
+                    
+                if match_ratio[0] > matched_entry[1] :
+                    matched_entry[0] =  reason[1]
+                    matched_entry[1] =  match_ratio[0]
 
-<<<<<<< HEAD
+            
+            if matched_entry[1] > match_ratio_minimum :
+                print (f"FuzzyMatchReason:: MATCHED {ureason} with { matched_entry[0] } " )
+                matched_reason = matched_entry[0]
+            else:
+                print(f"FuzzyMatchReason:: Continuing with {matched_reason}") 
+        except:
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )
+        finally:
+            return matched_reason
+                
     def OrderbookReasonsAndComments(self,  orderbook : dict ) -> dict:
-=======
-    def OrderbookReasonsAndComments(self,  orderbook : dict , email : str , username : str) -> None :
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         """
             Add Reasons for entering and exiting position and any comments for each entry
             ARGS   :
                         orderbook  ( dict )  entries by stock/symbol
-<<<<<<< HEAD
                         
             RETURNS:
                         orderbook  ( dict )  entries by stock/symbol
-=======
-                        email      ( str  )  email of user
-                        username   ( str  )  username of user to assign to entries 
-            RETURNS:
-                        nothing 
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         """
         indx  = 0
         cont  = ''
         try:
-<<<<<<< HEAD
             cont = input("\n\t\t\t\t  Add Reasons and comments to orderbook [ Y/n ]: " )
-=======
-            cont = input("\n\t\t\t Add Reasons and comments to orderbook [Y/n ]: " )
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             if cont.upper().find( 'Y') > -1 :
                 #Get Reasons
                 self.Conn.Send("select reasonId, reason,description from reasons where active = 1;")
@@ -688,35 +669,35 @@ class TraderDB:
                 print("\n\t\t\tReasons and Comments" )
                 print("\n\t\t\t   ID\t REASON\t\t\t\t DESCRIPTION")
                 for reason in reasons :                
-                    print(f"\t\t\t   {indx}\t {reason[1].ljust(30, ' ') }\t {reason[2].ljust(50, ' ') }")
+                    print(f"\t\t\t   {indx}\t {str(reason[1]).ljust(30, ' ') }\t {str(reason[2]).ljust(50, ' ') }")
                     indx += 1
                 
                 for symbol in orderbook.keys() :
                     for indx in range( len( orderbook[symbol] ) ) :
                         print(f"\n\t\t\tORDER: { orderbook[symbol][indx]['bidTime']} -> {orderbook[symbol][indx]['askTime'][11:16]} " +
-                              f"{ int( orderbook[symbol][indx]['qty'] ) } {orderbook[symbol][indx]['symbol']}") 
+                              f"{ int( orderbook[symbol][indx]['qty'] ) } * {orderbook[symbol][indx]['symbol']}  TP: ${round(orderbook[symbol][indx]['p_l'])}") 
                         reasonIn    = input(f"\t\t\t   What was the reason for entering this position : ")
-                        reasonIn    = reasons[int(reasonIn)][1] if reasonIn.isdigit() else reasonIn                    
+                        if reasonIn.isdigit() :
+                            reasonIn    = reasons[int(reasonIn)][1]
+                        else:
+                            reasonIn    = self.FuzzyMatchReason( ureason=reasonIn , reasons=reasons )
+                        
                         reasonOut   = input(f"\t\t\t   What was the reason for exiting this position : ")
-                        reasonOut   = reasons[int(reasonOut)][1] if reasonOut.isdigit() else reasonOut
+                        if reasonOut.isdigit():
+                            reasonOut   = reasons[int(reasonOut)][1]
+                        else:
+                            reasonOut   = self.FuzzyMatchReason( ureason=reasonOut , reasons=reasons )
+                        
                         comments    = input(f"\t\t\t   Comments about this postion: ")
                         orderbook[symbol][indx].update( { 'reasonIn': reasonIn , 'reasonOut' : reasonOut, 'comments' : comments} )
             else:
-<<<<<<< HEAD
                 print( "\n\t\t\t\t   -> Skipping adding Reasons and Comments to orderbook")
-=======
-                print( "\n\t\t\t Skipping adding Reasons and Comments to orderbook")
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         except:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-<<<<<<< HEAD
         finally:
             return orderbook
-=======
-
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
 
 
 
@@ -727,10 +708,6 @@ class TraderDB:
         """
             Staging Area to design schema 
         """
-<<<<<<< HEAD
-=======
-        
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         verifyUser = (#" DELIMITER // " +
                    "CREATE PROCEDURE verifyUser( IN user_name varchar (20), IN pass_word varchar(30), OUT userId  int  ) " +  
                     " BEGIN  " +
@@ -751,7 +728,8 @@ class TraderDB:
                       #"('SMA','Simple Moving Average:for the day',1,'trader',now(),'trader',now() ), ('FIB','Fibonacci Retracement: All Time',1,'trader',now(),'trader',now() ) , " +
                       "('ATH','All Time High: 200 days',1,'trader',now(),'trader',now() ), ('ATL','All Time Low: 200 days',1,'trader',now(),'trader',now() ) , " +
                       "('HIGH','Daily High',1,'trader',now(),'trader',now() ), ('LOW','Daily Low',1,'trader',now(),'trader',now() ) , " + #('dFib','Fibonacci Retracement: daily data',1,'trader',now(),'trader',now() ) , " +
-                      "('RSI','Relative Strength Index',1,'trader',now(),'trader',now() ), ('VolIndex','Volatility Index',1,'trader',now(),'trader',now() ) ; " +
+                      "('RSI','Relative Strength Index',1,'trader',now(),'trader',now() ), ('VolIndex','Volatility Index',1,'trader',now(),'trader',now() ) , " +
+                      "('Chop_Index','The choppiness , price action change of the stock',1,'trader',now(),'trader',now()); " +
                     "end // " +
                     "DELIMITER; " )
         users   = (#"DELIMITER // "+
@@ -760,13 +738,9 @@ class TraderDB:
                     " create table if not exists  users ( userId int auto_increment PRIMARY KEY not null, " +
                        " firstName varchar(20) , lastName  varchar(20),username varchar(20)  NOT NULL, passwd varchar(20) , pwd_hash varchar(256) , email varchar(30) , " +
                        "active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); "+                   
-<<<<<<< HEAD
                     " INSERT IGNORE INTO users ( username , passwd, pwd_hash,email, active,createdBy,createdDate,modBy, modDate ) values " +
                     " ('trader','verified', SHA2('verified', 256),'',1,'trader',now(),'trader',now() ) , " +
                     " ('Sean','Burner','sean','burner',sha2('burner',256), 'seanburner@gmail.com',1,'trader',now(),'trader',now()); " +
-=======
-                    " INSERT IGNORE INTO users ( username , passwd, pwd_hash, active,createdBy,createdDate,modBy, modDate ) values ('trader','verified', SHA2('verified', 256),1,'trader',now(),'trader',now() ) ; " +
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                     "end // " +
                     "DELIMITER; " )
         dates   = (#" DELIMITER // " +
@@ -786,7 +760,6 @@ class TraderDB:
                     "       sector varchar(15) ,active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
                     " end // "+ 
                     "DELIMITER; ")
-<<<<<<< HEAD
         
         reasons     = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableReasons(    )   " +
@@ -806,14 +779,12 @@ class TraderDB:
                         "  ('ANALYSIS: Trend Lines','Identifying up/down trends with trend lines',1,'trader',now(),'trader',now())," +
                         "  ('ANALYSIS: Profit Target','Identifying when to expect/take profit',1,'trader',now(),'trader',now()) ,"+
                         "  ('ANALYSIS: Pullback v. Reversal','MisIdentifying Pullback as Reversal or vice versa',1,'trader',now(),'trader',now()) ,"+
+                        "  ('ANALYSIS: Dan Rawitch','Following Dan Rawitch@UniversityOfOptions',1,'trader',now(),'trader',now()) , " +
                         "  ('EMOTIONAL: Distracted','Wasnt paying attention',1,'trader',now(),'trader',now()),"+
                         "  ('EMOTIONAL: Revenge','Revenge trading to make up for previous losses',1,'trader',now(),'trader',now())," +
                         "  ('EMOTIONAL: FOMO', 'Reacted without proper analysis becaused too anxious',1,'trader',now(),'trader',now());"+
                         "     END //  "+
                         "     DELIMITER ;  ")
-=======
-
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
 
         orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableOrderBook(    )   " +
@@ -852,42 +823,19 @@ class TraderDB:
                                 "FOREIGN KEY ( indicateId )   REFERENCES indicators(indId) ); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
-<<<<<<< HEAD
-=======
-        reasons     = (#"DELIMITER // "+
-                        " CREATE PROCEDURE createTableReasons(    )   " +
-                        " BEGIN  "+
-                             "create table if not exists reasons( reasonid int auto_increment PRIMARY KEY not null," +
-                                " reason varchar(40)  not null , description varchar(200) , " +                    
-                                " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
-                        " INSERT INTO reasons (reason,description, active,createdBy,createdDate,modBy, modDate ) values  "+
-                        "  ('AUTO','Trading bot',1,'trader',now(),'trader',now()), " +
-                        "  ('ANALYSIS: Bollinger Bands', 'Interpretation of the Bollinger Bands',1,'trader',now(),'trader',now() ), "+
-                        "  ('ANALYSIS: Risk Management', 'Did not calculate Stop-Loss properly',1,'trader',now(),'trader',now()),  " +
-                        "  ('ANALYSIS: Wick','Did not interpret wicks properly',1,'trader',now(),'trader',now()), " +
-                        "  ('ANALYSIS: Chop', 'Chop managment problems',1,'trader',now(),'trader',now()), " +
-                        "  ('ANALYSIS: Followed DR' ,'Followed Dan Rawitch advice',1,'trader',now(),'trader',now()), ",
-                        "  ('ANALYSIS: Greeks',' Did not allow for Options Delta or Gamma',1,'trader',now(),'trader',now()),"+
-                        "  ('ANALYSIS: Key Levels' ,'Price broke, held and show momentum above level',1,'trader',now(),'trader',now()),"+
-                        "  ('ANALYSIS: Trend Lines','Identifying up/down trends with trend lines',1,'trader',now(),'trader',now())," +
-                        "  ('ANALYSIS: Profit Target','Identifying when to expect/take profit',1,'trader',now(),'trader',now()) ,"+
-                        "  ('EMOTIONAL: Distracted','Wasnt paying attention',1,'trader',now(),'trader',now()),"+
-                        "  ('EMOTIONAL: Revenge','Revenge trading to make up for previous losses',1,'trader',now(),'trader',now())," +
-                        "  ('EMOTIONAL: FOMO', 'Reacted without proper analysis becaused too anxious',1,'trader',now(),'trader',now());"+
-                        "     END //  "+
-                        "     DELIMITER ;  ")
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         v_orderbook = (#"DELIMITER // "+
                         " CREATE PROCEDURE if not exists createTable_vOrderBook(   )   " +
                         " BEGIN  "+
                         "     create view v_orderbook  as" +
                         "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , " +
-                        "          o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL " + #, o.active, o.createdBy, o.createdDate, o.modBy,o.modDate "+
+                        "          o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL  ,r1.reason as reasonIn, r2.reason as reasonOut,o.comments " +
                         "     from orderbook o " +
                         "     inner join dates d on o.initiated =d.dateid "+
                         "     inner join dates d2 on o.closed = d2.dateid  "+
                         "     inner join stocks s on o.stockid =s.stockid  "+
-                        "     inner join users u on o.userid=u.userid "+
+                        "     inner join users u on o.userid=u.userid " +
+                        "     inner join reasons r1 on o.reasonIn = r1.reasonId " + 
+                        "     inner join reasons r2 on o.reasonOut= r2.reasonId " + 
                         "     where o.active = 1  order by initiated asc; " +
                         "     END //  "+
                         "     DELIMITER ;  ")        
@@ -904,7 +852,6 @@ class TraderDB:
                             " call createTable_vOrderbook(); " +
                             " END // " +
                             " DELIMITER ;")
-<<<<<<< HEAD
         
 
 
@@ -915,13 +862,6 @@ class TraderDB:
                 print( f"\n\nTable : {table}")
                 
                 #self.Conn.Write( table)
-=======
-        try:
-            tables = [verifyUser,indicators,users, dates,stocks,orderbook, orderIndicates ,v_orderbook, p_createTables ] #     
-            for table in tables :
-                print( f"Table : {table}")
-                self.Conn.Write( table)
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                              
             self.Conn.Write( "call createAllTables(); " )
             
@@ -932,6 +872,22 @@ class TraderDB:
 
 
         """
+CREATE PROCEDURE if not exists createTable_vOrderBook(   )   
+                         BEGIN  
+                             create view v_orderbook  as
+                                 select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , 
+                                  o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL ,r1.reason as reasonIn, r2.reason as reasonOut,o.comments 
+                             from orderbook o 
+                             inner join dates d on o.initiated =d.dateid 
+                             inner join dates d2 on o.closed = d2.dateid  
+                             inner join stocks s on o.stockid =s.stockid  
+                             inner join users u on o.userid=u.userid 
+                             inner join reasons r1 on o.reasonIn = r1.reasonId  
+                             inner join reasons r2 on o.reasonOut= r2.reasonId  
+                             where o.active = 1  order by initiated asc; 
+                             END // 
+
+
 CREATE PROCEDURE createTableReasons(    )  
                          BEGIN  
                              create table if not exists reasons( reasonid int auto_increment PRIMARY KEY not null,
@@ -970,7 +926,7 @@ WHERE
     
             SHOW CREATE PROCEDURE your_procedure_name;
             
-            SELECT * FROM mysql.proc WHERE name = 'your_procedure_name' \G
+            SELECT * FROM mysql.proc WHERE name = 'your_procedure_name' \\G
 
 
                         CREATE PROCEDURE createTableOrderIndicates(    )   

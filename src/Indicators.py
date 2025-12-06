@@ -24,11 +24,31 @@ import pandas       as      pd
 import numpy        as      np
 
 
-from datetime       import  datetime 
+from datetime           import datetime
+from pythonnet import load
+#import clr
+#from stock_indicators   import indicators
+
 
 warnings.filterwarnings('ignore')
-
-
+"""
+try:
+    # Explicitly load the CoreCLR runtime for Linux
+    os.environ['DOTNET_ROOT'] = "/usr/lib64/dotnet/"
+    print(f"Set DOTNET_ROOT to: {os.environ['DOTNET_ROOT']}")
+    load("coreclr") 
+    print("CoreCLR runtime loaded successfully.")
+    
+except Exception as e:
+    # This block should now be rare, but indicates a path/environment issue.
+    print(f"Error loading CoreCLR runtime: {e}") 
+    print("Please verify the DOTNET_ROOT environment variable.")
+    
+# --- STEP 2: Now perform the reference/import ---
+import clr
+from stock_indicators import indicators
+print("stock-indicators successfully imported.")
+"""
 class Indicators :
     def __init__( self, symbol : str , data : dict , seed_df : pd.DataFrame  ) -> None :
         """
@@ -52,6 +72,7 @@ class Indicators :
         self.BB_Lower   = 0
         self.BB_Upper   = 0
         self.VolIndex   = 0
+        self.ChopIndex  = 0
         
         self.Set( data, seed_df )
         
@@ -64,7 +85,7 @@ class Indicators :
         contents  = (f"Symbol : {self.Symbol}  "+ "\n Daily SMA : " + str( self.dSMA) + "\n VWAP : " + str(self.VWAP)+
                          "\n RSI : " + str(self.RSI) + "\n Volatility : " +str( self.VolIndex)  + "\n SMA : " +str( self.SMA)  +
                         f"\nAT [H/L] : {self.ATH} /{self.ATL}" + f"\n d_FIb: {self.dFib} " + f"\n FIb: {self.Fib} "+
-                         f"\nBollinger Bands : {self.BB_Lower} -> {self.BB_Upper}" )
+                         f"\nBollinger Bands : {self.BB_Lower} -> {self.BB_Upper}    Chop_Index : {self.ChopIndex}" ) #.iloc[-1]
         
         return contents 
 
@@ -85,7 +106,7 @@ class Indicators :
             for key in fib.keys():
                 summary.update( {  fibs[pos]+"_"+key : fib[key] } ) 
 
-        summary |= { 'BB_Lower' : self.BB_Lower, 'BB_Upper' :self.BB_Upper }
+        summary |= { 'BB_Lower' : self.BB_Lower, 'BB_Upper' :self.BB_Upper  , "ChopIndex" : self.ChopIndex} #.iloc[-1]}
         
         #summary |= { 'DFib' : self.dFib, 'FIB' :self.Fib }
         #print( "SUMMARY:", summary )
@@ -141,11 +162,13 @@ class Indicators :
             df = pd.DataFrame(entry).T
             df['date'] = df['datetime'].apply( lambda x: str(datetime.fromtimestamp(x/1000))[:10])
 
-            self.Data = self.Data.dropna()
+            #self.Data = self.Data.dropna()
             self.Data = pd.concat( [df, self.Data ],  ignore_index=True).reset_index( drop=True)
+            #print( f"DATA: {self.Data} ")
+            
             if 0 in self.Data.columns :
                 self.Data = self.Data.drop(0, axis=1)
-            
+                
             
             self.Calculate()
         except:
@@ -191,12 +214,63 @@ class Indicators :
 
             # Bollinger Bands
             self.CalculateBollinger()
-            
+
+            # Chop Index
+            self.CalculateChop()
 
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
+
+
+
+    def CalculateChop( self ) -> None :
+        """
+        Calculate the symbol's chop index ( without dependent library ) 
+        ARGS   :
+                nothing 
+        RETURNS:
+                nothing 
+        """
+        chop   = None 
+        period = 4
+        try:
+            # Calculate True Range (TR)            
+            high_low        = self.Data['high'] - self.Data['low']
+            high_close_prev = abs(self.Data['high'] - self.Data['close'].shift())
+            low_close_prev  = abs(self.Data['low'] - self.Data['close'].shift())
+            tr              = pd.concat([high_low, high_close_prev, low_close_prev], axis=1).max(axis=1)
+    
+            # Calculate the sum of ATR(1) over n periods (which is SUM(TR, n))
+            sum_tr = tr.rolling(window=period).sum()
+    
+            # Calculate the highest high and lowest low over n periods
+            max_high    = self.Data['high'].rolling(window=period).max()
+            min_low     = self.Data['low'].rolling(window=period).min()
+    
+            # Apply the CHOP formula
+            # CHOP = 100 * LOG10( SUM(ATR(1), n) / ( MaxHi(n) - MinLo(n) ) ) / LOG10(n)
+            numerator = sum_tr / (max_high - min_low)
+            # Handle cases where max_high - min_low is zero to avoid division by zero or log(0)
+            numerator = numerator.replace([np.inf, -np.inf], np.nan).fillna(0) 
+
+            chop            = 100 * np.log10(numerator) / np.log10(period)            
+            #print(f"CHOP : {chop}")
+            
+            if chop.shape[0] <= 3 :
+                self.Chop = 50
+            else:
+                self.ChopIndex  = round(chop.iloc[3], 2)
+           
+            
+        except:            
+            print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+            print(f"CHOP : {chop.shape}")
+
+
 
 
     def CalculateBollinger(self ) -> None:        
@@ -219,9 +293,9 @@ class Indicators :
             SD = self.Data['close'].rolling(window=look_back_interval).std()
             
             
-            self.BB_Lower = (MA - (2 * SD)).iloc[-1]   # Lower Bollinger Band
+            self.BB_Lower = round( (MA - (2 * SD)).iloc[-1] , 2)  # Lower Bollinger Band
             
-            self.BB_Upper = (MA + (2 * SD)).iloc[-1]  # Upper Bollinger Band
+            self.BB_Upper = round( (MA + (2 * SD)).iloc[-1] , 2)  # Upper Bollinger Band
             
         except: 
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -312,15 +386,15 @@ class Indicators :
             rs = avg_gain / avg_loss
 
             # Calculate RSI
-            rsi = 100 - (100 / (1 + rs))
+            rsi = round ( 100 - (100 / (1 + rs)) , 2 ) 
                
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )                
         finally:
-            self.RSI =  rsi.iloc[-1]            
-            return rsi.iloc[-1]
+            self.RSI =  round( rsi.iloc[-1] , 2 )
+            return round( rsi.iloc[-1] ,2 )
 
 
 
@@ -371,5 +445,5 @@ class Indicators :
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )                
         finally:
-            self.VolIndex = minute_volatility  #df["Log_Return"][-1]
-            return minute_volatility #df["Log_Return"][-1]
+            self.VolIndex = round ( minute_volatility , 2 ) #df["Log_Return"][-1]
+            return round ( minute_volatility , 2 )          #df["Log_Return"][-1]

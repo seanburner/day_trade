@@ -120,7 +120,7 @@ class TradeAccount:
 
 
 
-    def History( self, symbol : str , time_period : str ='daily' , time_range : int =1, period_type ="month" ) -> dict :
+    def History( self, symbol : str , time_period : str ='daily' , time_range : int =1, period_type ="month" , today :datetime = datetime.now()) -> dict :
         """
             Get historical entries for the symbol
             ARGS  :
@@ -129,8 +129,9 @@ class TradeAccount:
                     time_period  ( str )  daily / month / year / ytd 
             RETURNS:
         """
+        print(f"TRADEACCOUNT::HISTORY -  Its { ('NOT' if today.weekday() != 0 else '' ) }  MONDAY ")
         df              = None 
-        endDate         = datetime.now()- timedelta( days = 1 )  # time delta for when working on weekend 
+        endDate         = today- timedelta( days = ( 3 if today.weekday()== 0 else 1 ) )  # time delta for when working on weekend 
         timeStamp       = 0
         startDate       = None        
         quote_info      = None
@@ -145,19 +146,14 @@ class TradeAccount:
             periodType      = period_type #'month' #'day'
             frequencyType   = time_period
             
-            startDate       = endDate - timedelta( days = frequency * time_range ) 
+            startDate       = endDate - timedelta( days = ((frequency * time_range) + ( 3 if today.weekday()== 0 else 1 )  ) ) 
 
             
             response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
-<<<<<<< HEAD
             
             if response.status_code != 200 :
                 print( f"\t\t\t TradeAccount::History()  did not get Quote :{response.text}" )
-=======
-            #print( response.text )
-            if response.status_code != 200 :
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 return ticker_row
             #print( response.text)
             
@@ -436,12 +432,8 @@ class TradeAccount:
 
 
 
-<<<<<<< HEAD
     def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()),
                                                   ask_volume : int = 0, indicators : Indicators = None )  -> bool :
-=======
-    def Sell( self, stock : str, new_price : float, current_time : str = str( datetime.now()), ask_volume : int = 0, indicators : Indicators = None )  -> bool :
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         """
            Sell the stock currently holding , True = succeeded , False = failed
            Updates
@@ -472,9 +464,9 @@ class TradeAccount:
             if ( new_price  > self.InPlay[ stock ]['price'] ) :
                 diff = (new_price  - self.InPlay[ stock ]['price'] )/self.InPlay[ stock ]['price']
                 print ( f"\t\t\t    \\----> DIFF  -> {new_price }  {self.InPlay[ stock ]['price']}  {diff } ")
-                if diff < 0.00016 :    # ignore profit if less than % of investment 
-                    print(message_prefix + "  Not Selling - trying to be a little greedier ")
-                    return False
+                #if diff < 0.00016 :    # ignore profit if less than % of investment 
+                #    print(message_prefix + "  Not Selling - trying to be a little greedier ")
+                #    return False
             
 
             # Sell the stock IF MODE='TRADE'
@@ -491,11 +483,7 @@ class TradeAccount:
                             'qty' :self.InPlay[ stock ]['qty'],     'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()}
                 self.Trades[stock].append(  new_rec )                
-<<<<<<< HEAD
                 print ( f"\t\t\t \\-> SOLD :  from ${self.InPlay[stock]['price']} -> ${new_price }"  )
-=======
-                print ( f"\t\t\t \\-> SOLD :  from {self.InPlay[stock]['price']} -> {new_price }"  )
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
                 if (  p_l  < ( -0.01 * self.DailyFunds) ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY

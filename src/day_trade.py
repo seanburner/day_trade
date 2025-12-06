@@ -136,12 +136,11 @@ def blank_config() -> dict:
                     'action'            : '',
                     'start_date'        : "",
                     'end_date'          : '',
-                    'interval'          : '',
+                    'interval'          : 0,
                     'input_data'        : '',
                     'strategy'          : '',
                     'app_key'           : '',
-                    'app_secret'        : '',
-                    'sync_interval'     : 0,
+                    'app_secret'        : '',                    
                     'email'             : 'seanburner@gmail.com',
                     'username'          : 'seanburner',
                     'replay_date'       : '',
@@ -329,8 +328,7 @@ def parse_arguments() -> {} :
 			'start_date'        : { 'help': 'Start date', 	                            'action' : None}, 
 			'end_date'          : { 'help': 'End date' ,  			            'action' : None}, 
                         'username'          : { 'help': 'Username to associate with session',       'action' : None},
-			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None },                        
-                        'sync_interval'     : { 'help': 'Number or days to go back in the sync ( 0 = today)','action' : None },
+			'interval'          : { 'help': 'Time interval [ 5min / ]',           	    'action' : None },                                             
 			'input_data'        : { 'help': 'Data file to be used during back_test',    'action' : None },
                         'strategy'          : { 'help': 'Strategy to use [ basic/basic15/basicXm ]','action' : None },
                         'app_key'           : { 'help': 'Schwab application key ',                  'action' : None },
@@ -503,23 +501,17 @@ def system_test( configs : dict  ) -> None :
 
     account     = TradeAccount(funds=5000, limit=0.10, app_type='Schwab', app_key = configs['app_key'], app_secret = configs['app_secret'])
     sqlConn     = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
-<<<<<<< HEAD
 
     sqlConn.CreateTables()
     return
     
-=======
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
     sqlConn.Conn.WriteMany( header=HEADER, contents =CONTENTS)
     return 
 
 
 
     try:
-<<<<<<< HEAD
 
-=======
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
         while True :
             print ( "-> going round in circles ")
             time.sleep( 60 )
@@ -770,10 +762,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     data            = {}    
     account         = None
     success         = False
-<<<<<<< HEAD
     orb_calced      = False 
-=======
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
     date_format     = "%Y-%m-%d %H:%M:%S"  
     
 
@@ -787,7 +776,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         account.SetFunds( params['account_funds'], params['funds_ratio'] )  #5000.00, 0.50 )     
         account.SetMode( params['mode'] )      
         
-        Strategies.Set( configs['strategy'] , account)
+        Strategies.Set( strategy=configs['strategy'] ,  interval=configs['interval'],account=account)        
         print( f'\t* About to live {params["mode"]}: ', account )
         
         for stock in  configs['stock'] :
@@ -797,13 +786,9 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         current_time    = datetime.now()
         
         while ( cont )  :
-<<<<<<< HEAD
             if (current_time.hour >= 16 ) :
                 cont = False                
             elif (current_time.hour < 9  and current_time.minute < 30  ) or ( current_time.hour >= 17 ) :                
-=======
-            if (current_time.hour < 9  and current_time.minute < 30  ) or ( current_time.hour >= 17 ) :                
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 cont = False
                 print("\t\t\t\t -> Outside of market hours ")
                 ## Sell whatever is InPlay
@@ -817,24 +802,19 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                         account.Sell(stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else account.InPlay[symbol]['price'] ,
                                      ask_volume=ticker_row[5], indicators=Strategies.Stocks[symbol]['Indicators'] )
                 cont = False
-<<<<<<< HEAD
             elif  not orb_calced :#(current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
                 Strategies.SetORB(configs['stock'], account, current_time)
                 orb_calced = True
-=======
-            elif (current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
-                Strategies.SetORB(configs['stock'], account, current_time)    
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             else:
                 current_time    = datetime.strptime( str(current_time)[:17] +"00", date_format) 
-                symbols         = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
+                symbols         = configs['stock'] #[ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                 bought_action   = False 
                 for symbol in symbols:
-                    print(f"\t\t + {symbol}  @ { current_time } " )                    
+                    print(f"\t\t\t + {symbol}  @ { current_time } " )                    
                     ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
                     
                     if ticker_row != None:                    
-                        print(f"\t\t\tTICKER_ROW :{ticker_row}")                
+                        print(f"\t\t\t\tTICKER_ROW :{ticker_row}")                
                         success , msg , time_interval = Strategies.Run(  ticker_row,  account, configs )
                         
                         data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
@@ -842,12 +822,12 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                                               'volume':float(ticker_row[5]), 'interval': time_interval/60 , 'msg':msg } )
                         if msg.upper() == "BOUGHT" :
                             bought_action = True 
-                            print(f"\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                            
+                            print(f"\t\t\t\t In Play - should shift from 15 -> {time_interval} min  : " )                            
                         elif msg.upper() == "CLOSED" :
                             bought_action |= False          #KEEP TRACK IF NEED TO CHANGE THE INTERVAL BECAUSE BOUGHT ONE OF THE SYMBOLS 
-                            print(f"\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )
+                            print(f"\t\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )
                     else:
-                        print(f"\t\t\t Did not get ticker info for symbol { symbol }, CHECK SYMBOL AND TRY AGAIN ")
+                        print(f"\t\t\t\t Did not get ticker info for symbol { symbol }, CHECK SYMBOL AND TRY AGAIN ")
                         return 
                 # If TargetGoal == 0 then sleep for 30 minutes and readjust DailyFunds, TargetGoal  and Limit
                 if account.TargetGoal == 0 :
@@ -919,9 +899,9 @@ def  replay_test( configs: dict  ) -> None :
     account.SetFunds( 5000.00, 0.50 )
     try:        
         print( '\t* About to Replay test: ', account )
-        Strategies.Set( configs['strategy'] , account)        
+        Strategies.Set( strategy=configs['strategy'] ,  interval=configs['interval'],account=account)        
         account.SetMode( "TEST")
-        for stock in ( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
+        for stock in configs['stock']: #( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
             data.update({ stock :  [] } )
 
         current_time = configs['replay_date'][:10] + " 09:30:00"
@@ -949,7 +929,7 @@ def  replay_test( configs: dict  ) -> None :
                             print(f"\t\t\t Ticker Empty " ) 
                 cont = False
             else:
-                symbols = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
+                symbols = configs['stock'] #[ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
                 for symbol in symbols:
                     print(f"\t\t + {symbol}  @ { current_time } " )
                     if isFirst :
@@ -974,9 +954,9 @@ def  replay_test( configs: dict  ) -> None :
                 if account.TargetGoal == 0 :
                     account.SetFunds(4500 , .40)  #5000.00, 0.50 )
                     account.SetTargetGoal( target = 0.5  ) # Target making 50% of our funds ( SetFunds) before auto quitting 
-                    current_time   , sleep_interval   = calculate_new_poll_time( current_time , 1800) #30 min break
-                else:
+                   # current_time   , sleep_interval   = calculate_new_poll_time( current_time , 1800) #30 min break
                 """
+                
             current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
                         
                 #else:
@@ -1039,10 +1019,10 @@ def  back_test( configs: dict  ) -> None :
         data = read_csv( configs['input_data'] )        
         data = data.sort_values( by=['DATETIME'], ascending=True)        
         print( '\t* About to back_test: ', account )
-        Strategies.Set( configs['strategy'] , account)
+        Strategies.Set( strategy=configs['strategy'] ,  interval=configs['interval'],account=account)        
         account.SetMode( "TEST")
         for index, row in data.iterrows() :
-            for symbol in configs['stock']:
+            for symbol in configs['stock'] :#( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
                 if not ( symbol in new_data ):
                     new_data[  symbol ]       = []
                     thorHammer [  symbol ]    = { 'high' : -1,'low':-1, 'close': -1,'volume': -1 }
@@ -1100,7 +1080,7 @@ def  sync_broker_transactions( configs: dict  ) -> None :
     try:        
         account     = TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'], app_key = configs['app_key'], app_secret = configs['app_secret'])
         traderDB    = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
-        print( f'\t* Syncing transactions from  {configs["sync_interval"] } days prior for :', account )
+        print( f'\t* Syncing transactions from  {configs["interval"] } days prior for :', account )
 
         if not account :
             print("\t\t\t Could not connect to provided user's trading account ")
@@ -1111,11 +1091,11 @@ def  sync_broker_transactions( configs: dict  ) -> None :
             return
                   
         #GET TRANSACTIONS FROM BROKERAGE 
-        orders = account.Orders( time_interval=int(configs.get('sync_interval',10)))
+        orders = account.Orders( time_interval=int(configs.get('interval',10)))
         #print( orders ) 
 
         #Send the brokerages transactions to TraderDB for processing 
-        traderDB.SyncEntries(orders=orders, time_interval=int(configs.get('sync_interval',10)), username=configs['username'], email=configs['email'] )
+        traderDB.SyncEntries(orders=orders, time_interval=int(configs.get('interval',10)), username=configs['username'], email=configs['email'] )
         
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -1137,6 +1117,8 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         RETURNS:
                     nothing 
     """
+    profit          = 0
+    total_profits   = "" 
     try:
         print( '\t* Summary Report: ')
         #CONFIRM THE REPORT FOLDER EXISTS
@@ -1144,16 +1126,16 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
         if not os.path.exists(f"../reports/{configs['action']}/"):
             os.mkdir(f"../reports/{configs['action']}/")
 
-        if isinstance( configs['stock'] ,str ) :
-            if configs['stock'] in data:
-                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{ configs['stock']  }.pdf")
-                summary_report_engine(  configs['stock']  , data  , account  , report  ) 
-        elif isinstance( configs['stock'] , list ) :
-            for symbol in configs['stock'] :
-                if symbol in data:
-                    report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{symbol}.pdf")
-                    summary_report_engine( symbol  , data  , account  , report  ) 
-
+        
+        for symbol in configs['stock'] :#( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):            
+            if symbol in data.keys():
+                report = PDFReport( f"../reports/{configs['action']}/{str(datetime.now())[:19]}_{username}_{configs['strategy']}_{symbol}.pdf")
+                profit = summary_report_engine( symbol  , {symbol : data[symbol]}  , account  , report  )                
+                total_profits += f"\n\t\t\t{symbol} -> ${profit }  [ {(profit/(account.Funds - profit))* 100  } %]"
+            else:
+                  print(f"\t\t\t {symbol} -  No data  ")
+            
+        print( "* Account : " , account  , " : " , account.Funds , " : " , total_profits  )
     except: 
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
@@ -1212,7 +1194,7 @@ def plotting( ax  : object , plot_lines : list , x_label : str , y_label : str ,
         return ax
 
     
-def summary_report_engine(symbol : str, data : dict , account : object , report : object ) -> None :
+def summary_report_engine(symbol : str, data : dict , account : object , report : object ) -> float :
     """
         The contents ofthe summary report process that allows it to be repeatable if necessary
         ARGS   :
@@ -1221,8 +1203,9 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
                     account  ( TradeAccount ) - Trading Account that abstracts Schwab
                     report   ( PDFReport )    - PDF Report class for the symbol 
         RETURNS:
-                    nothing 
+                    total_profit ( float )    - total profits for the specific symbol 
     """
+    total_profit  = 0
     try:
         dt1     = []
         dt1_2   = []
@@ -1232,11 +1215,11 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
 
         if not ( symbol in data )  or not (symbol in account.Trades) :
             print(f"\t\t\t {symbol} No data for Symbol  ")
-            return
+            return total_profit
 
         if len(account.Trades[symbol]) == 0 :
             print(f"\t\t\t {symbol} No TRADING data for Symbol  ")
-            return 
+            return total_profit
         
         for entry in data[symbol] :
             #print("\t\t ADDING DT1 : " , entry )
@@ -1291,25 +1274,19 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         report.AddText( "OrderBook ", "h1", 1)    
         contents        = ""
         total_profit    = 0
-        print(f"\t {symbol} ORDERBOOK")
-        print(f"\t    == OPENED ==\t=== BID=== \t== CLOSED == \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
+        print(f"\t\t {symbol} ORDERBOOK")
+        print(f"\t\t\t    == OPENED ==\t=== BID=== \t== CLOSED == \t==== ASK ====\t== QUANTITY ==\t=== P & L ====\t\t= ACTUAL P&L =" )            
         for entry in account.Trades[symbol]:
-            print(f"\t   {entry['bidTime'][:19] }\t${entry['bid'] :.4f}\t\t" +
-<<<<<<< HEAD
+            print(f"\t\t\t   {entry['bidTime'][:19] }\t${entry['bid'] :.4f}\t\t" +
                   f"{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t"+
                   f"${entry['p_l']:.4f}\t\t${ entry.get('actualPL',0):.4f}" )            
-=======
-                  "{entry['askTime'][11:19]}\t${entry['ask']:.4f}\t\t\t{entry['qty']}\t${entry['p_l']:.4f}\t\t${ entry.get('actualPL',0):.4f}" )            
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             total_profit += entry.get("p_l")
 
         # LIST OF INPLAY
-        print(f"\n\t {symbol}  InPLAY")
+        print(f"\n\t\t {symbol}  InPLAY")
         for inplay in account.InPlay:
             print( "\t -  " , inplay ) 
 
-        print( "* Account : " , account  , " : " , account.Funds , " : " ,
-                   total_profit  , " : " , round((total_profit/(account.Funds - total_profit))* 100,5) ,"%")
 
         header = ['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']
         row     = [] 
@@ -1333,6 +1310,8 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
+
+    return total_profit
 
 
 
@@ -1440,7 +1419,7 @@ def main() -> None :
         #th_interface.start()
         #th_interface.join()
 
-        
+        Configs['stock'] =  [ Configs['stock'] ] if isinstance( Configs['stock'], str) else Configs['stock'] 
 
         # ACTION == DOWNLOAD / BACK_TEST / TRADE
         hub = {

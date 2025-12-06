@@ -42,27 +42,15 @@ class DayTradeStrategy:
         """
         self.Strategies = {
                                 'basic'         :{ 'detail' : 'Basic Bitch of the group',                           'method': self.DayTradeBasic},
-                                'basic1'        :{ 'detail' : 'Basic Bitch of the group based on 1 min candles',    'method': self.DayTradeBasic_1Min},
-                                'basic5'        :{ 'detail' : 'Basic Bitch of the group based on 5 min candles',    'method': self.DayTradeBasic_5Min},
-                                'basic10'       :{ 'detail' : 'Basic Bitch of the group based on 10min candles',    'method': self.DayTradeBasic_10Min},
-                                'basic15'       :{ 'detail' : 'Basic Bitch of the group based on 15min candles',    'method': self.DayTradeBasic_15Min},
-                                'basicXm'       :{ 'detail' : 'Basic Bitch of the group based on Varying candles',  'method': self.DayTradeBasic_Xm},
-                                'opening_range' :{ 'detail' : 'Use first candle to provide range of interest',      'method': self.OpeningRange} 
+                                'simple'        :{ 'detail' : 'Three candle rule with Chop Index consideration',    'method': self.DayTradeSimple},
+                                'opening_range' :{ 'detail' : 'Use first candle to provide range of interest',      'method': self.OpeningRange} # still needs to be worked 
                           }
-
-<<<<<<< HEAD
+        self.Interval   = 1
         self.Stocks     = {}
-=======
-        self.Stocks     = {
-                            'Stock' : {
-                                    'Price'         :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0, 'High' : 0, 'Upward' : 0, 'Downwad' : 0},
-                                    'Volume'        :   {'Previous': 0, 'Slope' : 0, 'Bought' : 0 },
-                                    'Indicators'    :   None
-                                }
-                         }
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
        
         self.StrategyName = ""
+        
+        self.isORBBuild = False 
         
 
          
@@ -81,9 +69,15 @@ class DayTradeStrategy:
         return contents
 
 
-    def Set( self, strategy :str , account : object   )  -> bool :
+    def Set( self, strategy :str , interval : int , account : TradeAccount   )  -> bool :
         """
-            Do the overhead for the specific strategy 
+            Do the overhead for the specific strategy
+            ARGS    :
+                        strategy  ( str )          - name fo the strategy
+                        interval  ( int )          - time frame ( minutes )  to use for strategy
+                        account   ( TradeAccount ) - trade account for  buy/sell 
+            RETURNS :
+                        true/false ( bool )  - indication of success
         """
         targetGoal  = 0.025  #  This needs to be tied to the strategy so it can change, this is not the right place for it 
 
@@ -92,14 +86,15 @@ class DayTradeStrategy:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Strategy does not exist : ", strategy )
             return False
         
-        self.StrategyName =strategy
+        self.StrategyName   = strategy
+        self.Interval       = interval
         account.SetTargetGoal( targetGoal  )
         
         return True
 
     
     def PrimeStockEntry( self, symbol : str, ticker_df : pd.DataFrame, ticker_row : list, current_time : datetime,
-                         account : TradeAccount, closePos : int = 3, highPos : int = 6, volumePos : int = 5 ) -> dict :
+                                 account : TradeAccount, closePos : int = 3, highPos : int = 6, volumePos : int = 5 ) -> dict :
         """
             Set the Stock object entry for a new stock symbol
             ARGS  :
@@ -114,37 +109,32 @@ class DayTradeStrategy:
         stock_entry     = {}
         
         try:
-            data        = account.History ( symbol = symbol, time_range=time_range )           # GET HISTORICAL INFO FOR SYMBOL               
-            seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')
-<<<<<<< HEAD
+            print( "PrimeStockEntry :: DATA   , SET UP RULES FOR MONDAYS ON HISTORY")
+            data        = account.History ( symbol = symbol, time_range=time_range , today= current_time)           # GET HISTORICAL INFO FOR SYMBOL
+            print( "PrimeStockEntry :: SEED ")
+            seed_df     = account.History( symbol=symbol, time_range=1, period_type="day", time_period='minute')
             #print(f"DATA : {data}")    
             if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0:
                 seed_df = data
             #print(f"SEED : {seed_df}")    
-=======
-            
-            if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0:
-                seed_df = data
-                
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
             seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
             
             # Previous Day's High/Low            
             indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
-            stock_entry = {                        
-<<<<<<< HEAD
+            stock_entry = {
+                                    'Previous'      : [0,0,0,0,0,0,0],
                                     'Price'         : {
-                                                        'Previous'  : ticker_row[ closePos ],       'Slope'  : 1 , 'Bought'  : 0,
-                                                       'High'       :ticker_row[ highPos ],         'Upward' : 0 , 'Downward': 0
+                                                        'Previous'  : ticker_row[ closePos ],
+                                                        'Slope'     : 1 , 'Bought'  : 0,
+                                                        'High'      : ticker_row[ highPos ],
+                                                        'Upward' : 0 , 'Downward': 0,
+                                                        'HighSinceBought' : 0
                                                        },
                                     'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
                                     'AvgNumMoves'   : [],
                                     'AvgAmount'     : [],
-=======
-                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Upward' : 0 , 'Downward': 0 },
-                                    'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
+                                    'AvgOccurrVol'  : 0,
                                     'Indicators'    : indicators,
                                     'Losses'        : 0,
                                                            
@@ -179,61 +169,36 @@ class DayTradeStrategy:
         date_format     = "%Y-%m-%d %H:%M:%S"
 
         try:
+            if self.isORBBuild :
+                return
+            
             print("\t\t\t * Building ORB levels ")
             if ( current_time.hour < 10  and current_time.minute < 59 ) :  # Pause until 10
                 time_to_sleep = ( 60 - current_time.minute ) *60 #(( 10 - current_time.hour) * 60 * 60) - ( 60 - current_time.minute ) 
                 print(f" Pausing for   { time_to_sleep}")
                 if time_to_sleep > 0 :
-                    print ( f" From {current_time} -> 10am - sleep { time_to_sleep }   "+
+                    print ( f" From {current_time} -> 10am - sleep :{ time_to_sleep }   "+
                                 f"HOURS: {((current_time.hour - 10) * 60)}  MINUTE : {( 60 - current_time.minute )}")
-                    if account.Mode.upper() == "TRADE"  or account.Mode.upper() == "TEST" :
+                    if account.Mode.upper() == "TRADE" :# or account.Mode.upper() == "TEST" :
                         time.sleep( time_to_sleep )
             else:
-<<<<<<< HEAD
                 print(f"No Need to pause  {current_time}")
-=======
-                print("No Need to pause  {current_time}")
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             
             today_date  = str(current_time)[:10]
             symbols     = [ symbols ] if isinstance( symbols, str) else symbols            
             for symbol in symbols:          
-                current_time    = datetime.strptime( f"{today_date} 10:00:00", date_format) 
-                ticker_df       = account.History( symbol=symbol, time_range=1)   
+                current_time    = datetime.strptime( f"{today_date} 10:00:00", date_format)
+                print( "SetORB :: TICKER DF ")
+                ticker_df       = account.History( symbol=symbol, time_range=1, today=current_time)
+                print( "SetORB :: TICKER ROW ")
                 ticker_row      = account.QuoteByInterval ( symbols= symbol,  frequency= 60*30, endDate = current_time)
                 stock_entry     = self.PrimeStockEntry(  symbol, ticker_df, ticker_row, current_time ,
                                                      account , closePos = 3, highPos = 6, volumePos = 5 )
-<<<<<<< HEAD
-                self.Stocks.update( {symbol : stock_entry } ) 
+                self.Stocks.update( {symbol : stock_entry } )
+                
 
-=======
-                self.Stocks[ symbol ]  = stock_entry
-                """
-                data        = account.History ( symbol = symbol, time_range=200 )                # GET HISTORICAL INFO FOR SYMBOL
-                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')
-                
-                if not isinstance(seed_df, pd.DataFrame) or len(seed_df) ==0 :
-                    seed_df = data
-                
-                seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))
-                seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]
-                
-                indicators  = Indicators ( symbol= symbol, data= data , seed_df=seed_df)               # CALCULATE THE INDICATORS
-                 
-               # PULL THE FIRST 30 MINS OF DATA3
-                self.Stocks[ symbol ]  = {                        
-                                    'Price'         : {'Previous': ticker_row[ 4 ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ 4 ], 'Upward' : 0 },
-                                    'Volume'        : {'Previous': ticker_row[ 5], 'Slope' : 1 , 'Bought' : 0},
-                                    'Indicators'    : indicators,
-                                    "PrevDayHigh"   : ticker_df[ :-1]['high'].to_string(index=False) if ticker_df != None else ticker_row[2] ,
-                                    "PrevDayLow"    : ticker_df[ :-1]['low'].to_string(index=False)  if ticker_df != None else ticker_row[6] ,
-                                    "ORB_L"         : ticker_row[2] if ticker_row else 0,
-                                    "ORB_H"         : ticker_row[6] if ticker_row else 0,
-                                    'Losses'        : 0
-                             }
-                """
-                
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
+            self.isORBBuild = True 
+
         except:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -256,7 +221,7 @@ class DayTradeStrategy:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Strategy does not exist : ", self.StrategyName )
             return False 
         
-        return self.Strategies[ self.StrategyName  ]['method'] ( ticker_row, account, configs )
+        return self.Strategies[ self.StrategyName  ]['method'] ( ticker_row, account, configs  )
 
 
             
@@ -332,7 +297,42 @@ class DayTradeStrategy:
                 }
 
 
+    def DayTradeSimple ( self, ticker_row : list, account : object , configs : dict ) -> (bool, str) :
+        """
+            Set the params for the DayTrade 15 min  version  , then call the function
+            ARGS  :
+                        ticker_row ( list ) information about the stock and current price and volume
+                        account    ( TradeAccount )  the trading account for BUYS and SELLS
+                        configs    (  dict)    configurations 
+            RETURNS:
+                        bool: True/False - in case something breaks or could not complete    
+        """
+        matrix      = {     0  : { 'numOfLosses' : 1 , 'time_interval' : 900 , 'time_interval_bought' : 900 },
+                            1  : { 'numOfLosses' : 2 , 'time_interval' : 60 , 'time_interval_bought' : 60 },
+                            5  : { 'numOfLosses' : 2 , 'time_interval' : 300 , 'time_interval_bought' : 300 },
+                            10 : { 'numOfLosses' : 2 , 'time_interval' : 600 , 'time_interval_bought' : 600 , 'volume_change_avg_ratio' : 0.10 , 'crash_out_percent' :0.85},
+                            15 : { 'numOfLosses' : 2 , 'time_interval' : 900 , 'time_interval_bought' : 900 , 'volume_change_avg_ratio' : 0.10 , 'crash_out_percent' :0.85},
+                            16 : { 'numOfLosses' : 2 , 'time_interval' : 300 , 'time_interval_bought' : 60 }
+                         }
+        params      = self.BaseParams()
+        interval    = int( configs.get('interval',1) )
 
+        try:
+            for key in matrix[ interval ].keys():
+                params[key]           =  matrix[ interval ][key]
+            
+            params['volume_threshold']      = configs['volume_threshold']
+        
+            #print(f"\t *Strategy : Simple {configs['interval']} min ")
+        except:
+            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+                
+        return self.DayTradeSimpleModule ( ticker_row , account, params  )
+
+    
 
     def DayTradeBasic ( self, ticker_row : list, account : object , configs : dict ) -> (bool, str) :
         """
@@ -344,130 +344,37 @@ class DayTradeStrategy:
             RETURNS:
                         bool: True/False - in case something breaks or could not complete    
         """
-        params = self.BaseParams()
-        params["numOfLosses"]           = 2 
-        params['time_interval']         = 900
-        params['time_interval_bought']  = 900
-        params['volume_threshold']      = configs['volume_threshold']
+        matrix      = {     0  : { 'numOfLosses' : 1 , 'time_interval' : 900 , 'time_interval_bought' : 900 },
+                            1  : { 'numOfLosses' : 2 , 'time_interval' : 60 , 'time_interval_bought' : 60 },
+                            5  : { 'numOfLosses' : 2 , 'time_interval' : 300 , 'time_interval_bought' : 300 },
+                            10 : { 'numOfLosses' : 2 , 'time_interval' : 600 , 'time_interval_bought' : 600 , 'volume_change_avg_ratio' : 0.10 , 'crash_out_percent' :0.85},
+                            15 : { 'numOfLosses' : 2 , 'time_interval' : 900 , 'time_interval_bought' : 900 , 'volume_change_avg_ratio' : 0.10 , 'crash_out_percent' :0.85},
+                            16 : { 'numOfLosses' : 2 , 'time_interval' : 300 , 'time_interval_bought' : 60 }
+                         }
+        params      = self.BaseParams()
+        interval    =  int( configs.get('interval',1) )
+
         
-        #print("\t *Strategy : basic bitch 15 min ")
+
+        try:        
+            for key in matrix[ interval ].keys():
+                params[key]           =  matrix[ interval ][key]
+            
+            params['volume_threshold']      = configs['volume_threshold']
+        
+            #print("\t *Strategy : basic bitch 15 min ")
+        except:
+            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+                
         return self.DayTradeBasicModule ( ticker_row , account, params  )
 
 
-    
-    def DayTradeBasic_1Min ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
-        """
-            Set the params for the DayTrade 1 min  version  , then call the function
-            ARGS  :
-                        ticker_row ( list ) information about the stock and current price and volume
-                        account    ( TradeAccount )  the trading account for BUYS and SELLS
-                        configs    (  dict)    configurations                   
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                                    
-        """
-        params = self.BaseParams()
-        params["numOfLosses"]           = 2 
-        params['time_interval']         = 60
-        params['time_interval_bought']  = 60
-        params['volume_threshold']      = configs['volume_threshold']
-        
-        
-        #print("\t *Strategy : basic bitch 1 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params     )
 
 
-
-    def DayTradeBasic_5Min ( self, ticker_row : list, account : object, configs : dict) -> (bool, str) :
-        """
-              Set the params for the DayTrade 5 min  version  , then call the function
-            ARGS  :
-                        ticker_row    ( list ) information about the stock and current price and volume
-                        account       ( TradeAccount )  the trading account for BUYS and SELLS
-                        configs       (  dict)    configurations                   
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                         
-        """
-        params = self.BaseParams()
-        params["numOfLosses"]           = 2 
-        params['time_interval']         = 300
-        params['time_interval_bought']  = 300
-        params['volume_threshold']      = configs['volume_threshold']
-        
-        
-        #print("\t *Strategy : basic bitch 5 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params    )
-
-
-
-
-
-    def DayTradeBasic_10Min ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
-        """
-              Set the params for the DayTrade 10 min  version  , then call the function
-            ARGS  :
-                        ticker_row        ( list ) information about the stock and current price and volume
-                        account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        configs           (  dict)    configurations                   
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                         
-        """
-        params = self.BaseParams()
-        params["numOfLosses"]               = 2 
-        params['time_interval']             = 600
-        params['time_interval_bought']      = 600
-        params['crash_out_percent']         = 0.85 
-        params['volume_threshold']          = configs['volume_threshold']
-        params['volume_change_avg_ratio']   = 0.10 
-
-        #print("\t *Strategy : basic bitch 10 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params    )
-
-
-
-    def DayTradeBasic_15Min ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
-        """
-            ARGS  :
-                        ticker_row        ( list ) information about the stock and current price and volume
-                        account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        configs           (  dict)    configurations                   
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                         
-        """
-        params = self.BaseParams()
-        params["numOfLosses"]               = 2 
-        params['time_interval']             = 900
-        params['time_interval_bought']      = 900
-        params['crash_out_percent']         = 0.85 
-        params['volume_threshold']          = configs['volume_threshold']
-        params['volume_change_avg_ratio']   = 0.10 
-
-        #print("\t *Strategy : basic bitch 15 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params    )
-
-
-
-
-    def DayTradeBasic_Xm ( self, ticker_row : list, account : object, configs : dict ) -> (bool, str) :
-        """
-            Sets the limits for the account -> 5 m to 1 min
-
-            PARAMETER  :
-                        ticker_row        ( list ) information about the stock and current price and volume
-                        account           ( TradeAccount )  the trading account for BUYS and SELLS
-                        configs           (  dict)    configurations                   
-            RETURNS    :
-                        bool: True/False - in case something breaks or could not complete                         
-        """
-        params = self.BaseParams()
-        params["numOfLosses"]           = 2 
-        params['time_interval']         = 300
-        params['time_interval_bought']  = 60
-        params['volume_threshold']      = configs['volume_threshold']
-        
-        
-        #print("\t *Strategy : basic bitch 5 -> 1 min ")
-        return self.DayTradeBasicModule ( ticker_row , account, params    )
-        
+      
 
     def ResetStock( self , symbol : str,  stockClose : float , stockVolume : int , stockHigh : float  ) -> None :
         """
@@ -485,6 +392,9 @@ class DayTradeStrategy:
             self.Stocks[ symbol ]['Volume']['Previous'] =  stockVolume
             if stockClose > float(self.Stocks[ symbol ]['Price']['High']) :
                 self.Stocks[ symbol ]['Price']['High'] = stockHigh
+            if stockClose > float(self.Stocks[ symbol ]['Price']['HighSinceBought']) :
+                self.Stocks[ symbol ]['Price']['HighSinceBought'] = stockClose
+            
         except:
             print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -492,6 +402,184 @@ class DayTradeStrategy:
 
 
 
+    
+    def DayTradeSimpleModule ( self, ticker_row : list, account : object, params : dict  ) -> (bool, str) :
+        """
+            Look for three candles that are update , with the second's body equal or greater than 1st wick, and the 3rd body equal or greater than second ,
+            while the ChopIndex < 60
+            
+            ARGS  :
+                        ticker_row        ( list ) information about the stock and current price and volume
+                        account           ( TradeAccount )  the trading account for BUYS and SELLS
+                        volume_threshold  ( int )  the lower limit for volume activity to engage in buy/sell ( may not be important after all )
+                        params            ( dicts ) parameters to customize the run 
+            RETURNS    :
+                        bool: True/False - in case something breaks or could not complete                         
+        """
+        limit               = params['limit']        # DO NOT EXCEED 10% OF THE ACCOUNT.FUNDS ON ANY ONE PURCHASE
+        profit              = 0
+        action              = ""
+        success             = False
+        symbol              = ticker_row[0]
+        lowPos              = params['lowPos']
+        timePos             = params['timePos']
+        openPos             = params['openPos']
+        highPos             = params['highPos']
+        closePos            = params['closePos']
+        volumePos           = params['volumePos']
+        risk_percent        = params['risk_percent']
+        time_interval       = params['time_interval']
+        crash_out_percent   = params['crash_out_percent']      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
+        max_num_of_losses   = params["numOfLosses"]
+
+        try:            
+            # NO BUYING AFTER 3:45
+            current_time    = datetime.now()
+            if not ( symbol in self.Stocks.keys() )  and ( current_time.hour == 15 and current_time.minute >= 45) :
+                print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
+                return False, action, params["time_interval"]
+
+            # ADD MECHANISM FOR DETERMINING THE AVG NUMBER OF MOVES BEFORE PIVOTING AND THE AVG $ MOVES  BEFORE PIVOTING
+         
+            # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY             
+            if not ( symbol in self.Stocks.keys() ) :
+                print("SIMPLE - doing the PrimeEntry")
+                ticker_df       = account.History( symbol=symbol, time_range=1)   
+                self.Stocks[symbol] = self.PrimeStockEntry( symbol=symbol , ticker_df=ticker_df,ticker_row=ticker_row , current_time=current_time,
+                                                            account=account, closePos = closePos , highPos=highPos , volumePos=volumePos)
+             
+            candle_body            = (ticker_row[closePos] - ticker_row[openPos]) 
+            candle_is_big_enough   = ((ticker_row[closePos] - ticker_row[openPos])  >= 20)
+            previous_candle_body   = ( self.Stocks[symbol]['Previous'][closePos] - self.Stocks[symbol]['Previous'][openPos] ) 
+            # ARE WE TRENDING UP            
+            if self.Stocks[ symbol]['Price']['Bought'] == 0:  # MEANS NO OPTION POSITIONS
+                if ticker_row[closePos] < self.Stocks[symbol]['Previous'][closePos]  and self.Stocks[ symbol]['Price']['Upward'] > 0:
+                    self.Stocks[ symbol]['Price']['Upward']     = 0
+                    self.Stocks[ symbol]['AvgOccurrVol']        = 0
+                #    print(f"{symbol} - PRICE DIPPED - RESET SOLDIERS ")                        
+                elif ticker_row[closePos] > self.Stocks[symbol]['Previous'][closePos]  or candle_is_big_enough: #only look at $0.20+ candles
+                    self.Stocks[ symbol]['Price']['Upward']  += 1
+                    self.Stocks[ symbol]['AvgOccurrVol'] += ticker_row[volumePos]
+                    #if  self.Stocks[ symbol]['Price']['Upward']  == 1 :
+                    #    print(f"{symbol} - SIMPLE : FIRST SOLDIER ")                        
+                        
+                    if self.Stocks[ symbol]['Price']['Upward']  == 2 : #RESHIFT THE SIGNAL CANDLE 
+                        if ticker_row[closePos] < self.Stocks[symbol]['Previous'][highPos] :
+                            self.Stocks[ symbol]['Price']['Upward']  -= 1
+                            self.Stocks[ symbol]['AvgOccurrVol'] -= ( self.Stocks[ symbol]['AvgOccurrVol'] - ticker_row[volumePos] )
+                        #    print(f"{symbol} - DAYTRADESIMPLE::Second Soldier Failed ")
+                        #else:
+                        #    print(f"{symbol} - DAYTRADESIMPLE::Second Soldier  ")
+                        
+                    
+                    if self.Stocks[ symbol]['Price']['Upward']  > 3 :
+                        if ( candle_body < 0.5*( previous_candle_body )  and
+                                 ticker_row[closePos]   <  ( 0.90 * self.Stocks[symbol]['Previous'][highPos] )   ) : #or
+                                     #ticker_row[closePos]   <  self.Stocks[symbol]['Previous'][closePos]  or  
+                                      #   ticker_row[volumePos]   <  (0.75* self.Stocks[symbol]['Previous'][volumePos] )  ) :
+                            self.Stocks[ symbol]['Price']['Upward']     = 0
+                            self.Stocks[ symbol]['AvgOccurrVol']        = 0
+                            print(f"{symbol} - DAYTRADESIMPLE::San Pei failed  CANDLE BODY : {candle_body} -> {0.5*( previous_candle_body ) } "+
+                                  f"CANDLE WICK : {ticker_row[closePos]}   <  {0.99 *self.Stocks[symbol]['Previous'][highPos]}   VOLUME: {ticker_row[volumePos]} -> {0.75*( self.Stocks[symbol]['Previous'][volumePos] ) }" +
+                                  f" CHOP :  {self.Stocks[ symbol ]['Indicators'].ChopIndex} RSI :  {self.Stocks[ symbol ]['Indicators'].RSI} ")
+                        #else:
+                        #    print(f"{symbol} - DAYTRADESIMPLE::San Pei  ")
+                    
+                    #print( f"INDICATOR : " , self.Stocks[ symbol ]['Indicators'].ChopIndex)
+
+                    
+                    if ( self.Stocks[ symbol]['Price']['Upward']  > 3  and
+                             self.Stocks[ symbol ]['Indicators'].ChopIndex < 60   and
+                                 ( 70 > self.Stocks[ symbol ]['Indicators'].RSI > 30 )   and
+                                     ticker_row[volumePos] > 0.9*(self.Stocks[ symbol]['AvgOccurrVol']/(self.Stocks[ symbol]['Price']['Upward'] - 1)) ): # SAN PEI AND CHOPINDEX < 60 and volume 
+                        print(f"{symbol} - It took {self.Stocks[ symbol]['Price']['Upward']} soldiers  with ChopIndex : {self.Stocks[ symbol ]['Indicators'].ChopIndex}  to finally break through ")
+                        if ( account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
+                                 current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
+                                    volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators'])   ) :
+                            print(f"{symbol} - BOUGHT @ : UPWARD:{self.Stocks[ symbol]['Price']['Upward']} -> CHOP: {self.Stocks[ symbol ]['Indicators'].ChopIndex}  PRICE: {ticker_row[closePos]}")
+                            success     = True                                               
+                            action      = "bought"
+                            self.ResetStock( symbol =symbol , stockClose=ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
+                            self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
+                            self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
+                            self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
+                            self.Stocks[ symbol]['Price']['Upward']     =  0
+                            self.Stocks[ symbol]['AvgOccurrVol']        =  0
+                   # else:
+                   #     if self.Stocks[ symbol]['Price']['Upward']  > 1 :
+                   #         print(f"{symbol} - BUY NOT Triggered : {self.Stocks[ symbol]['Price']['Upward']} -> {self.Stocks[ symbol ]['Indicators'].ChopIndex} " +
+                   #               f"VOLUME :{ticker_row[volumePos]} -> {(self.Stocks[ symbol]['AvgOccurrVol']/(self.Stocks[ symbol]['Price']['Upward'] - 1))} ::" +
+                   #               f"{self.Stocks[ symbol]['Price']['Upward']} -> {self.Stocks[ symbol]['AvgOccurrVol']}   RSI : {self.Stocks[ symbol ]['Indicators'].RSI}")
+                else:
+                    self.Stocks[ symbol]['Price']['Upward']  = 0
+                    self.Stocks[ symbol]['AvgOccurrVol']      =  0
+                    #print(f"{symbol} - PRICE DIPPED - SOLDIERS NULLIFIED  : {self.Stocks[ symbol]['Price']['Upward']} -> {self.Stocks[ symbol ]['Indicators'].ChopIndex}  PRICE : {self.Stocks[ symbol]['Previous'][closePos]} ->{ticker_row[closePos]}")
+            
+            if action != 'bought' and self.Stocks[ symbol]['Price']['Bought'] > 0 :                
+                upward_pressure        =  ( round( float(ticker_row[highPos])  - float(ticker_row[closePos]), 3) if round( float(ticker_row[highPos])  - float(ticker_row[closePos]), 3) > 0 else 1 )
+                downward_pressure      =  ( round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 3)  if round( float( ticker_row[openPos]) - float(ticker_row[lowPos]) , 3) > 0 else 1 )
+                #print( f"{symbol} - CURRENT : { round(ticker_row [closePos], 5)}   " +
+                #       f"BOUGHT AT : { round(self.Stocks[ symbol]['Price']['Bought'],5)}  " +
+                #       f"PREVIOUS AT: {round(self.Stocks[ symbol]['Price']['Previous'] ,5)}  " +
+                #       f"OPEN: {round(ticker_row[openPos],5)}   CLOSE :{ round(ticker_row[closePos],5)} " +
+                #       f" PRESSURE: {upward_pressure} -> {downward_pressure} %{upward_pressure /downward_pressure}  " )
+
+            
+            #CONSIDER SELLING 
+            if  action != 'bought' and self.Stocks[ symbol]['Price']['Bought'] > 0:  # INSIDE OF A POSITION
+                #print(f"INSIDE A POSITION:   {self.Stocks[symbol]['Price']['Bought']} ->{ticker_row[closePos]} --> {self.Stocks[symbol]['Previous'][closePos]}  PROFIT : {( ticker_row[closePos]  - self.Stocks[symbol]['Price']['Bought']   ) }")
+                if (  ( ticker_row[closePos] < (0.95 * self.Stocks[symbol]['Previous'][closePos] ) ) or
+                       ( ticker_row[volumePos] < 0.75 * self.Stocks[symbol]['Previous'][volumePos] )  or 
+                        (ticker_row[closePos] < (0.95 * self.Stocks[symbol]['Price']['Bought'] ) ) or
+                         (ticker_row[closePos] < (0.95 * self.Stocks[symbol]['Price']['HighSinceBought'] ))  or
+                          (  0.05 < ( ticker_row[closePos]  - self.Stocks[symbol]['Price']['Bought']   )  ) or          # $0.07 take profit
+                          (  0.15 < ( self.Stocks[symbol]['Previous'][closePos] - ticker_row[closePos]   )  ) or        #HARD CODED STOPS                              
+                              (  0.12 < (self.Stocks[symbol]['Price']['Bought'] - ticker_row[closePos]  )  )       ) :   #AS SOON AS PRICE DIPS -> SELL
+                      print( "TIME TO SELL ")
+                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ]) ,
+                                           current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ),
+                                       ask_volume=float(ticker_row[ volumePos ] ), indicators=self.Stocks[symbol]['Indicators'] )  :
+                         success        = True
+                         action         = "closed"
+                         self.Stocks[ symbol ]['Price' ]['Bought'] = 0
+                         self.Stocks[ symbol ]['Price' ]['High']   = 0
+                         self.Stocks[ symbol ]['Volume']['Bought'] = 0
+                         self.Stocks[ symbol ]['Volume']['HighSinceBought'] = 0
+                         #self.Stocks[symbol]['Losses']    += 1
+
+                         for trade in account.Trades[symbol]:
+                             print(f"\t\t\t   Indicators [IN ] : {trade['indicators_in']}  [OUT] {trade['indicators_out']}  ")
+
+            #CLEAN UP
+            
+            # Update the indicators            
+            entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
+                       'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
+
+            self.Stocks[ symbol ]['Indicators'].Update( entry = entry)
+            
+            # UPDATE THE STOCK INFO WITH THE CURRENT PRICE / VOLUME
+            self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )
+            self.Stocks[ symbol ]['Previous']          =  ticker_row
+            
+            # CHANGE TO 5 MINUTE INFO TO JUMP IN AND OUT MOREL ACCURATELY
+            if float(self.Stocks[ symbol]['Price']['Bought']) > 0 :
+                time_interval   = params['time_interval_bought']
+            else:
+                if action =='closed' :
+                    print("Taking a breathe")
+               #     time.sleep(params['time_interval'] ) # After closing a position , take a pause 
+                    
+                time_interval   = params['time_interval']
+                
+        except: 
+            print("\t\t|EXCEPTION: DayTradeStrategy::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t >>   " + str(entry) )
+
+        finally :
+            return success , action, time_interval 
+    
     
     def DayTradeBasicModule ( self, ticker_row : list, account : object, params : dict  ) -> (bool, str) :
         """
@@ -520,54 +608,29 @@ class DayTradeStrategy:
         crash_out_percent   = params['crash_out_percent']      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
         max_num_of_losses   = params["numOfLosses"]
         
-        try :
-            
+        try :            
             # NO BUYING AFTER 3:45
             current_time    = datetime.now()
             if not ( symbol in self.Stocks.keys() )  and ( current_time.hour == 15 and current_time.minute >= 45) :
                 print(f"\t\t\t -> DayTradeStrategy:: DayTradeBasic () -> TOO LATE TO CONSIDER MAKING BIDS " )
                 return 
-<<<<<<< HEAD
 
             # ADD MECHANISM FOR DETERMINING THE AVG NUMBER OF MOVES BEFORE PIVOTING AND THE AVG $ MOVES  BEFORE PIVOTING
-=======
-   
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
          
             # ADD STOCK ENTRY IF NOT INPLAY /  THIS SHOULD MAINLY BE DONE IN SETORB (), BUT INCASE SOME GET ADDED ALONG THE WAY 
             if not ( symbol in self.Stocks.keys() ) :
                 ticker_df       = account.History( symbol=symbol, time_range=1)   
                 self.Stocks[symbol] = self.PrimeStockEntry( symbol=symbol , ticker_df=ticker_df,ticker_row=ticker_row , current_time=current_time,
                                                             account=account, closePos = closePos , highPos=highPos , volumePos=volumePos)
-<<<<<<< HEAD
              
-=======
-                """
-                data = account.History ( symbol = symbol, time_range =200 )           # GET HISTORICAL INFO FOR SYMBOL
-                
-                seed_df     = account.History( symbol=symbol, time_range=0, period_type="day", time_period='minute')                
-                if not isinstance(seed_df, pd.DataFrame) or len(seed_df) == 0  :
-                    seed_df = data
-                
-                seed_df['full_date'] = seed_df['datetime'].apply( lambda x: datetime.fromtimestamp(x/1000))                    
-                seed_df = seed_df[seed_df['full_date'] < f"{today_date} 10:00:00"]                
-
-                indicators = Indicators ( symbol= symbol, data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
-                self.Stocks[ symbol ]  = {                        
-                                    'Price'         : {'Previous': ticker_row[ closePos ], 'Slope' : 1 , 'Bought' : 0, 'High':ticker_row[ highPos ], 'Upward' : 0 , 'Downward' :0},
-                                    'Volume'        : {'Previous': ticker_row[ volumePos], 'Slope' : 1 , 'Bought' : 0},
-                                    'Indicators'    : indicators,
-                                    'Losses'        : 0
-                             }
-                """
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             
             # Update the indicators            
             entry ={0:{'close': ticker_row[closePos], 'open' : ticker_row[openPos] ,'low' : ticker_row[lowPos], 'high' : ticker_row[highPos],
                        'datetime' : (datetime.strptime( ticker_row[timePos][:19], Date_Format) ).timestamp()  * 1000 , 'volume' : ticker_row[volumePos]}}
             self.Stocks[ symbol ]['Indicators'].Update( entry = entry)            
-            print(f"\t\t\t\t + INDICATORS:    RSI : {self.Stocks[ symbol ]['Indicators'].Summary()['RSI'] } "+
-                  f"VOLATILTIY: {self.Stocks[ symbol ]['Indicators'].Summary()['VolIndex'] }  dSMA : {self.Stocks[ symbol ]['Indicators'].Summary()['dSMA']} ")
+            print(f"\t\t\t\t + INDICATORS:    RSI : {self.Stocks[ symbol ]['Indicators'].Summary()['RSI'] }    "+
+                  f"VOLATILTIY: {self.Stocks[ symbol ]['Indicators'].Summary()['VolIndex'] }  dSMA : {self.Stocks[ symbol ]['Indicators'].Summary()['dSMA']}  " +
+                  f"ChopIndex : {self.Stocks[ symbol ]['Indicators'].Summary()['ChopIndex'] } " )
             
             #IF MORE THAN 3 LOSSES THEN DONT DO ANY MORE BUYING - NEED TO ADD TO PARAMS 
             if ( not (symbol in account.InPlay) and   self.Stocks[symbol]['Losses'] > max_num_of_losses ):
@@ -595,11 +658,7 @@ class DayTradeStrategy:
             crash_trail_stop       =  round(crash_out_percent * float(self.Stocks[ symbol]['Price']['Bought']) ,5)
 
 
-<<<<<<< HEAD
             upward_pressure     =  0.001 if upward_pressure == 0   else upward_pressure
-=======
-            upward_pressure     =  0.001 if upward_pressure == 0 else upward_pressure
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
             downward_pressure   =  0.001 if downward_pressure == 0 else downward_pressure
 
 
@@ -610,10 +669,7 @@ class DayTradeStrategy:
             if ticker_row[closePos] > self.Stocks[ symbol ]['Price' ]['Previous'] :# and  ticker_row[closePos] > ticker_row[openPos]:
                     self.Stocks[ symbol]['Price']['Upward']  += 1
             else:
-<<<<<<< HEAD
                 self.Stocks[ symbol]['AvgNumMoves'].append( self.Stocks[ symbol]['Price']['Upward'] )
-=======
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 self.Stocks[ symbol]['Price']['Upward']  = 0
 
             
@@ -672,23 +728,12 @@ class DayTradeStrategy:
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                     volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators'])   ) :
                     
-<<<<<<< HEAD
                         success     = True                                               
                         action      = "bought"
                         self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
                         self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
                         self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos] 
-=======
-                        success = True
-                        self.ResetStock( symbol =symbol , stockClose= ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
-                        self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]
-                        self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
-                        self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
-                        self.Stocks[ symbol]['Price']['Downward']  = 0
-                        self.Stocks[ symbol]['Price']['Upward']    = 0
-                        action          = "bought"
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                 else:    
                     print( f"\t\t\t  *  BUY::  Upward {upward_pressure}  less than downward pressure  {downward_pressure}" )
                     
@@ -713,14 +758,10 @@ class DayTradeStrategy:
                  if  round(float(ticker_row[ closePos ]), 5) < round( float(self.Stocks[ symbol]['Price']['Previous']) , 5)  :
                      self.Stocks[ symbol]['Price']['Downward'] += 1
                  else:
-<<<<<<< HEAD
                      self.Stocks[ symbol]['AvgNumMoves'].append( self.Stocks[ symbol]['Price']['Downward'] )
                      self.Stocks[ symbol]['Price']['Downward'] = 0
                      
 
-=======
-                     self.Stocks[ symbol]['Price']['Downward'] = 0
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
                  if (   ( current_to_previous > 0.95)  and (upward_pressure /downward_pressure > 0.65) and self.Stocks[ symbol]['Price']['Downward'] < 2 ):               #and ( ticker_row[closePos] > ticker_row[openPos])         
                      print( f"\t\t\t  \\-> SELL SIGNAL [ RESCIND ] IN PROFIT  : " +
                             f" More upward than downward pressure : { round( float(ticker_row[highPos]) - float(ticker_row[closePos]), 5) } -> " +
@@ -738,7 +779,6 @@ class DayTradeStrategy:
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ])  ,
                                        current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                            ask_volume=float(ticker_row[ volumePos ] ),  indicators=self.Stocks[symbol]['Indicators'])  :
-<<<<<<< HEAD
                          success    = True                         
                          action     = "closed"
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
@@ -746,18 +786,8 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
                          
 
-                         print(f"\t\t\t   Indicators [IN ] : {account.Trades[symbol]['indicators_in']}  [OUT] {account.Trades[symbol]['indicators_out']}  ") 
-=======
-                         success = True
-                         self.Stocks[ symbol ]['Price' ]['Bought'] = 0
-                         self.Stocks[ symbol ]['Price' ]['High']   = 0
-                         self.Stocks[ symbol ]['Volume']['Bought'] = 0
-                         self.Stocks[ symbol]['Price']['Downward'] = 0
-                         self.Stocks[ symbol]['Price']['Upward']   = 0
-                         action          = "closed"
-
-                         print(f"\t\t\t   Indicators [IN ] : {account.InPlay[symbol]['indicators_in']}  [OUT] {self.Stocks[symbol]['Indicators']}  ") 
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
+                         for trade in account.Trades[symbol]:
+                             print(f"\t\t\t   Indicators [IN ] : {trade['indicators_in']}  [OUT] {trade['indicators_out']}  ") 
                         
                         
 
@@ -776,7 +806,6 @@ class DayTradeStrategy:
                      if  account.Sell( stock=symbol, new_price=float(ticker_row[ closePos ]) ,
                                            current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ),
                                        ask_volume=float(ticker_row[ volumePos ] ), indicators=self.Stocks[symbol]['Indicators'] )  :
-<<<<<<< HEAD
                          success        = True
                          action         = "closed"
                          self.Stocks[ symbol ]['Price' ]['Bought'] = 0
@@ -784,19 +813,8 @@ class DayTradeStrategy:
                          self.Stocks[ symbol ]['Volume']['Bought'] = 0
                          self.Stocks[symbol]['Losses']    += 1
 
-                         print(f"\t\t\t   Indicators [IN ] : {account.Trades[symbol]['indicators_in']}  [OUT] {account.Trades[symbol]['indicators_out']}  ") 
-=======
-                         success = True
-                         self.Stocks[ symbol ]['Price' ]['Bought'] = 0
-                         self.Stocks[ symbol ]['Price' ]['High']   = 0
-                         self.Stocks[ symbol ]['Volume']['Bought'] = 0
-                         self.Stocks[ symbol]['Price']['Downward'] = 0
-                         self.Stocks[ symbol]['Price']['Upward']   = 0
-                         action          = "closed"
-                         self.Stocks[symbol]['Losses']    += 1
-
-                         print(f"\t\t\t   Indicators [IN ] : {account.InPlay[symbol]['indicators_in']}  [OUT] {self.Stocks[symbol]['Indicators']}  ") 
->>>>>>> 95ac551378124dddd7c9e6ebcacf9de3452d9226
+                         for trade in account.Trades[symbol]:
+                             print(f"\t\t\t   Indicators [IN ] : {trade['indicators_in']}  [OUT] {trade['indicators_out']}  ") 
 
             
             
