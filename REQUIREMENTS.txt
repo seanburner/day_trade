@@ -1,5 +1,5 @@
 <<<<<<< HEAD
-pip3 install requests   pandas  thefuzz
+pip3 install requests   pandas  thefuzz stock_indicators
 
 sudo dnf install python-reportlab* python-selenium python-pymssql 
 pip3 install loguru selenium chrome webdriver-manager pymssql mysql-connector

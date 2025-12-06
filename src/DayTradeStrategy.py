@@ -149,8 +149,8 @@ class DayTradeStrategy:
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
 
-        finally:
-            return stock_entry 
+
+        return stock_entry 
 
     def SetORB ( self , symbols : str ,account : TradeAccount, current_time : datetime ) -> None :
         """
@@ -577,8 +577,8 @@ class DayTradeStrategy:
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
 
-        finally :
-            return success , action, time_interval 
+
+        return success , action, time_interval 
     
     
     def DayTradeBasicModule ( self, ticker_row : list, account : object, params : dict  ) -> (bool, str) :
@@ -844,8 +844,8 @@ class DayTradeStrategy:
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
 
-        finally :
-            return success , action, time_interval 
+
+        return success , action, time_interval 
 
 
 
