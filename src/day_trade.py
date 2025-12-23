@@ -659,11 +659,16 @@ def send_data_to_file( configs : dict , data: dict   )   -> None :
 
 def send_transactions_to_sql( configs : dict , trades: list  ) -> None :
     """
-        Use TraderDB class to properly normalize transactions and save 
+        Use TraderDB class to properly normalize transactions and save
+        ARGS   :
+                    configs  ( dict ) - configuration for application from user
+                    trades   ( list ) - completed trades by system 
+        RETURNS:
+                    nothing 
     """
     try:
         traderDB = TraderDB( server =configs['sql_server'], userName =configs['sql_user'], password =configs['sql_password'] )
-        traderDB.InsertOrderbook(orderbook=trades , email=configs['email'] , username=configs['username'] )
+        traderDB.InsertOrderbook(orderbook=trades , strategy=configs['strategy'],email=configs['email'] , username=configs['username'] )
 
     except:
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
@@ -770,7 +775,7 @@ def  trade_center( configs :  dict , params : dict ) -> None :
     try:  
         configs['stock'] = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
         
-        account      = TradeAccount(funds=100, limit=0.10, app_type=configs['trading_platform'], userName = configs['username'], email=configs['email'],
+        account          = TradeAccount(funds=100, limit=0.10, app_type=configs['trading_platform'], userName = configs['username'], email=configs['email'],
                                         app_key = configs['app_key'], app_secret = configs['app_secret'] ,
                                     sqlServer =configs['sql_server'], sqlUserName =configs['sql_user'], sqlPassword =configs['sql_password'] )
         account.SetFunds( params['account_funds'], params['funds_ratio'] )  #5000.00, 0.50 )     
@@ -813,9 +818,9 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                     print(f"\t\t\t + {symbol}  @ { current_time } " )                    
                     ticker_row = account.QuoteByInterval ( symbols=symbol,  frequency=time_interval, endDate = current_time)
                     
-                    if ticker_row != None:                    
+                    if ticker_row != None and isinstance( ticker_row, list) :                    
                         print(f"\t\t\t\tTICKER_ROW :{ticker_row}")                
-                        success , msg , time_interval = Strategies.Run(  ticker_row,  account, configs )
+                        success , msg , time_interval,account = Strategies.Run(  ticker_row,  account, configs )
                         
                         data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),
@@ -826,9 +831,9 @@ def  trade_center( configs :  dict , params : dict ) -> None :
                         elif msg.upper() == "CLOSED" :
                             bought_action |= False          #KEEP TRACK IF NEED TO CHANGE THE INTERVAL BECAUSE BOUGHT ONE OF THE SYMBOLS 
                             print(f"\t\t\t\t OUT Play - should shift from {time_interval} -> 15 min  : " )
-                    else:
-                        print(f"\t\t\t\t Did not get ticker info for symbol { symbol }, CHECK SYMBOL AND TRY AGAIN ")
-                        return 
+                    #else:
+                    #    print(f"\t\t\t\t Did not get ticker info for symbol { symbol }, CHECK SYMBOL AND TRY AGAIN ")
+                    #    return 
                 # If TargetGoal == 0 then sleep for 30 minutes and readjust DailyFunds, TargetGoal  and Limit
                 if account.TargetGoal == 0 :
                     account.SetFunds( params['account_funds'] - (params['account_funds'] * 0.10), params['funds_ratio'] - 0.10 )  #5000.00, 0.50 )
@@ -870,6 +875,140 @@ def  trade_center( configs :  dict , params : dict ) -> None :
         for entry in sys.exc_info():
             print("\t\t >>   " + str(entry) )
 
+
+def replay_test_compare( configs: dict  ) -> None :
+    """
+        Allows for efficient comparing of strategies ( makes sure using the same data )
+        Expects there to be multiple strategies , probably only one stock 
+        Provide  charts for confirmation
+        
+        ARGS    : 
+                    configs     :  dictionary of configuration info                   
+        RETURNS :
+                    Nothing 
+    """
+    if not ( ',' in configs['strategy'] ):
+        print("\t\t\t Please pick more than one strategy delimited with commas then ")
+        return
+    else:
+        configs['strategy'] =  list( configs['strategy'].split(",") )
+        
+    msg             = ""
+    cont            = True
+    data            = {}
+    isFirst         = True  # First quote requested should be on the 1 min chart 
+    success         = False
+    account         =  TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'],userName = configs['username'], email=configs['email'],
+                                        app_key = configs['app_key'], app_secret = configs['app_secret'] )
+                                    #sqlServer =configs['sql_server'], sqlUserName =configs['sql_user'], sqlPassword =configs['sql_password'] )
+    accounts        = []
+    date_format     = "%Y-%m-%d %H:%M:%S"
+    current_time    = ""
+    strategies      = [] 
+    
+    account.SetFunds( 5000.00, 0.50 )
+    account.SetMode( "TEST")
+
+
+    try:        
+        print('\t* About to Replay test Comparison: ', account )
+
+        configs['stock'] = [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock']
+        
+        for indx, strat  in enumerate( configs['strategy']):
+            strategies.append( DayTradeStrategy() ) 
+            accounts.append( TradeAccount(funds=5000, limit=0.10, app_type=configs['trading_platform'],userName = configs['username'], email=configs['email'],
+                                        app_key = configs['app_key'], app_secret = configs['app_secret'] )    )
+            accounts[indx].SetFunds( 5000.00, 0.50 )
+            accounts[indx].SetMode( "TEST")
+            strategies[indx].Set( strategy=strat ,  interval=configs['interval'],account=accounts[indx])
+
+        
+        for stock in configs['stock']: #( [ configs['stock'] ] if isinstance( configs['stock'], str) else configs['stock'] ):
+            for indx, strat  in enumerate( strategies):
+                data.update({ f"{stock+str('' if indx ==0 else indx)}" :  [] } )
+
+        current_time = configs['replay_date'][:10] + " 09:30:00"
+        current_time = datetime.strptime( current_time, date_format)                                             
+        time_interval = 900
+        
+        while ( cont )  :
+            #print("\t\t\t\t + Current Time : " , current_time ) 
+            if (current_time.hour < 9  and current_time.minute < 30 ) or ( current_time.hour >= 17 ) :                
+                cont = False
+                print("\t\t\t\t -> Outside of market hours ")
+            elif (current_time.hour == 9  and (current_time.minute >= 30  or current_time.minute  <= 59 ) ):    # ORB CALCULATIONS
+                for indx, strat  in enumerate( strategies):
+                    for symbol in configs['stock']:
+                        strategies[indx].SetORB( symbol , accounts[indx], current_time )    
+            elif ( current_time.hour == 15 and (current_time.minute   +  (time_interval / 60 )) >= 55)   :      # Sell whatever is InPlay
+                print("\t\t\t > Market closing ; shifting InPlay -> Trades" )
+                for symbol in configs['stock']:
+                    ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
+                    for indx, strat  in enumerate( strategies):
+                        symbol = f"{symbol+str('' if indx ==0 else indx)}"
+                        print(f"\t\t + {symbol}  @ { current_time }   {strategies[indx].StrategyName}" )                         
+                        if ticker_row != [] :
+                            if symbol in accounts[indx].InPlay.keys():
+                                accounts[indx].Sell( stock=symbol, new_price=float(ticker_row[3])  if ticker_row != None else accounts[indx].InPlay[symbol]['price'] ,
+                                          ask_volume=ticker_row[5], indicators=strategies[indx].Stocks[symbol]['Indicators'] )
+                        else:
+                            print(f"\t\t\t Ticker Empty " ) 
+                    cont = False
+            else:                
+                for symbol in configs['stock']:
+                    if isFirst :
+                        ticker_row = account.Quote ( symbols= symbol)[symbol]
+                        isFirst = False 
+                    else:
+                        ticker_row = account.QuoteByInterval ( symbols= symbol,  frequency= time_interval , endDate = current_time)
+                    
+                    if ( ticker_row != None and ticker_row != [] ): 
+                        for indx, strat  in enumerate( strategies):
+                            symbol = f"{symbol+str('' if indx ==0 else indx)}"
+                            print(f"\t\t + {symbol}  @ { current_time }   {strategies[indx].StrategyName}" )
+                            #ticker_row[0] = symbol
+                            print(f"\t\t\t->DATA : {ticker_row} " )
+                            success , msg , time_interval,  accounts[indx] = strategies[indx].Run(  ticker_row,  accounts[indx] , configs)                   
+                            data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
+                                            'high':float(ticker_row[6]),'close':float(ticker_row[3]),
+                                              'volume':float(ticker_row[5]), 'interval': time_interval/60 , 'msg':msg } )
+                            if msg.upper() == "BOUGHT" :
+                                print(f"\t\t\t   -> In Play - should shift from 15 -> {time_interval/60} min  : " )                        
+                            elif msg.upper() == "CLOSED" :
+                                print(f"\t\t\t   -> OUT Play - should shift from {time_interval/60} -> 15 min  : " )
+                        
+                        
+                """    
+                if account.TargetGoal == 0 :
+                    account.SetFunds(4500 , .40)  #5000.00, 0.50 )
+                    account.SetTargetGoal( target = 0.5  ) # Target making 50% of our funds ( SetFunds) before auto quitting 
+                   # current_time   , sleep_interval   = calculate_new_poll_time( current_time , 1800) #30 min break
+                """
+                
+            current_time , sleep_interval   = calculate_new_poll_time( current_time , time_interval)                    
+                        
+                #else:
+                #    cont = False
+                #    print( 'Just received  empty ticker info ')
+
+        #RECONCILE WHAT WE LOGGED WITH HOW THE BROKERAGE EXECUTED OUR TRADES
+        account.Reconcile()
+        
+        # SEND TRANSACTIONS TO SQL
+        #send_transactions_to_sql( configs, account.Trades  )
+
+        # SEND DATA TO FILE
+        #send_data_to_file( configs, data )
+
+        
+        # SEND EMAIL OF PERFORMANCE         
+        for accnt  in  accounts:
+            summary_report( configs, data, accnt )
+    except:
+        print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+        for entry in sys.exc_info():
+            print("\t\t >>   " + str(entry) )
 
 
 
@@ -940,7 +1079,7 @@ def  replay_test( configs: dict  ) -> None :
                     print(f"\t\t\t->DATA : {ticker_row} " ) 
                     if ( ticker_row != None and ticker_row != [] ): 
                        # print(f"\t\t\t->DATA : {ticker_row} " ) 
-                        success , msg , time_interval = Strategies.Run(  ticker_row,  account , configs)                   
+                        success , msg , time_interval,account = Strategies.Run(  ticker_row,  account , configs)                   
                         data[symbol].append( {'stock':symbol,'datetime':f"{current_time}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),
                                               'volume':float(ticker_row[5]), 'interval': time_interval/60 , 'msg':msg } )
@@ -1040,7 +1179,7 @@ def  back_test( configs: dict  ) -> None :
                 """          
             
                 #print( f"\t\t Data :  {ticker_row} ")
-                success , msg , interval = Strategies.Run(  ticker_row,  account, configs )
+                success , msg , interval,account = Strategies.Run(  ticker_row,  account, configs )
                 
                 new_data[symbol].append( {'stock':symbol,'datetime':f"{ticker_row[1]}",'low': float(ticker_row[2]),'quote':float(ticker_row[4]),
                                             'high':float(ticker_row[6]),'close':float(ticker_row[3]),
@@ -1135,7 +1274,7 @@ def summary_report ( configs : dict , data : dict , account : object ) -> None :
             else:
                   print(f"\t\t\t {symbol} -  No data  ")
             
-        print( "* Account : " , account  , " : " , account.Funds , " : " , total_profits  )
+        print( "\t* Account : " , account  , " : " , account.Funds , " : " , total_profits  )
     except: 
         print("\t\t|EXCEPTION: day_trade::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
         for entry in sys.exc_info():
@@ -1244,7 +1383,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         ax2 = plotting( ax=ax2 , plot_lines=[[dt2,"green"]], x_label="time" , y_label="dollars", has_grid=True , title=f"{symbol} P & L"  )
         
         # GRAPH 3
-        ax2 = plotting( ax=ax3 , plot_lines=[[dt3,"green"]], x_label="time" , y_label="dollars", has_grid=True , title=f"{symbol} Actual P & L" )
+        ax3 = plotting( ax=ax3 , plot_lines=[[dt3,"green"]], x_label="time" , y_label="dollars", has_grid=True , title=f"{symbol} Actual P & L" )
         
         
         chart_graph = "../pix/graph1.png"
@@ -1285,7 +1424,7 @@ def summary_report_engine(symbol : str, data : dict , account : object , report 
         # LIST OF INPLAY
         print(f"\n\t\t {symbol}  InPLAY")
         for inplay in account.InPlay:
-            print( "\t -  " , inplay ) 
+            print( "\t\t\t  -  " , inplay ) 
 
 
         header = ['STOCK','TIME','PRICE','QTY','CLOSED','ASK','P&L']
@@ -1423,13 +1562,14 @@ def main() -> None :
 
         # ACTION == DOWNLOAD / BACK_TEST / TRADE
         hub = {
-                'options'       : options_trading,
-                'download'      : download_stock_data,
-                'back_test'     : back_test,
-                'test'          : system_test,
-                'live_test'     : live_test,
-                'live_trade'    : live_trade,
-                'replay_test'   : replay_test,
+                'options'               : options_trading,
+                'download'              : download_stock_data,
+                'back_test'             : back_test,
+                'test'                  : system_test,
+                'live_test'             : live_test,
+                'live_trade'            : live_trade,
+                'replay_test'           : replay_test,
+                'replay_test_compare'   : replay_test_compare,
                 'sync'          : sync_broker_transactions
             }
 

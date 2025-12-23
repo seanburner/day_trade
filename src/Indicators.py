@@ -14,11 +14,13 @@ import re
 import sys
 import json
 import time
+import talib    # Calculate ADX
 import base64
 import getpass
 import inspect
 import warnings
 import platform
+
 
 import pandas       as      pd
 import numpy        as      np
@@ -68,11 +70,13 @@ class Indicators :
         self.dSMA       = {}
         self.VWAP       = 0
         self.dFib       = {}
+        self.EMA9       = None 
         self.Symbol     = symbol
         self.BB_Lower   = 0
         self.BB_Upper   = 0
         self.VolIndex   = 0
         self.ChopIndex  = 0
+        self.ADX        = 0
         
         self.Set( data, seed_df )
         
@@ -144,6 +148,9 @@ class Indicators :
 
         self.Data = pd.concat([self.Data, seed_df ])
         self.Data = self.Data.dropna().reset_index(drop=True)
+        
+        self.Data = pd.DataFrame({}) #Wipe out the dataframe
+        
         
 
 
@@ -218,10 +225,23 @@ class Indicators :
             # Chop Index
             self.CalculateChop()
 
+            # ADX
+            self.CalculateADX()
+
+            # 9 EMA
+            self.EMA9 = self.Data['close'].ewm(span=9, adjust=False).mean().iloc[-1]
+
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )
+
+
+
+
+    def AvgTrueRange( self ) -> float :
+        return (self.Data['close'] - self.Data['open']).mean().iloc[-1]
+
 
 
 
@@ -444,6 +464,54 @@ class Indicators :
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t >>   " + str(entry) )                
-        finally:
-            self.VolIndex = round ( minute_volatility , 2 ) #df["Log_Return"][-1]
-            return round ( minute_volatility , 2 )          #df["Log_Return"][-1]
+
+        self.VolIndex = round ( minute_volatility , 4 ) #df["Log_Return"][-1]
+        return round ( minute_volatility , 4 )          #df["Log_Return"][-1]
+
+
+
+    def CalculateADX(self,  period : int =14) -> None :
+        """
+            Calculate ADX to verify trend strength 
+        """
+        """
+        # 1. Calculate True Range (TR)
+        self.Data['High-Low']       = self.Data['high'] - self.Data['low']
+        self.Data['High-PrevClose'] = abs(self.Data['high'] - self.Data['close'].shift(1))
+        self.Data['Low-PrevClose']  = abs(self.Data['low'] - self.Data['close'].shift(1))
+        self.Data['TR']             = self.Data[['High-Low', 'High-PrevClose', 'Low-PrevClose']].max(axis=1)
+
+        # 2. Calculate Directional Movement (DM)
+        self.Data['UpMove']     = self.Data['high'].diff()
+        self.Data['DownMove']   = self.Data['low'].diff().mul(-1) # Make down move positive
+
+        self.Data['+DM'] = np.where((self.Data['UpMove'] > self.Data['DownMove']) & (self.Data['UpMove'] > 0), self.Data['UpMove'], 0)
+        self.Data['-DM'] = np.where((self.Data['DownMove'] > self.Data['UpMove']) & (self.Data['DownMove'] > 0), self.Data['DownMove'], 0)
+
+        # 3. Smoothed TR, +DM, -DM (using Wilder's smoothing)
+        # Wilder's smoothing is like an EMA with alpha=1/period
+        self.Data['SmoothedTR']     = self.Data['TR'].ewm(alpha=1/period, adjust=False).mean()
+        self.Data['Smoothed+DM']    = self.Data['+DM'].ewm(alpha=1/period, adjust=False).mean()
+        self.Data['Smoothed-DM']    = self.Data['-DM'].ewm(alpha=1/period, adjust=False).mean()
+
+        # 4. Calculate Directional Indicators (+DI, -DI)
+        self.Data['+DI'] = (self.Data['Smoothed+DM'] / self.Data['SmoothedTR']) * 100
+        self.Data['-DI'] = (self.Data['Smoothed-DM'] / self.Data['SmoothedTR']) * 100
+
+        # 5. Calculate Directional Index (DX)
+        self.Data['DX'] = (abs(self.Data['+DI'] - self.Data['-DI']) / (self.Data['+DI'] + self.Data['-DI'])) * 100
+
+        # 6. Calculate ADX (EMA of DX)
+        self.Data['DX'] = self.Data['DX'].ewm(alpha=1/period, adjust=False).mean()
+        self.ADX  = self.Data[['datetime','TR', '+DM', '-DM', '+DI', '-DI', 'DX'] ]
+
+        #print( f"ADX: { self.ADX[['TR', '+DM', '-DM', '+DI', '-DI', 'DX'] ][:0] } " )
+        #print( self.Data.columns)
+        """
+        df = self.Data[:self.Data.shape[0]-1].sort_values(by=['datetime'],ascending=True).reset_index()
+        df['ADX'] = talib.ADX(df['high'], df['low'], df['close'], timeperiod=7)
+        self.ADX = df[['ADX','datetime']]
+        self.ADX['full_date'] = self.ADX['datetime'].apply( lambda x : datetime.fromtimestamp( x/1000) )
+        
+        #print ( self.ADX )
+

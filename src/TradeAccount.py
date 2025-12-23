@@ -151,6 +151,7 @@ class TradeAccount:
             
             response = self.Conn.QuoteByInterval( symbol=symbol, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
+
             
             if response.status_code != 200 :
                 print( f"\t\t\t TradeAccount::History()  did not get Quote :{response.text}" )
@@ -169,8 +170,8 @@ class TradeAccount:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print(f"\t\t| Period: {period} Frequency: {frequency}  PeriodType: {periodType}  FrequencyType:{frequencyType} ")
-        finally:            
-            return  df
+
+        return  df
 
 
 
@@ -200,8 +201,9 @@ class TradeAccount:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )            
-        finally:            
-            return  ticker_row
+
+
+        return  ticker_row
 
         
     def QuoteByInterval ( self, symbols : list | str, frequency : int = 60, frequencyType : str = "minute" , endDate : datetime = datetime.now()) -> requests.Response :
@@ -229,8 +231,9 @@ class TradeAccount:
             
             response = self.Conn.QuoteByInterval( symbol=symbols, periodType=periodType, period=period,
                                               frequencyType=frequencyType, frequency=frequency, startDate= startDate, endDate =endDate)
+
             
-            if response.status_code != 200 :
+            if isinstance( response, str) or response.status_code != 200 :
                 return ticker_row
             
             candles = response.json()          
@@ -272,8 +275,8 @@ class TradeAccount:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )                
             
-        finally:
-          return ticker_row  
+
+        return ticker_row  
 
 
 
@@ -350,7 +353,7 @@ class TradeAccount:
 
 
     def Buy( self, stock : str , price : float, current_time : str = str( datetime.now()), volume : int = 0 ,
-             volume_threshold : int = 0, indicators : Indicators = None )  -> bool :
+                                                         volume_threshold : int = 0, indicators : Indicators = None )  -> bool :
         """
            Attempt to buy the stock under the confines of the limit , True = succeeded , False = failed
            Updates
@@ -384,7 +387,7 @@ class TradeAccount:
 
             # CHECK IF ALREADY HOLDING 
             if stock in self.InPlay.keys() :
-                print(f"{message_prefix}   Already holding, cant take any more ")
+                print(f"{message_prefix}   Already holding {stock}, cant take any more ")
                 return success
 
             if not(stock  in self.Trades.keys() ) :
@@ -393,9 +396,9 @@ class TradeAccount:
             #IF THE CURRENT PRICE IS BELOW THE PREVIOUS PRICE WE BOUGHT AT , SHOULD WE BE BUYING ????            
             if len( self.Trades[stock] ) > 0 :
                 lenth = len( self.Trades[stock] ) - 1 
-                if self.Trades[stock][ lenth]['bid'] > price :
-                    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[stock][lenth]['bid']} ")
-                    return success 
+                #if self.Trades[stock][ lenth]['bid'] > price :
+                #    print(f"{message_prefix}   Current price {price}  has fallen below previous bid {self.Trades[stock][lenth]['bid']} ")
+                #    return success 
 
             working_capital = self.DailyFunds  if  (self.DailyFunds ) <  (self.Funds * self.Limit )  else (self.Funds * self.Limit )
             print ( f"{message_prefix}   Working Capital  : {working_capital}  :  {self.Funds * self.Limit }  -> {self.DailyFunds} " )
@@ -483,7 +486,7 @@ class TradeAccount:
                             'qty' :self.InPlay[ stock ]['qty'],     'askTime':current_time, 'ask':new_price, 'p_l': p_l ,
                             'indicators_in': self.InPlay[stock]['indicators_in'], 'indicators_out': indicators.Summary()}
                 self.Trades[stock].append(  new_rec )                
-                print ( f"\t\t\t \\-> SOLD :  from ${self.InPlay[stock]['price']} -> ${new_price }"  )
+                print ( f"\t\t\t \\-> SOLD :  from ${self.InPlay[stock]['price']} -> ${new_price }  PROFIT: { p_l}"  )
                 self.InPlay.pop( stock )    #REMOVE ENTRY FROM DICTIONARY 
                 self.Performance[stock].append ( 'WIN' if p_l >0 else 'LOSS' )                
                 if (  p_l  < ( -0.01 * self.DailyFunds) ) : #                     self.LossLimit) :   # WE HAVE LOST TOO MUCH ON ONE DEAL , CALL QUITS FOR TODAY
@@ -503,8 +506,8 @@ class TradeAccount:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )                
-        finally :
-            return success 
+
+        return success 
 
 
     def Orders( self , time_interval : int = 0  ) -> list :
@@ -525,7 +528,7 @@ class TradeAccount:
             toTime      = (datetime.now(timezone.utc)).strftime( date_format)
             fromTime    = (datetime.now(timezone.utc)- timedelta( days = time_interval+1) ).strftime('%Y-%m-%dT%H:%M:%SZ')           
             
-            
+            print(f"ORDERS: from - {fromTime} -> {toTime}")
             orders = self.Conn.AccountOrders ( self.Conn.GetAccountHash() ,
                                 fromTime =fromTime,toTime=toTime , status = "FILLED" )
             #print( f"ORDERS : {orders}")

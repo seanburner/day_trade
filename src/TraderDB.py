@@ -77,7 +77,11 @@ class TraderDB:
 
     def GetUserId( self, userName : str ) -> int | None  :
         """
-            Get the userid  by the userName or email address; if not exists return None 
+            Get the userid  by the userName or email address; if not exists return None
+            ARGS   :
+                        userName  ( str ) - name used to log into system                        
+            RETURNS:
+                        userId   ( int )  - userId returned from SQL 
         """
         userId = None
         query  = f"select userId from users where username ='{self.Sanitize(userName)}' or email ='{self.Sanitize(userName)}' ;"
@@ -91,9 +95,32 @@ class TraderDB:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )     
-        finally:
-            return userId 
 
+        return userId 
+
+
+    def GetStrategyId( self, strategy : str ) -> int | None  :
+        """
+            Get the strategyId by strategy; if not exists return id for HUMAN
+            ARGS   :
+                        strategy   ( str)  - name of strategy 
+            RETURNS:
+                        strategyId ( int )  - id from database for strategy
+        """
+        strategyId = None
+        query  = f"select strategyId from strategies where strategy ='{self.Sanitize(strategy)}' ;"
+
+        try:
+            self.Conn.Send( query )
+            if self.Conn.Results != [] :
+                strategyId = self.Conn.Results[0][0]
+            
+        except:      
+            print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print("\t\t |   " + str(entry) )     
+
+        return strategyId 
 
 
 
@@ -152,8 +179,8 @@ class TraderDB:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print(f"\t\tQUERY: {query}")
-        finally:
-            return userId
+
+        return userId
 
        
     def InsertReason( self, reason :  str ) -> int | None  :
@@ -186,8 +213,8 @@ class TraderDB:
                 print("\t\t |   " + str(entry) )
 
             print( f"\t\tQUERY:{query}")
-        finally:
-            return reasonId
+
+        return reasonId
         
     def InsertDate( self, date : datetime | str ) -> int | None  :
         """
@@ -225,8 +252,8 @@ class TraderDB:
                 print("\t\t |   " + str(entry) )
 
             print( f"\t\tQUERY:{query}")
-        finally:
-            return dateId
+
+        return dateId
 
 
     def InsertStock( self, stock : str = ""  , symbol : str = "", description : str = ''  , sector : str = '') -> int | None :
@@ -259,8 +286,8 @@ class TraderDB:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print( f"\t\tQUERY:{query}")
-        finally:
-            return stockId
+
+        return stockId
 
 
 
@@ -303,8 +330,8 @@ class TraderDB:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print( f"\t\tQUERY:{query}")
-        finally:
-            return indicatorTbl 
+
+        return indicatorTbl 
 
 
     def InsertOrderIndicators( self, indicatorsId : dict , orderId : int , indicators_in : dict ,indicators_out : dict  ) -> None :
@@ -336,19 +363,20 @@ class TraderDB:
             print( f"\t\tQUERY:{header } -> {contents}")
             
     
-    def InsertOrderbook( self, orderbook : dict , email : str , username : str = '') -> bool:
+    def InsertOrderbook( self, orderbook : dict ,strategy : str, email : str , username : str = '') -> bool:
         """
             Insert the transactions from the order book in to the database properly normalized
             ARGS   :
                         orderbook  ( dict )  - entries to be added to orderbook table
+                        strategy   ( str )   - name of strategy being used 
                         email      ( str )   - email of user to associate with orderbook entries
                         username   ( str )   - user name to associate with session entries
             RETURNS:
                         nothing 
         """
-        header          = (f"INSERT INTO orderbook( userId, initiated, stockId, bid, qty , closed,ask,p_l,type,bidVolume,askVolume," +
+        header          = (f"INSERT INTO orderbook( userId, initiated, strategyId,stockId, bid, qty , closed,ask,p_l,type,bidVolume,askVolume," +
                             f"bidReceipt,bidFilled,askReceipt,askFilled,actualPL,reasonIn,reasonOut,comments {self.InsertMetaFields(0) } ) values " )
-                            #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
+                            #"(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" )
         query           = ""
         numRec          = 0
         dupeNum         = 0
@@ -359,6 +387,7 @@ class TraderDB:
         stockId         = None 
         initDateId      = None
         closeDateId     = None
+        strategyId      = None
         indicatorsId    = {}
         
         try:
@@ -378,6 +407,7 @@ class TraderDB:
                     for order in  orderbook[symbol]  : 
                         userId      = self.InsertUser(  email  = email, userName =username )
                         stockId     = self.InsertStock( symbol = symbol )
+                        strategyId  = self.GetStrategyId( strategy = strategy )
                         initDateId  = self.InsertDate(  date   = order['bidTime'] )
                         closeDateId = self.InsertDate(  date   = order['askTime'] )
                         reasonInId  = self.InsertReason(  reason   = order.get('reasonIn',None) )
@@ -387,7 +417,7 @@ class TraderDB:
                             print("\t\t\t   | Found PreExisting OrderBook Entry : ", self.Conn.Results)#order )
                             dupeNum += 1
                         else:
-                            query = (header + f"('{userId}','{initDateId }','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
+                            query = (header + f"('{userId}','{initDateId }','{strategyId}','{stockId}','{order['bid']}','{order['qty']}','{closeDateId}','{order['ask']}'," +
                                     f"'{order['p_l']}','{order['type'] }','{order['bidVolume'] }','{order['askVolume']}','{order['bidReceipt']}'," +
                                      f"'{order['bidFilled']}','{order['askReceipt']}','{order['askFilled'] }'," +
                                      f"'{order['actualPL']}',{NULL if reasonInId == None else reasonInId}, "+
@@ -408,8 +438,9 @@ class TraderDB:
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
             print( f"\t\tQUERY:{query}")
-        finally:
-                return success
+
+
+        return success
 
 
   
@@ -464,6 +495,7 @@ class TraderDB:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
+                
         return orders
 
 
@@ -569,7 +601,7 @@ class TraderDB:
                 if cont.upper().find("Y" ) > -1 :
                     print("\t\t\t\t  Continuing with the sync process ")
                     orderbook = self.OrderbookReasonsAndComments( orderbook = orderbook)
-                    self.InsertOrderbook(  orderbook = orderbook, email=email  , username=username)
+                    self.InsertOrderbook(  orderbook = orderbook, strategy='human',email=email  , username=username)
         except:  
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
@@ -605,8 +637,8 @@ class TraderDB:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-        finally:
-            return indx 
+
+        return indx 
         
     def FuzzyMatchReason( self, ureason : str , reasons : list ) -> str :
         """
@@ -645,8 +677,8 @@ class TraderDB:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-        finally:
-            return matched_reason
+
+        return matched_reason
                 
     def OrderbookReasonsAndComments(self,  orderbook : dict ) -> dict:
         """
@@ -696,8 +728,9 @@ class TraderDB:
             print("\t\t|EXCEPTION: TraderDB::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-        finally:
-            return orderbook
+
+
+        return orderbook
 
 
 
@@ -761,6 +794,18 @@ class TraderDB:
                     " end // "+ 
                     "DELIMITER; ")
         
+        strategies  = (#"DELIMITER //  " +
+                   " CREATE PROCEDURE createTableStrategies( )  " +
+                    " BEGIN  " +
+                    " create table if not exists  strategies ( strategyId int auto_increment PRIMARY KEY not null, " +
+                    "       strategy varchar(10) ,  description varchar(200),  " +
+                    "       active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); " +
+                    " INSERT IGNORE INTO strategies ( strategy , description,  active,createdBy,createdDate,modBy, modDate ) values " +
+                   "  ('Human','Interactive activity by human',1,'trader',now(),'trader',now() ) , " +
+                    " ('Basic','First strategy conceived with basic understanding',1,'trader',now(),'trader',now() ) , " +
+                    " ('Simple','Second strategy conceived with better understandfing of trading process',1,'trader',now(),'trader',now()); " +
+                    " end // "+ 
+                    "DELIMITER; ")
         reasons     = (#"DELIMITER // "+
                         " CREATE PROCEDURE createTableReasons(    )   " +
                         " BEGIN  "+
@@ -790,16 +835,17 @@ class TraderDB:
                         " CREATE PROCEDURE createTableOrderBook(    )   " +
                         " BEGIN  "+
                              "create table if not exists orderbook( id int auto_increment PRIMARY KEY not null, userId int not null, initiated  int  not null,  stockId int not null, " +
-                                "type int not null,bid decimal(10,4) not null , qty  int not null , bidVolume int ,  closed  int not null,ask  decimal(10,4), askVolume int, p_l decimal(10,4) , " +
+                                "strategyId int not null,type int not null,bid decimal(10,4) not null , qty  int not null , bidVolume int ,  closed  int not null,ask  decimal(10,4), askVolume int, p_l decimal(10,4) , " +
                                  "bidReceipt bigint(25) , bidFilled decimal(10,4),  askReceipt bigint(20) , askFilled decimal(10,4), actualPL decimal(10,4), " +
                                 " reasonIn int , reasonOut int , comments varchar(200), " +
                                 " active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime,  " +
-                                "FOREIGN KEY ( userId )   REFERENCES users(userId)  ," +
-                                "FOREIGN KEY ( stockId  ) REFERENCES stocks(stockId) , " +
-                                "FOREIGN KEY ( initiated) REFERENCES dates(dateId)   , " +
-                                "FOREIGN KEY ( closed)    REFERENCES dates(dateId)   , " +
-                                "FOREIGN KEY ( reasonIn)  REFERENCES reasons(reasonId), " +
-                                "FOREIGN KEY ( reasonOut)  REFERENCES reasons(reasonId)); " +
+                                "FOREIGN KEY ( strategyId )   REFERENCES users(strategies)  ," +
+                                "FOREIGN KEY ( userId )       REFERENCES users(userId)  ," +
+                                "FOREIGN KEY ( stockId  )     REFERENCES stocks(stockId) , " +
+                                "FOREIGN KEY ( initiated)     REFERENCES dates(dateId)   , " +
+                                "FOREIGN KEY ( closed)        REFERENCES dates(dateId)   , " +
+                                "FOREIGN KEY ( reasonIn)      REFERENCES reasons(reasonId), " +
+                                "FOREIGN KEY ( reasonOut)    REFERENCES reasons(reasonId)); " +
                         "     END //  "+
                         "     DELIMITER ;  ")
         orderIndicates = (#"DELIMITER // "+
@@ -827,12 +873,13 @@ class TraderDB:
                         " CREATE PROCEDURE if not exists createTable_vOrderBook(   )   " +
                         " BEGIN  "+
                         "     create view v_orderbook  as" +
-                        "         select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , " +
+                        "         select o.id, u.email, d.date as initiated , s.symbol,if(o.type=0,'Regular',if(o.type=1,'Call','Put')) as type,t.strategy,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , " +
                         "          o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL  ,r1.reason as reasonIn, r2.reason as reasonOut,o.comments " +
                         "     from orderbook o " +
                         "     inner join dates d on o.initiated =d.dateid "+
                         "     inner join dates d2 on o.closed = d2.dateid  "+
                         "     inner join stocks s on o.stockid =s.stockid  "+
+                        "     inner join strategies t on o.strategyId =t.strategyid  "+
                         "     inner join users u on o.userid=u.userid " +
                         "     inner join reasons r1 on o.reasonIn = r1.reasonId " + 
                         "     inner join reasons r2 on o.reasonOut= r2.reasonId " + 
@@ -847,6 +894,7 @@ class TraderDB:
                             " call createTableUsers(); " +
                             " call createTableStocks(); " +
                             " call createTableReasons(); " +
+                            " call createTableStrategies( ); " +
                             " call createTableOrderbook(); " +
                             " call createTableOrderIndicates(); " +
                             " call createTable_vOrderbook(); " +
@@ -872,21 +920,34 @@ class TraderDB:
 
 
         """
+
+
+CREATE PROCEDURE createTableStrategies( )  
+                     BEGIN  
+                     create table if not exists  strategies ( strategyId int auto_increment PRIMARY KEY not null, 
+                           strategy varchar(10) ,  description varchar(200),  
+                           active  tinyint , createdBy varchar(20), createdDate datetime, modBy varchar(20), modDate datetime ); 
+                     INSERT IGNORE INTO strategies ( strategy , description,  active,createdBy,createdDate,modBy, modDate ) values
+                     ('Human','Interactive activity by human',1,'trader',now(),'trader',now() ) ,
+                     ('Basic','First strategy conceived with basic understanding',1,'trader',now(),'trader',now() ) , 
+                     ('Simple','Second strategy conceived with better understandfing of trading process',1,'trader',now(),'trader',now()); 
+                     end // 
+
 CREATE PROCEDURE if not exists createTable_vOrderBook(   )   
                          BEGIN  
                              create view v_orderbook  as
-                                 select o.id, u.email, d.date as initiated , s.symbol,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , 
-                                  o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL ,r1.reason as reasonIn, r2.reason as reasonOut,o.comments 
+                                 select o.id, u.email, d.date as initiated , s.symbol,if(o.type=0,'Regular',if(o.type=1,'Call','Put')) as type,t.strategy,o.bid, o.bidVolume,o.qty,d2.date as closed ,o.ask , 
+                                  o.askVolume, o.p_l, o.bidFilled, o.askFilled,o.actualPL  ,r1.reason as reasonIn, r2.reason as reasonOut,o.comments 
                              from orderbook o 
                              inner join dates d on o.initiated =d.dateid 
                              inner join dates d2 on o.closed = d2.dateid  
                              inner join stocks s on o.stockid =s.stockid  
+                             inner join strategies t on o.strategyId =t.strategyid  
                              inner join users u on o.userid=u.userid 
                              inner join reasons r1 on o.reasonIn = r1.reasonId  
-                             inner join reasons r2 on o.reasonOut= r2.reasonId  
+                             inner join reasons r2 on o.reasonOut= r2.reasonId 
                              where o.active = 1  order by initiated asc; 
-                             END // 
-
+                             END //
 
 CREATE PROCEDURE createTableReasons(    )  
                          BEGIN  

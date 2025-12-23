@@ -227,13 +227,15 @@ class SchwabAccount :
             Returns:
                 request.Response: Dictionary containing candle history
         """
+        numTries = 0
         response = ""
         
         try:
             self.CheckAccessTokens() 
             #print( f"\t\t >> AGAIN Comparing {startDate}  -> { endDate}")
             #print(" Now TimeStamp : " , int(datetime.now().timestamp()  * 1000) )
-            response =requests.get(f'{self._base_api_url}/marketdata/v1/pricehistory',
+            while numTries < 5 and isinstance(response , str):
+                response =requests.get(f'{self._base_api_url}/marketdata/v1/pricehistory',
                             headers={'Authorization': f'Bearer {self.Tokens["access_token"]}'},
                             params=self._params_parser({'symbol': symbol,
                                                         'periodType': periodType,
@@ -245,7 +247,7 @@ class SchwabAccount :
                                                         'needExtendedHoursData': needExtendedHoursData,
                                                         'needPreviousClose': needPreviousClose}),
                             timeout=self.Timeout)
-        
+                numTries += 1 
             #print(f"Schwab:QuoteByInterval - {response} - {response.text}")
         
         except:   
