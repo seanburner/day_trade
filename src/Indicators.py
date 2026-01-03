@@ -77,6 +77,7 @@ class Indicators :
         self.VolIndex   = 0
         self.ChopIndex  = 0
         self.ADX        = 0
+        self.Data       = None 
         
         self.Set( data, seed_df )
         
@@ -231,6 +232,14 @@ class Indicators :
             # 9 EMA
             self.EMA9 = self.Data['close'].ewm(span=9, adjust=False).mean().iloc[-1]
 
+
+
+            # CURRENT PRICE RANGE  30 MIN
+            """
+            self.RangeHigh  = self.Data['high'].rolling(window=30).max()
+            self.RangeLow   = self.Data['low'].rolling(window=30).min()
+            self.RangeMean  = self.Data['close'].rolling(window=30).mean()
+            """
         except:
             print("\t\t|EXCEPTION: Indicators::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
