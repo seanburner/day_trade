@@ -126,11 +126,11 @@ class DayTradeStrategy:
             # Previous Day's High/Low            
             indicators = Indicators ( symbol= symbol ,data= data, seed_df=seed_df )                 # CALCULATE THE INDICATORS 
             stock_entry = {
-                                    'Previous'      : [0,0,0,0,0,0,0],
-                                    'Previous1'     : [0,0,0,0,0,0,0],
-                                    'Previous2'     : [0,0,0,0,0,0,0],
-                                    'Previous3'     : [0,0,0,0,0,0,0],
-                                    'Previous4'     : [0,0,0,0,0,0,0],
+                                    'Previous'      : [0,0,0,0,0,0,0,0,0,0],
+                                    'Previous1'     : [0,0,0,0,0,0,0,0,0,0],
+                                    'Previous2'     : [0,0,0,0,0,0,0,0,0,0],
+                                    'Previous3'     : [0,0,0,0,0,0,0,0,0,0],
+                                    'Previous4'     : [0,0,0,0,0,0,0,0,0,0],
                                     'Price'         : {
                                                         'Previous'  : ticker_row[ closePos ],
                                                         'Slope'     : 1 , 'Bought'  : 0,
@@ -667,7 +667,7 @@ class DayTradeStrategy:
         highPos             = params['highPos']
         closePos            = params['closePos']
         volumePos           = params['volumePos']
-        adxPos              = 6 
+        adxPos              = highPos + 1 
         risk_percent        = params['risk_percent']
         time_interval       = params['time_interval']
         crash_out_percent   = params['crash_out_percent']      # IF PRICE IS FALLING FAST, DONT SELL IF BELOW THIS PERCENT OF THE PURCHASE, TAKE RISK AND WAIT FOR REBOUND 
@@ -704,11 +704,12 @@ class DayTradeStrategy:
             
             
             if  self.Stocks[ symbol ]['Indicators'].ADX.shape[0] > 3 : 
-                ticker_row.append( self.Stocks[ symbol ]['Indicators'].ADX.iloc[ -1 ]['ADX']  ) # ticker_row[ len( ticker_row ) - 1] = self.Stocks[ symbol ]['Indicators'].ADX.iloc[ -1 ]['ADX']             else:
+                ticker_row.append( self.Stocks[ symbol ]['Indicators'].ADX.iloc[ -1 ]['ADX']  ) # ticker_row[ len( ticker_row ) - 1] = self.Stocks[ symbol ]['Indicators'].ADX.iloc[ -1 ]['ADX']
+            else:
                 ticker_row.append( 0 )  # ADX PLACE HOLDER
             ticker_row.append( self.Stocks[ symbol ]['Indicators'].RSI )
             ticker_row.append( self.Stocks[ symbol ]['Indicators'].ChopIndex ) 
-            print( ticker_row )
+            print(f"HighPos: {highPos}    AdxPos:{adxPos}       Ticker:  {ticker_row}" )
 
             
             # NO BUYING AFTER 3:45
@@ -733,6 +734,7 @@ class DayTradeStrategy:
             candle_body3            = ( self.Stocks[symbol]['Previous2'][closePos] - self.Stocks[symbol]['Previous2'][openPos] )
             candle_body4            = ( self.Stocks[symbol]['Previous3'][closePos] - self.Stocks[symbol]['Previous3'][openPos] )
             candle_body5            = ( self.Stocks[symbol]['Previous4'][closePos] - self.Stocks[symbol]['Previous4'][openPos] )
+            candle_body_avg         = ( candle_body + candle_body1  + candle_body2  + candle_body3  + candle_body4 + candle_body5) /6 
             candle_is_big_enough    = ((ticker_row[closePos] - ticker_row[openPos])  >= 0.30)           
             morning_rsi             = ( ticker_row[1][11:13] < '11' and  100 > self.Stocks[ symbol ]['Indicators'].RSI  ) 
             afternoon_rsi           = ( ticker_row[1][11:13] >= '11' and  60 > self.Stocks[ symbol ]['Indicators'].RSI >= 10 )    
@@ -755,14 +757,16 @@ class DayTradeStrategy:
                     else:
                         p += 1
                 pattern += f"{p},"
+
+            print(f"TRADING RANGE : LOW : { rangeLow} - HI: {rangeHigh} = {rangeHigh - rangeLow}   PRICE : {ticker_row[closePos]}    MEAN : {rangeMean}  MEDIAN: {rangeMedian}    AvgCandle:{candle_body_avg}  %:{candle_body_avg/(rangeHigh/rangeLow)}")              
             print( f"PATTERN : {pattern} CANDLES : {candle_body5} , {candle_body4}, {candle_body3},{candle_body2} ")
 
             # IF RSI DROPS BY 17 POINTS TREND IS OVER 
-            
+            adxDiff                =  ticker_row[adxPos ] - self.Stocks[ symbol ]['Previous'][adxPos] 
             volume_increase        =  (  (float( ticker_row[ volumePos]) - float(self.Stocks[ symbol]['Previous'][volumePos] ) ) / float(self.Stocks[ symbol]['Previous'][volumePos] )  if self.Stocks[ symbol]['Previous'][volumePos] > 0 else 0 )
             still_trading_time     = (( ticker_row[1][11:13] == '15' and ticker_row[1][14:16] < '45') or ( ticker_row[1][11:13] < '15' ) ) 
-            impulsiveCandles       = ( self.Stocks[ symbol ]['Indicators'].ChopIndex < 70  and ( 71 > self.Stocks[ symbol ]['Indicators'].RSI >= 10 ) and   # CHANGED RSI from 10 -> 20 and 72 ->71
-                                        (   candle_body2 >= 0.11 and candle_body > 0.75*candle_body1  and   candle_body1 > 0.75*candle_body2    ) and                  #   candle_body2  >= 0.12  and  candle_body3 >= 0.12) and                              <- IMPULSIVE NEED ONLY TWO CANDLES TO CONFIRM
+            superImpulsiveCandles  = ( candle_body > 0.90 and self.Stocks[ symbol ]['Indicators'].ChopIndex < 70  and ( 90 > self.Stocks[ symbol ]['Indicators'].RSI >= 10 ) and   # CHANGED RSI from 10 -> 20 and 72 ->71
+                                        (   candle_body2 >= 0.11 and candle_body > 0.35*candle_body1  and   candle_body1 > 0.35*candle_body2    ) and                  #   candle_body2  >= 0.12  and  candle_body3 >= 0.12) and                              <- IMPULSIVE NEED ONLY TWO CANDLES TO CONFIRM
                                   #         ( round(self.Stocks[ symbol]['Previous1'][highPos],2) > round(self.Stocks[ symbol]['Previous2'][highPos],2) and round(self.Stocks[ symbol]['Previous'][highPos],2) > ticker_row[highPos] ) and
                                    #    (ticker_row[adxPos] >= 35) and
                                                   (
@@ -771,12 +775,31 @@ class DayTradeStrategy:
                                                 ) #and
                                            #(pattern != "0,0," and pattern != "0,-2,")
                                        )
+
+            impulsiveCandles       = ( self.Stocks[ symbol ]['Indicators'].ChopIndex < 70  and ( 71 > self.Stocks[ symbol ]['Indicators'].RSI >= 10 ) and   # CHANGED RSI from 10 -> 20 and 72 ->71
+                                        (   candle_body2 >= 0.11 and candle_body > 0.75*candle_body1  and   candle_body1 > 0.75*candle_body2    ) and                  #   candle_body2  >= 0.12  and  candle_body3 >= 0.12) and                              <- IMPULSIVE NEED ONLY TWO CANDLES TO CONFIRM
+                                  #         ( round(self.Stocks[ symbol]['Previous1'][highPos],2) > round(self.Stocks[ symbol]['Previous2'][highPos],2) and round(self.Stocks[ symbol]['Previous'][highPos],2) > ticker_row[highPos] ) and
+                                   #    (ticker_row[adxPos] >= 35) and
+                                        (
+                                            (
+                                                 ticker_row[closePos ] >= self.Stocks[ symbol ]['Previous'][closePos]   >= self.Stocks[ symbol ]['Previous1'][closePos]  
+                                            )  or
+                                           (
+                                                ticker_row[highPos] >= self.Stocks[ symbol ]['Previous'][highPos] >= self.Stocks[ symbol ]['Previous1'][highPos] >= self.Stocks[ symbol ]['Previous2'][highPos]
+                                            )
+                                        ) #and
+                                           #(pattern != "0,0," and pattern != "0,-2,")
+                                       )
                                            #AVERAGE THE LAST 2 candles and see if the 3rd is 1.5X or less than 0.75
+            #2026-01-14 - maybe focus on price action more than candle being positive growth ( some compromise of such)
             floaterCandles         = (
-                                        is_dogee and  upward_pressure < candle_body  and 
-                                        self.Stocks[ symbol ]['Indicators'].ChopIndex < 70  and ( 82 > self.Stocks[ symbol ]['Indicators'].RSI >= 10 ) and   # RSI  72 -> 82
-                                        (    candle_body >= candle_body1  ) and # candle_body1 >= candle_body2     and
-                                        ( ticker_row[closePos ] >= self.Stocks[ symbol ]['Previous'][closePos]  )   and  ( self.Stocks[ symbol ]['Previous'][closePos] >= self.Stocks[ symbol ]['Previous1'][closePos]  )                 
+                                        is_dogee and  upward_pressure < candle_body  and
+                                        self.Stocks[ symbol ]['Indicators'].ChopIndex <= 64.5  and ( 82 > self.Stocks[ symbol ]['Indicators'].RSI >= 10 ) and   # RSI  72 -> 82
+                                        (    candle_body >= candle_body1  ) and  #candle_body1 >= candle_body2   and candle_body2 >= candle_body3     and
+                                        ( 37 >= ticker_row[adxPos ] >= 20 and   adxDiff >= -3  )   and
+                                        ( ticker_row[closePos ] >= self.Stocks[ symbol ]['Previous'][closePos]  )   and
+                                        ( self.Stocks[ symbol ]['Previous'][closePos] >= self.Stocks[ symbol ]['Previous1'][closePos])
+                                          #>= self.Stocks[ symbol ]['Previous2'][closePos]  )                 
                                      )
             candle_size_compare    = (
                                             (ticker_row[closePos] - ticker_row[openPos] ) >= ( self.Stocks[ symbol ]['Previous'][closePos] - self.Stocks[ symbol ]['Previous'][openPos] ) and
@@ -842,9 +865,10 @@ class DayTradeStrategy:
                           f"  {  candle_body1} >= 0.12  ->  {  candle_body2} >= 0.12  -> {  candle_body3} >= 0.12  -> " +
                            f" CHOP :  {self.Stocks[ symbol ]['Indicators'].ChopIndex} RSI :  {self.Stocks[ symbol ]['Indicators'].RSI}  DOGEE: {is_dogee}  ")#ADX: {ticker_row[adxPos]}"
                 print(f"FLOATER: [DOGEE]{is_dogee}   UP WICK vs Candle:{ upward_pressure} < {candle_body}  CHOP: {self.Stocks[ symbol ]['Indicators'].ChopIndex} < 70    RSI:( 82 > {self.Stocks[ symbol ]['Indicators'].RSI} >= 10 )  " +
-                      f"\n\t  CANDLES: {candle_body} >= {candle_body1}   and {candle_body1} >= {candle_body2} and  PRICE: [NEW] {ticker_row[closePos ]} >= {self.Stocks[ symbol ]['Previous'][closePos] } " )
+                      f"\n\t  CANDLES: {candle_body} >= {candle_body1}   and {candle_body1} >= {candle_body2} and  PRICE: [NEW] {ticker_row[closePos ]} >= {self.Stocks[ symbol ]['Previous'][closePos] } "+
+                      f"ADX DIFF : { adxDiff }>= -3  ")
 
-                if  ( impulsiveCandles or floaterCandles or 
+                if  ( impulsiveCandles or floaterCandles or superImpulsiveCandles or 
                              peiCriteria or
                                   basicCriteria ) :
                     if basicCriteria:
@@ -866,7 +890,9 @@ class DayTradeStrategy:
                             return False, action, time_interval, account
                     reason = "UNKNOWN"
                     if impulsiveCandles:
-                        reason = "IMPULSIVE" 
+                        reason = "IMPULSIVE"
+                    elif superImpulsiveCandles:
+                        reason = "SUPER IMPULSIVE"
                     elif peiCriteria :
                         reason = "PEI" 
                     elif floaterCandles :
@@ -879,25 +905,27 @@ class DayTradeStrategy:
                            f"\n\t\t\t\t   Volume :  from { round( self.Stocks[ symbol]['Volume']['Previous'] , 5)  } ==> { round(volume_increase, 5 ) } " +
                            f"\n\t\t\t\t   PRESSURE :  upward : { round(upward_pressure,5)} ==>  downward :{ round(downward_pressure,5)} " +
                            f"\n\t\t\t\t   OCCUR : {self.Stocks[symbol]['Price']['Upward'] }  -> {params['bounce_up_min'] } " +
-                           f"\n\t\t\t\t   BODY vs WICK : {round( (ticker_row[closePos] - ticker_row[openPos]) ,5 ) } --> { round( (ticker_row[highPos] - ticker_row[closePos]) , 5 )}   PATTERN: {pattern}  RANGE: [BAND] {rangeBand} -> [MEAN]{rangeMean}->[MEDIAN]{rangeMedian}")#  ADX: {ticker_row[adxPos]}"    )                            
-
+                           f"\n\t\t\t\t   BODY vs WICK : {round( (ticker_row[closePos] - ticker_row[openPos]) ,5 ) } --> { round( (ticker_row[highPos] - ticker_row[closePos]) , 5 )}  " +
+                           f"\n\t\t\t\t   PATTERN: {pattern}  RANGE: [BAND] {rangeBand} -> [MEAN]{rangeMean}->[MEDIAN]{rangeMedian}  AvgCandle:{candle_body_avg}  %:{candle_body_avg/(rangeHigh/rangeLow)}"+
+                           f"\n\t\t\t\t   ADX: {ticker_row[adxPos]}   ADX DIFF : { adxDiff}>= -4 "    )                            
+                    
                     # 2025-10-21  Playing around to get best results 
                     if ( still_trading_time  and   # DONT OPEN TRADES TOO LATE IN THE DAY
-                          (  (rangeBand <= 0.50 and ticker_row[closePos] >= rangeMean) or rangeBand > 0.50 ) and 
-                                account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
+                          (  (rangeBand <= 0.50 and ticker_row[closePos] >= rangeMean) or rangeBand > 0.50 )  ):
+                            if ( account.Buy( stock=symbol , price=float(ticker_row[ closePos ])  ,
                                  current_time=str( ticker_row[timePos] if account.Mode.lower() =="test" else datetime.now()   ) ,
                                     volume = ticker_row[volumePos], volume_threshold = params['volume_threshold'], indicators=self.Stocks[symbol]['Indicators']) ) :
-                        print(f"{symbol} - BOUGHT @ : UPWARD:{self.Stocks[ symbol]['Price']['Upward']} -> CHOP: {self.Stocks[ symbol ]['Indicators'].ChopIndex}  RSI :  {self.Stocks[ symbol ]['Indicators'].RSI}   PRICE: {ticker_row[closePos]} ADX: { self.Stocks[ symbol ]['Indicators'].ADX.iloc[ -1 ]['ADX']}")
-                        success     = True                                               
-                        action      = "bought"
-                        self.ResetStock( symbol =symbol , stockClose=ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
-                        self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]                            
-                        self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
-                        self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
-                        self.Stocks[ symbol]['Price']['Upward']     =  0
-                        self.Stocks[ symbol]['AvgOccurrVol']        =  0
+                                print(f"{symbol} - BOUGHT @ : UPWARD:{self.Stocks[ symbol]['Price']['Upward']} -> CHOP: {self.Stocks[ symbol ]['Indicators'].ChopIndex}  RSI :  {self.Stocks[ symbol ]['Indicators'].RSI}   PRICE: {ticker_row[closePos]} ADX: { self.Stocks[ symbol ]['Indicators'].ADX.iloc[ -1 ]['ADX']}")
+                                success     = True                                               
+                                action      = "bought"
+                                self.ResetStock( symbol =symbol , stockClose=ticker_row[ closePos] , stockVolume=ticker_row[ volumePos], stockHigh = ticker_row[ highPos]  )                    
+                                self.Stocks[ symbol ]['Price' ]['Bought']   =  ticker_row[ closePos ]                            
+                                self.Stocks[ symbol ]['Price' ]['Previous'] =  ticker_row[ closePos ]
+                                self.Stocks[ symbol ]['Volume']['Bought']   =  ticker_row[volumePos]
+                                self.Stocks[ symbol]['Price']['Upward']     =  0
+                                self.Stocks[ symbol]['AvgOccurrVol']        =  0
                     else:
-                        print(f"{symbol} - BUY NOT Triggered : PAST BUYING TIME or RangeBand : {rangeLow} -> {rangeHigh} = {rangeBand}   PRICE :{ticker_row[closePos]}")
+                        print(f"{symbol} - BUY NOT Triggered : PAST BUYING TIME : {still_trading_time }  or RangeBand : {rangeLow} -> {rangeHigh} = {rangeBand}  RangeMean: {rangeMean}  PRICE :{ticker_row[closePos]}")
             
 
             rsiFlipSell         = ( self.Stocks[ symbol ]['Indicators'].RSI > 70  and candle_body < 0.30  and ticker_row[closePos] <= (self.Stocks[symbol]['Previous'][closePos] - 0.16) )
@@ -933,13 +961,18 @@ class DayTradeStrategy:
                          ((ticker_row[volumePos] < 0.80 * self.Stocks[symbol]['Previous'][volumePos] )  and  (  0.05 < ( ticker_row[closePos]  - self.Stocks[symbol]['Price']['Bought']   )  ) ) or          # $0.07 take profit                          
                               (  0.12 < (self.Stocks[symbol]['Price']['Bought'] - ticker_row[closePos]  )  )       ) :   #AS SOON AS PRICE DIPS -> SELL
                 """
-                if (  ( impulsiveCandles and impulsiveCandleSell) or
+                if (ticker_row[closePos] - self.Stocks[symbol]['Previous'][closePos] ) > 0.16:
+                    print(f"POSSIBLE EXIT POINT : {ticker_row[closePos]} - {self.Stocks[symbol]['Previous'][closePos]} = {ticker_row[closePos] - self.Stocks[symbol]['Previous'][closePos]}")
+
+                #check the sizes of candles are decreasing    
+                if (#(ticker_row[closePos] - self.Stocks[symbol]['Previous'][closePos] ) > 0.16 or
+                    ( impulsiveCandles and impulsiveCandleSell) or
                       ( not impulsiveCandles and
                         (
                           rsiFlipSell or 
                             ( ticker_row[closePos] < (self.Stocks[symbol]['Previous'][closePos] - 0.15) ) or # this might be obsolete and duplication                
                             ( ticker_row[closePos] < highSinceBoughtTrailStop ) or  (self.Stocks[symbol]['Previous'][closePos] - ticker_row[closePos] > 0.35 ) or (ticker_row[closePos] - self.Stocks[symbol]['Previous'][closePos]  > 0.45 ) or #BIG MOVES ARENT SUSTAINABLE
-                             self.Stocks[ symbol ]['Indicators'].ChopIndex > 70 or                    
+                            ( self.Stocks[ symbol ]['Indicators'].ChopIndex > 70 ) or # and self.Stocks[ symbol ]['Indicators'].RSI < 50) or                    
                             ( ( ticker_row[closePos] < self.Stocks[symbol]['Previous'][closePos] )  and ( self.Stocks[symbol]['Previous1'][closePos] < self.Stocks[symbol]['Previous1'][closePos] )  ) or
                      #   pressureImbalanceSell >= 20 or 
                             trailStopSell or
@@ -958,6 +991,8 @@ class DayTradeStrategy:
                       
                       if ( impulsiveCandles and impulsiveCandleSell):
                           print (f"->SELL - IMPULSIVE CANDLE; RSI : {self.Stocks[ symbol ]['Indicators'].RSI} > 80  and CANDLE : {candle_body} > 0.30  and CLOSE: {ticker_row[closePos]} <= {(self.Stocks[symbol]['Previous'][closePos] - 0.16)}" )
+                      elif (ticker_row[closePos] - self.Stocks[symbol]['Previous'][closePos] ) > 0.16 :
+                          print (f"->SELL - HARD CODE: {(ticker_row[closePos] - self.Stocks[symbol]['Previous'][closePos] )} > 0.16 -> {self.Stocks[ symbol ]['Indicators'].ChopIndex} > 70  RSI : {self.Stocks[ symbol ]['Indicators'].RSI} > 80  and CANDLE : {candle_body} > 0.30  and CLOSE: {ticker_row[closePos]} <= {(self.Stocks[symbol]['Previous'][closePos] - 0.16)}" )
                       elif self.Stocks[ symbol ]['Indicators'].ChopIndex > 70 :
                           print (f"->SELL - CHOP INDEX:  {self.Stocks[ symbol ]['Indicators'].ChopIndex} > 70  RSI : {self.Stocks[ symbol ]['Indicators'].RSI} > 80  and CANDLE : {candle_body} > 0.30  and CLOSE: {ticker_row[closePos]} <= {(self.Stocks[symbol]['Previous'][closePos] - 0.16)}" )
                       elif rsiFlipSell:
