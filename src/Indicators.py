@@ -232,7 +232,8 @@ class Indicators :
             # 9 EMA
             self.EMA9 = self.Data['close'].ewm(span=9, adjust=False).mean().iloc[-1]
 
-
+            #SMA
+            self.CalculateDailySMA( )
 
             # CURRENT PRICE RANGE  30 MIN
             """
@@ -334,7 +335,7 @@ class Indicators :
     
     def CalculateDailySMA( self ) -> None:
         """
-            Calculate the simaple moving averages based on daily summary info / not intraday
+            Calculate the simple moving averages based on daily summary info / not intraday
             ARGS   :
                         nothing 
             RETURNS:

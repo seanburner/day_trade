@@ -193,7 +193,8 @@ class SchwabAccount :
         #print("\t\t\t\t  -> Access Schwab Tokens ")
         # Needs to add expires at for refresh token             self.Tokens['expires_at'] < datetime.now() or
         if ( self.Tokens == BLANK_TOKENS or  self.Tokens['refresh_expires_at'] < datetime.now()  or 'error' in self.Tokens or
-             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys()) ): # or
+             not ( 'access_token' in self.Tokens.keys()  and 'refresh_token' in self.Tokens.keys())  or
+             self.Tokens['access_token'] =='' or self.Tokens['refresh_token'] =='' ): # or
              #(self.Tokens['expires_at'] + timedelta(minutes=self.Tokens['expires_in'] ) )< datetime.now() ):
             success = self.Authenticate() 
         elif self.Tokens['expires_at'] < datetime.now() :          
@@ -399,15 +400,168 @@ class SchwabAccount :
         """       
 
 
+
+
+
+
+
+
+
+
+    def OrderEntryRecord( self, symbol : str , order : dict , orderLeg : dict , order_type : int  , order_strategy : str, orderPrice : int , orderTime :object  )-> dict :
+        """
+            Build the SyncEntry record - this might need to be in the SchwabAccount 
+            ARGS    :
+                        symbol     ( str )  stock symbol
+                        order      ( dict ) the full order structure ( including orderLeg) for time/price  ( overkill )
+                        orderLeg   ( dict ) order leg info from platform
+                        order_type ( int )  0 = EQUITY  1 =OPTIONS_CALL  2=OPTIONS_PUT
+            RETURNS :
+                        dictionary of values
+        """
+        entry =  {               'symbol'               : symbol,
+                                 'instrument'           : orderLeg['instrument']['cusip'] ,
+                                 'legType'              : orderLeg['orderLegType'], #  'EQUITY' or OPTION
+                                 'qty'                  : orderLeg['quantity'] ,
+                                 'type'                 : order_type , # 0 = regular , 1 = options call 2 = options puts                                     
+                                 'orderStrategyType'    : order_strategy,
+                                 'action'               : orderLeg['instruction'].upper() ,
+                                # 'positionEffect'       : [ orderLeg['positionEffect'] ],
+                                    'bidTime'           if orderLeg['positionEffect'].upper().find("OPENING") > -1  else 'askTime'           : str(order['enteredTime'])[:19].replace('T',' '),
+                                    'bidReceipt'        if orderLeg['positionEffect'].upper().find("OPENING") > -1  else 'askReceipt'        : order['orderId'],
+                                    'bidFilled'         if orderLeg['positionEffect'].upper().find("OPENING") > -1  else 'askFilled'         : orderPrice,
+                                    'bidFilledAt'       if orderLeg['positionEffect'].upper().find("OPENING") > -1  else 'askFilledAt'       : orderTime,
+                                    'indicators_in'     if orderLeg['positionEffect'].upper().find("OPENING") > -1  else 'indicators_out'    : {}
+                                }
+        #print(f"SCHWABACCOUNT {str(inspect.currentframe().f_code.co_name) } ->ENTRY :{entry }")
+        return entry 
+
+    def OrderEntries ( self, orders : list ) -> list :
+        """
+            Accepts a list of dictionary representing orders from the brokerage
+            ARGS   :
+                    orders        ( list of dictionary ) - orders from brokerage with keys ( symbol, openedAt, bidReceipt, bid, qty ,   askReceipt, ask, pl )
+                    
+            RETURNS:
+                    orderEntries  ( list of dictionary) 
+        """
+        pos         = 0
+        recs        = []
+        found       = False 
+        types       = { 'OPTION': {
+                                    'CALL' : 1 ,
+                                    'PUT'  : 2
+                                },
+                          'EQUITY': 0
+                      }
+        orderTime   = None
+        orderPrice  = None
+        strategy    = ''
+        orderLegs   = None 
+        order_type  = 0
+        orderEntries= []   
+        
+        
+        try:
+            # ITER THRU RESPONSE JSON TO BUILD  ORDERS 
+            for order in orders :
+                if order['status'] != 'FILLED':
+                    #print(f"\nSKIPPING UNFILLED ORDER \n")
+                    continue 
+                #print(f"\n**ORDER : {order} \n")
+                if 'session' in order:
+                    orderLegs  = order['orderLegCollection']
+                    strategy   = order['complexOrderStrategyType'].upper()
+                    orderTime  = order['orderActivityCollection'][0]['executionLegs'][0]['time']
+                    orderPrice = order['orderActivityCollection'][0]['executionLegs'][0]['price']
+                else:                                        
+                    orderLegs  = order['childOrderStrategies'][0]['orderLegCollection']
+                    strategy   = order['childOrderStrategies'][0]['complexOrderStrategyType'].upper()                    
+                    orderTime  = order['childOrderStrategies'][0]['orderActivityCollection'][0]['executionLegs'][0]['time']
+                    orderPrice = order['childOrderStrategies'][0]['orderActivityCollection'][0]['executionLegs'][0]['price']
+               
+                symbol      = orderLegs[0]['instrument']['underlyingSymbol'] if 'underlyingSymbol' in orderLegs[0]['instrument'] else orderLegs[0]['instrument']['symbol']        
+                receipt     = order['orderId']
+                order_date  = order['enteredTime'][:10]                 
+    
+                if len(recs) == 0 :
+                    recs.append( self.OrderEntryRecord( symbol=symbol , order=order, orderLeg=orderLegs[0] , order_type=order_type , 
+                                                                      order_strategy=strategy  , orderPrice=orderPrice ,orderTime=orderTime  )  )
+                    recs[0].update({'positionEffect' : [ orderLegs[0]['positionEffect'] ] , 'status' : 'INCOMPLETE'} )
+                else:
+                    pos     = 0
+                    found   = False 
+                    for indx, rec in enumerate(recs) :
+                        #print(f"\t\tCHECKING {indx} : {rec}")
+                        if not found and ( symbol.upper() == rec['symbol'] and
+                                orderLegs[0]['instrument']['cusip'] == rec['instrument'] and
+                                order['quantity'] == rec['qty']  and
+                                ( 'positionEffect' in rec and orderLegs[0]['positionEffect'] .upper() != rec['positionEffect']  ) and                                           
+                                    order_date == (rec['bidTime'][:10] if 'bidTime' in rec else rec['askTime'][:10] )
+                                ) :
+                            found = True
+                            pos = indx
+                            #print(f"\n\tFOUND ENTRY : {recs[indx]}")
+                            recs[indx] |=  self.OrderEntryRecord( symbol=symbol , order=order, orderLeg=orderLegs[0] , order_type=order_type  ,
+                                                                      order_strategy=strategy  ,orderTime=orderTime, orderPrice=orderPrice  )
+                            recs[indx]['status']         = 'COMPLETE'
+                            recs[indx]['action']         += '--' + orderLegs[0]['instruction'].upper()
+                            recs[indx]['positionEffect'].append( orderLegs[0]['positionEffect'] )
+
+                            if 'bidReceipt' in recs[indx] and 'askReceipt' in recs[indx] :
+                                recs[indx].update ({'bid'        : recs[indx]['bidFilled'], 'ask' : recs[indx]['askFilled'], 'price' : recs[indx]['bidFilled']} )
+                                recs[indx].update ({  'p_l'      : ( (recs[indx]['askFilled'] - recs[indx]['bidFilled']) * recs[indx]['qty'] ) * (100 if order_type > 0 else 1 ) } )
+                                recs[indx].update ({'actualPL'   : recs[indx]['p_l'] , 'bidVolume' : 0, 'askVolume' : 0} )    
+                                #print(f"SCHWABACCOUNT: ADD ORDER ENTRY: {recs[indx]}")                                                   
+                                orderEntries.append( recs[indx] )
+                                recs.pop( indx )
+                            break
+                    if not found :                               
+                        pos = len( recs )
+                        recs.append( self.OrderEntryRecord( symbol=symbol , order=order, orderLeg=orderLegs[0] , order_type=order_type  ,
+                                                                      order_strategy=strategy  , orderPrice=orderPrice,orderTime=orderTime  )  )
+                        recs[pos].update({'positionEffect' : [ orderLegs[0]['positionEffect'] ] , 'status' : 'INCOMPLETE'} )
+    
+                        
+
+            if len(recs) > 0 :
+               print(f"\nINCOMPLETE ORDERS : { recs }")
+               for rec in recs :
+                   if not ( 'bidVolume' in rec ):
+                       rec.update ({'bid' : 0,  'price' : 0, 'bidVolume' : 0, 'bidFilled' : 0 , 'bidTime' : 'YYYY-MM-DD hh:mm:ss' , 'bidReceipt' : '0123456789987'} )
+                   else:
+                       rec.update ({'ask' : 0, 'askFilled' : 0, 'price' : rec['bidFilled'], 'askVolume' : 0 , 'askTime' : 'YYYY-MM-DD hh:mm:ss' , 'askReceipt' : '0987456321123'} )
+                   rec.update ({  'p_l'      :  (rec['askFilled'] - rec['bidFilled']) * rec['qty']   } )
+                   rec.update ({'actualPL'   : rec['p_l'] } )    
+                   orderEntries.append( rec )
+           
+        except:  
+            print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
+            for entry in sys.exc_info():
+                print(f"\t\t |   {entry}" )
+                
+        for orderEntry in orderEntries:
+            print(f"\n\\->OrderEntry : {orderEntry}\n") 
+        return orderEntries # list of dictionary of orders 
+
+
+
+
+
+
+
+
     def AccountOrders ( self, accountHash : str , fromTime : datetime , toTime : datetime , status : str = "open"  ) -> dict:
         """
-            Get the orders for a specific account
+            1. Get the orders for a specific account
+            2. Format Order using OrderEntries
             ARGS   :
                     account  - account hashid as str
             RETURNS:
                     dictionary of orders for account 
         """
         temp  = None
+        orders = []
 
         try :
             #print(f"FROMTIME : {fromTime} -> {type(fromTime)}")
@@ -421,13 +575,13 @@ class SchwabAccount :
                             timeout=self.Timeout)
             #print("\t\t\t\t      * ", temp.text )
             
+            orders = self.OrderEntries( orders=temp.json() )
         except:      
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
 
-        finally:
-            return temp.json()
+        return orders
 
     def Orders ( self, symbol : str , enteredTime : datetime | str, qty : int, action : str | list) -> dict :
         """
@@ -491,8 +645,13 @@ class SchwabAccount :
             print("\t\t|EXCEPTION: SchwabAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
                 print("\t\t |   " + str(entry) )
-        finally:
-            return results
+        
+        return results
+
+
+
+
+
         
     def UpdateTokensFile( self ) -> bool :
         """

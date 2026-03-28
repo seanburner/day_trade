@@ -531,7 +531,7 @@ class TradeAccount:
             print(f"ORDERS: from - {fromTime} -> {toTime}")
             orders = self.Conn.AccountOrders ( self.Conn.GetAccountHash() ,
                                 fromTime =fromTime,toTime=toTime , status = "FILLED" )
-            #print( f"ORDERS : {orders}")
+            #print( f"TRADE ACCOUNT ORDERS : {orders}")
         except:
             print("\t\t|EXCEPTION: TradeAccount::" + str(inspect.currentframe().f_code.co_name) + " - Ran into an exception:" )
             for entry in sys.exc_info():
